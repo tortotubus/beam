@@ -47,7 +47,6 @@ target_link_libraries(beam
     #${LAPACK_LIBRARIES}
     #${BLAS_LIBRARIES}
     Eigen3::Eigen
-    autodiff:autodiff
 )
 
 # Versioning
