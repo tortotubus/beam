@@ -15,7 +15,7 @@ typedef enum {
 
 typedef struct {
   double position[3];
-  double angle[3];
+  double slope[3];
 } EulerBeamBCVals;
 
 typedef struct {
