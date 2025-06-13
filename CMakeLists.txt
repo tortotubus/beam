@@ -98,3 +98,35 @@ endif()
 # Add executable
 add_executable(beam_demo src/main.cpp)
 target_link_libraries(beam_demo PRIVATE beam)
+
+# Add Doxygen with awesome theme
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
+    # Download doxygen-awesome-css if not exists
+    set(DOXYGEN_AWESOME_PATH "${CMAKE_CURRENT_SOURCE_DIR}/doxygen-awesome-css")
+    if(NOT EXISTS "${DOXYGEN_AWESOME_PATH}")
+        message(STATUS "Downloading doxygen-awesome-css...")
+        file(DOWNLOAD
+            "https://github.com/jothepro/doxygen-awesome-css/archive/refs/heads/main.zip"
+            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome.zip"
+            SHOW_PROGRESS
+        )
+        file(ARCHIVE_EXTRACT INPUT "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome.zip"
+            DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+        
+        # Copy required files to source directory
+        file(COPY
+            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css-main/doxygen-awesome.css"
+            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css-main/doxygen-awesome-fragment-copy-button.js"
+            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css-main/doxygen-awesome-paragraph-link.js"
+            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css-main/doxygen-awesome-interactive-toc.js"
+            DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}"
+        )
+    endif()
+
+    add_custom_target(doc
+        ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM)
+endif()
