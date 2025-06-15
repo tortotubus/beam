@@ -1,5 +1,10 @@
-cmake_minimum_required(VERSION 3.5)
-project(beam VERSION 1.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.10...3.27)
+
+# Enable both C and C++
+project(beam VERSION 1.0 LANGUAGES C CXX)
+
+# Set CMake policies
+cmake_policy(SET CMP0167 NEW)  # Use FindBoost from CMake 3.27
 
 # —————————————————————————————————————————————
 # Options & flags
@@ -7,7 +12,8 @@ project(beam VERSION 1.0 LANGUAGES CXX)
 # Build shared by default; set -DBUILD_SHARED_LIBS=OFF to get a static .a only
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
-set(CMAKE_CXX_STANDARD 11)
+# Set C++17 for if constexpr support
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # PIC for static libs so they can be linked into shared objects
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -15,17 +21,25 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Include path
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# —————————————————————————————————————————————
-# Locate LAPACK/BLAS/LAPACKE
-# —————————————————————————————————————————————
-#find_package(LAPACK REQUIRED)   # provides LAPACK_LIBRARIES
-#find_package(BLAS   REQUIRED)   # provides BLAS_LIBRARIES
-#find_library(LAPACKE_LIBRARY
-#  NAMES lapacke
-#  REQUIRED
-#)
-
+# Find Eigen Package
 find_package(Eigen3 3.3 REQUIRED)
+
+# Find VTK package with additional components
+find_package(VTK 9.0 COMPONENTS 
+    CommonCore
+    CommonDataModel
+    IOXMLParser
+    IOXML
+    RenderingCore
+    RenderingOpenGL2
+    InteractionStyle
+    RenderingContextOpenGL2
+    InteractionWidgets
+    REQUIRED
+)
+
+# Find MFEM package
+find_package(MFEM REQUIRED)
 
 # —————————————————————————————————————————————
 # Library target
@@ -41,13 +55,22 @@ set(SRCS
 add_library(beam ${SRCS})
 
 # Link in numeric libs
-target_link_libraries(beam
-  PUBLIC
-    #${LAPACKE_LIBRARY}
-    #${LAPACK_LIBRARIES}
-    #${BLAS_LIBRARIES}
+target_link_libraries(beam 
+  PUBLIC 
+    ${VTK_LIBRARIES}
+    ${MFEM_LIBRARIES}
     Eigen3::Eigen
 )
+
+target_include_directories(beam PUBLIC ${VTK_INCLUDE_DIRS} ${MFEM_INCLUDE_DIRS})
+
+# VTK requires this when building with static libraries
+if(VTK_ENABLE_WRAPPING)
+    vtk_module_autoinit(
+        TARGETS beam
+        MODULES ${VTK_LIBRARIES}
+    )
+endif()
 
 # Versioning
 set_target_properties(beam PROPERTIES
@@ -80,50 +103,26 @@ if(BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-# —————————————————————————————————————————————
-# pkg-config support (optional)
-# —————————————————————————————————————————————
-# find_package(PkgConfig QUIET)
-# if(PKG_CONFIG_FOUND)
-#   pkg_check_modules(PC_BEAM QUIET beam)
-#   if(NOT PC_BEAM_FOUND)
-#     # generate a simple pc file
-#     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/beam.pc.in
-#                    ${CMAKE_CURRENT_BINARY_DIR}/beam.pc @ONLY)
-#     install(FILES ${CMAKE_CURRENT_BINARY_DIR}/beam.pc
-#             DESTINATION lib/pkgconfig)
-#   endif()
-# endif()
-
 # Add executable
 add_executable(beam_demo src/main.cpp)
-target_link_libraries(beam_demo PRIVATE beam)
+target_link_libraries(beam_demo 
+    PRIVATE 
+    beam
+    ${VTK_LIBRARIES}
+    ${MFEM_LIBRARIES}
+)
 
-# Add Doxygen with awesome theme
+# VTK module initialization for the demo executable
+if(VTK_ENABLE_WRAPPING)
+    vtk_module_autoinit(
+        TARGETS beam_demo
+        MODULES ${VTK_LIBRARIES}
+    )
+endif()
+
+# Add Doxygen documentation
 find_package(Doxygen)
 if(DOXYGEN_FOUND)
-    # Download doxygen-awesome-css if not exists
-    set(DOXYGEN_AWESOME_PATH "${CMAKE_CURRENT_SOURCE_DIR}/doxygen-awesome-css")
-    if(NOT EXISTS "${DOXYGEN_AWESOME_PATH}")
-        message(STATUS "Downloading doxygen-awesome-css...")
-        file(DOWNLOAD
-            "https://github.com/jothepro/doxygen-awesome-css/archive/refs/heads/main.zip"
-            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome.zip"
-            SHOW_PROGRESS
-        )
-        file(ARCHIVE_EXTRACT INPUT "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome.zip"
-            DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
-        
-        # Copy required files to source directory
-        file(COPY
-            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css-main/doxygen-awesome.css"
-            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css-main/doxygen-awesome-fragment-copy-button.js"
-            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css-main/doxygen-awesome-paragraph-link.js"
-            "${CMAKE_CURRENT_BINARY_DIR}/doxygen-awesome-css-main/doxygen-awesome-interactive-toc.js"
-            DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}"
-        )
-    endif()
-
     add_custom_target(doc
         ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

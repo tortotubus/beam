@@ -9,6 +9,9 @@ namespace beam {
  * MyClass provides a basic example of class documentation and functionality.
  * It stores a base value and can perform computations using this value.
  * 
+ * For solving systems of nonlinear equations, we use techniques similar to 
+ * those described in @cite duque_derivation_2016 for beam equations.
+ * 
  *   The distance between \f$(x_1,y_1)\f$ and \f$(x_2,y_2)\f$ is 
  * \f(\sqrt{(x_2-x_1)^2+(y_2-y_1)^2}\f)
  * 
