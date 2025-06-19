@@ -1,20 +1,20 @@
 PROJECT_NAME = "Basilisk Beam"
 PROJECT_BRIEF = "A C++ library for beam mechanics"
-OUTPUT_DIRECTORY = docs
+OUTPUT_DIRECTORY = doc
 CREATE_SUBDIRS = YES
 EXTRACT_ALL = YES
 EXTRACT_PRIVATE = YES
-INPUT = include src README.md
+INPUT = config fem general integ mesh models README.md
 RECURSIVE = YES
 USE_MDFILE_AS_MAINPAGE = README.md
 GENERATE_LATEX = YES
 GENERATE_HTML = YES
 HTML_OUTPUT = html
-HTML_EXTRA_STYLESHEET = doxygen-awesome.css
-HTML_EXTRA_FILES = doxygen-awesome-fragment-copy-button.js \
- doxygen-awesome-paragraph-link.js \
- doxygen-awesome-interactive-toc.js
-HTML_COLORSTYLE = LIGHT
+#HTML_EXTRA_STYLESHEET = doxygen-awesome.css
+#HTML_EXTRA_FILES = doxygen-awesome-fragment-copy-button.js \
+# doxygen-awesome-paragraph-link.js \
+# doxygen-awesome-interactive-toc.js
+HTML_COLORSTYLE = DARK
 HTML_DYNAMIC_SECTIONS = YES
 HTML_TIMESTAMP = NO
 GENERATE_TREEVIEW = YES
@@ -26,8 +26,8 @@ HTML_COLORSTYLE_GAMMA = 113
 SEARCHENGINE = YES
 SERVER_BASED_SEARCH = NO
 EXTERNAL_SEARCH = NO
+
+# LaTeX Configurations
 USE_MATHJAX = YES
 MATHJAX_EXTENSIONS = TeX/AMSmath TeX/AMSsymbols
-
-# Enable BibTeX citations
-CITE_BIB_FILES = library.bib
+CITE_BIB_FILES = bibliography.bib

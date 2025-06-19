@@ -1,131 +1,135 @@
-cmake_minimum_required(VERSION 3.10...3.27)
+cmake_minimum_required(VERSION 3.12.0...4.0.0)
+message(STATUS "CMake version: ${CMAKE_VERSION}")
 
-# Enable both C and C++
-project(beam VERSION 1.0 LANGUAGES C CXX)
+# Require C++17 and disable compiler-specific extensions
+set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to use.")
+set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE BOOL
+  "Force the use of the chosen C++ standard.")
+set(CMAKE_CXX_EXTENSIONS OFF CACHE BOOL "Enable C++ standard extensions.")
 
-# Set CMake policies
-cmake_policy(SET CMP0167 NEW)  # Use FindBoost from CMake 3.27
+project(beam NONE)
+# Current version of BEAM, see also `makefile`.
+#   mfem_VERSION = (string)
+#   BEAM_VERSION = (int)   [automatically derived from mfem_VERSION]
+set(${PROJECT_NAME}_VERSION 0.0.1)
 
-# —————————————————————————————————————————————
-# Options & flags
-# —————————————————————————————————————————————
-# Build shared by default; set -DBUILD_SHARED_LIBS=OFF to get a static .a only
-option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+# Load project defaults
+include("${CMAKE_CURRENT_SOURCE_DIR}/config/defaults.cmake")
 
-# Set C++17 for if constexpr support
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-# PIC for static libs so they can be linked into shared objects
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+# Prohibit in-source build
+if (${PROJECT_SOURCE_DIR} STREQUAL ${PROJECT_BINARY_DIR})
+  message(FATAL_ERROR
+    "BEAM does not support in-source CMake builds at this time.")
+endif (${PROJECT_SOURCE_DIR} STREQUAL ${PROJECT_BINARY_DIR})
 
-# Include path
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+# Path to CMake modules and utilities.
+set(BEAM_CMAKE_PATH ${PROJECT_SOURCE_DIR}/config)
+set(CMAKE_MODULE_PATH ${BEAM_CMAKE_PATH}/cmake/modules)
 
-# Find Eigen Package
-find_package(Eigen3 3.3 REQUIRED)
+# Load BEAM CMake utilities.
+include(BeamCmakeUtilities)
 
-# Find VTK package with additional components
-find_package(VTK 9.0 COMPONENTS 
-    CommonCore
-    CommonDataModel
-    IOXMLParser
-    IOXML
-    RenderingCore
-    RenderingOpenGL2
-    InteractionStyle
-    RenderingContextOpenGL2
-    InteractionWidgets
-    REQUIRED
+# Enable languages.
+enable_language(CXX)
+
+# Suppress warnings about MACOSX_RPATH
+set(CMAKE_MACOSX_RPATH OFF CACHE BOOL "")
+if (CMAKE_BUILD_TYPE MATCHES "Debug|debug|DEBUG")
+  set(BEAM_DEBUG ON)
+else()
+  set(BEAM_DEBUG OFF)
+endif()
+
+# Set 
+if (BEAM_PRECISION MATCHES "^(double|Double|DOUBLE)$")
+  set(BEAM_USE_SINGLE OFF)
+  set(BEAM_USE_DOUBLE ON)
+elseif (BEAM_PRECISION MATCHES "^(single|Single|SINGLE)$")
+  set(BEAM_USE_SINGLE ON)
+  set(BEAM_USE_DOUBLE OFF)
+else()
+  message(FATAL_ERROR " *** Invalid floating-point precision: "
+    "BEAM_PRECISION = ${BEAM_PRECISION}")
+endif()
+
+# BEAM_DEBUG
+if (CMAKE_BUILD_TYPE MATCHES "Debug|debug|DEBUG")
+  set(BEAM_DEBUG ON)
+else()
+  set(BEAM_DEBUG OFF)
+endif()
+
+# BLAS, LAPACK
+if (BEAM_USE_LAPACK)
+  find_package(BLAS REQUIRED)
+  find_package(LAPACK REQUIRED)
+endif()
+
+# CoDiPack package
+if (MFEM_USE_CODIPACK)
+  find_package(CODIPACK REQUIRED)
+  # find_package updates CODIPACK_FOUND, CODIPACK_INCLUDE_DIRS, CODIPACK_LIBRARIES
+endif()
+
+# Find Eigen3 package
+find_package(Eigen3 REQUIRED)
+
+
+# Headers and sources
+set(SOURCES "")
+set(HEADERS "")
+set(BEAM_SOURCE_DIRS general models basilisk)
+
+# Collect from the specified subdirectories
+foreach(DIR IN LISTS BEAM_SOURCE_DIRS)
+  add_subdirectory(${DIR})
+endforeach()
+
+add_subdirectory(config)
+
+# Variables used when generating _config.hpp, and config.mk
+set(BEAM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(BEAM_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
+
+# Configure the config header
+configure_file(
+  "${PROJECT_SOURCE_DIR}/config/cmake/config.hpp.in"
+  "${PROJECT_BINARY_DIR}/config/_config.hpp")
+
+# Declaring the library
+add_library(beam SHARED ${SOURCES} ${HEADERS})
+
+# Add binary dir to include paths to find generated config.hpp
+target_include_directories(beam 
+  PUBLIC 
+    ${CMAKE_CURRENT_BINARY_DIR}/config
+    ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
-# Find MFEM package
-find_package(MFEM REQUIRED)
-
-# —————————————————————————————————————————————
-# Library target
-# —————————————————————————————————————————————
-set(SRCS
-  src/Euler/InextensibleEulerBeam.cpp
-  src/beam_c.cpp
-  src/LinAlg/Matrix.cpp
-  src/LinAlg/Vector.cpp
-  src/MyClass.cpp
-)
-
-add_library(beam ${SRCS})
 
 # Link in numeric libs
 target_link_libraries(beam 
-  PUBLIC 
-    ${VTK_LIBRARIES}
-    ${MFEM_LIBRARIES}
+  PUBLIC
     Eigen3::Eigen
 )
 
-target_include_directories(beam PUBLIC ${VTK_INCLUDE_DIRS} ${MFEM_INCLUDE_DIRS})
-
-# VTK requires this when building with static libraries
-if(VTK_ENABLE_WRAPPING)
-    vtk_module_autoinit(
-        TARGETS beam
-        MODULES ${VTK_LIBRARIES}
-    )
-endif()
-
-# Versioning
-set_target_properties(beam PROPERTIES
-  VERSION     ${PROJECT_VERSION}
-  SOVERSION   ${PROJECT_VERSION_MAJOR}
-)
-
-# —————————————————————————————————————————————
-# Install rules
-# —————————————————————————————————————————————
-install(TARGETS beam
-        EXPORT beam-config
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION bin)
-
-install(DIRECTORY include/ DESTINATION include)
-
-install(EXPORT beam-config
-        NAMESPACE beam::
-        DESTINATION lib/cmake/beam)
-
-
-find_package(GTest REQUIRED)
-enable_testing()
-
-option(BUILD_TESTS "Build unit & integration tests" ON)
+option(BUILD_TESTS "Build unit & integration tests" OFF)
 if(BUILD_TESTS)
+  # Find GTest
+  find_package(GTest REQUIRED)
+
   enable_testing()
   add_subdirectory(tests)
 endif()
 
-# Add executable
-add_executable(beam_demo src/main.cpp)
-target_link_libraries(beam_demo 
-    PRIVATE 
-    beam
-    ${VTK_LIBRARIES}
-    ${MFEM_LIBRARIES}
-)
-
-# VTK module initialization for the demo executable
-if(VTK_ENABLE_WRAPPING)
-    vtk_module_autoinit(
-        TARGETS beam_demo
-        MODULES ${VTK_LIBRARIES}
-    )
-endif()
-
 # Add Doxygen documentation
-find_package(Doxygen)
-if(DOXYGEN_FOUND)
-    add_custom_target(doc
-        ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Generating API documentation with Doxygen"
-        VERBATIM)
+option(BUILD_DOC "Build documentation" OFF)
+if (BUILD_DOC)
+  find_package(Doxygen)
+  if (DOXYGEN_FOUND)
+      add_custom_target(doc ALL
+          ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+          COMMENT "Generating API documentation with Doxygen"
+          VERBATIM)
+  endif()
 endif()

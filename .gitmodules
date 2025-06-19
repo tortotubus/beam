@@ -1,0 +1,3 @@
+[submodule "basilisk/basilisk"]
+	path = basilisk/basilisk
+	url = git@gitlab.math.ubc.ca:colive/beam-basilisk

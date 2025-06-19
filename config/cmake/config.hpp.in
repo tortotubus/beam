@@ -1,0 +1,213 @@
+// Copyright (c) 2010-2025, Lawrence Livermore National Security, LLC. Produced
+// at the Lawrence Livermore National Laboratory. All Rights reserved. See files
+// LICENSE and NOTICE for details. LLNL-CODE-806117.
+//
+// This file is part of the BEAM library. For more information and source code
+// availability visit https://beam.org.
+//
+// BEAM is free software; you can redistribute it and/or modify it under the
+// terms of the BSD-3 license. We welcome feedback and contributions, see file
+// CONTRIBUTING.md for details.
+
+#pragma once
+
+// BEAM version: integer of the form: (major*100 + minor)*100 + patch.
+// #cmakedefine BEAM_VERSION @BEAM_VERSION@
+
+// BEAM version string of the form "3.3" or "3.3.1".
+// #cmakedefine BEAM_VERSION_STRING "@BEAM_VERSION_STRING@"
+
+// BEAM version type, see the BEAM_VERSION_TYPE_* constants below.
+// #define BEAM_VERSION_TYPE ((BEAM_VERSION)%2)
+
+// BEAM version type constants.
+// #define BEAM_VERSION_TYPE_RELEASE 0
+// #define BEAM_VERSION_TYPE_DEVELOPMENT 1
+
+// Separate BEAM version numbers for major, minor, and patch.
+// #define BEAM_VERSION_MAJOR ((BEAM_VERSION)/10000)
+// #define BEAM_VERSION_MINOR (((BEAM_VERSION)/100)%100)
+// #define BEAM_VERSION_PATCH ((BEAM_VERSION)%100)
+
+// BEAM source directory.
+// #define BEAM_SOURCE_DIR "@BEAM_SOURCE_DIR@"
+
+// BEAM install directory.
+// #define BEAM_INSTALL_DIR "@BEAM_INSTALL_DIR@"
+
+// Description of the git commit used to build BEAM.
+// #cmakedefine BEAM_GIT_STRING "@BEAM_GIT_STRING@"
+
+// Enable shared library build of BEAM.
+// #cmakedefine BEAM_SHARED_BUILD
+
+// Build the parallel BEAM library.
+// Requires an MPI compiler, and the libraries HYPRE and METIS.
+// #cmakedefine BEAM_USE_MPI
+
+// Use double-precision floating point type
+#cmakedefine BEAM_USE_DOUBLE
+
+// Use single-precision floating point type
+#cmakedefine BEAM_USE_SINGLE
+
+// Enable debug checks in BEAM.
+#cmakedefine BEAM_DEBUG
+
+// Throw an exception on errors.
+#cmakedefine BEAM_USE_EXCEPTIONS
+
+// Enable zlib in BEAM.
+// #cmakedefine BEAM_USE_ZLIB
+
+// Enable backtraces for beam_error through libunwind.
+// #cmakedefine BEAM_USE_LIBUNWIND
+
+// Enable BEAM features that use the METIS library (parallel BEAM).
+// #cmakedefine BEAM_USE_METIS
+
+// Enable this option if linking with METIS version 5 (parallel BEAM).
+// #cmakedefine BEAM_USE_METIS_5
+
+// Use LAPACK routines for various dense linear algebra operations.
+#cmakedefine BEAM_USE_LAPACK
+
+// Use thread-safe implementation. This comes at the cost of extra memory
+// allocation and de-allocation.
+// #cmakedefine BEAM_THREAD_SAFE
+
+// Enable the OpenMP backend.
+// #cmakedefine BEAM_USE_OPENMP
+
+// [Deprecated] Enable experimental OpenMP support. Requires BEAM_THREAD_SAFE.
+// #cmakedefine BEAM_USE_LEGACY_OPENMP
+
+// Internal BEAM option: enable group/batch allocation for some small objects.
+// #cmakedefine BEAM_USE_MEMALLOC
+
+// Which library functions to use in class StopWatch for measuring time.
+// For a list of the available options, see INSTALL.
+// If not defined, an option is selected automatically.
+// #cmakedefine BEAM_TIMER_TYPE @BEAM_TIMER_TYPE@
+
+// Enable BEAM functionality based on the SUNDIALS libraries.
+// #cmakedefine BEAM_USE_SUNDIALS
+
+// Enable BEAM functionality based on the SuiteSparse library.
+// #cmakedefine BEAM_USE_SUITESPAR// SE
+
+// Enable BEAM functionality based on the SuperLU_DIST library.
+// #cmakedefine BEAM_USE_SUPERLU
+// #cmakedefine BEAM_USE_SUPERLU5
+
+// Enable BEAM functionality based on the MUMPS library.
+// #cmakedefine BEAM_USE_MUMPS
+// #cmakedefine BEAM_MUMPS_VERSION @BEAM_MUMPS_VERSION@
+
+// Enable BEAM functionality based on the STRUMPACK library.
+// #cmakedefine BEAM_USE_STRUMPACK
+
+// Enable functionality based on the Ginkgo library.
+// #cmakedefine BEAM_USE_GINKGO
+
+// Enable BEAM functionality based on the AmgX library.
+// #cmakedefine BEAM_USE_AMGX
+
+// Enable BEAM functionality based on the MAGMA library.
+// #cmakedefine BEAM_USE_MAGMA
+
+// Enable secure socket streams based on the GNUTLS library.
+// #cmakedefine BEAM_USE_GNUTLS
+
+// Enable Sidre support.
+// #cmakedefine BEAM_USE_SIDRE
+
+// Enable the use of SIMD in the high performance templated classes.
+// #cmakedefine BEAM_USE_SIMD
+
+// Enable FMS support.
+// #cmakedefine BEAM_USE_FMS
+
+// Enable Conduit support.
+// #cmakedefine BEAM_USE_CONDUIT
+
+// Enable functionality based on the HDF5 library (reading VTKHDF files).
+// #cmakedefine BEAM_USE_HDF5
+
+// Enable functionality based on the NetCDF library (reading CUBIT files).
+// #cmakedefine BEAM_USE_NETCDF
+
+// Enable functionality based on the PETSc library.
+// #cmakedefine BEAM_USE_PETSC
+
+// Enable functionality based on the SLEPc library.
+// #cmakedefine BEAM_USE_SLEPC
+
+// Enable functionality based on the MPFR library.
+// #cmakedefine BEAM_USE_MPFR
+
+// Enable BEAM functionality based on the PUMI library.
+// #cmakedefine BEAM_USE_PUMI
+
+// Enable Moonolith-based general interpolation between finite element spaces.
+// #cmakedefine BEAM_USE_MOONOLITH
+
+// Enable BEAM functionality based on the HIOP library.
+// #cmakedefine BEAM_USE_HIOP
+
+// Enable BEAM functionality based on the GSLIB library.
+// #cmakedefine BEAM_USE_GSLIB
+
+// Build the NVIDIA GPU/CUDA-enabled version of the BEAM library.
+// Requires a CUDA compiler (nvcc).
+// #cmakedefine BEAM_USE_CUDA
+
+// Build the AMD GPU/HIP-enabled version of the BEAM library.
+// Requires a HIP compiler (hipcc).
+// #cmakedefine BEAM_USE_HIP
+
+// Enable functionality based on the RAJA library.
+// #cmakedefine BEAM_USE_RAJA
+
+// Enable functionality based on the OCCA library.
+// #cmakedefine BEAM_USE_OCCA
+
+// Enable functionality based on the libCEED library.
+// #cmakedefine BEAM_USE_CEED
+
+// Enable functionality based on the Caliper library.
+// #cmakedefine BEAM_USE_CALIPER
+
+// Enable functionality based on the Algoim library.
+// #cmakedefine BEAM_USE_ALGOIM
+
+// Enable functionality based on the Umpire library.
+// #cmakedefine BEAM_USE_UMPIRE
+
+// Enable IO functionality based on the ADIOS2 library.
+// #cmakedefine BEAM_USE_ADIOS2
+
+// Version of HYPRE used for building BEAM.
+// #cmakedefine BEAM_HYPRE_VERSION @BEAM_HYPRE_VERSION@
+
+// Macro defined when PUMI is built with support for the Simmetrix SimModSuite
+// library.
+// #cmakedefine BEAM_USE_SIMMETRIX
+
+// Enable interface to the MKL CPardiso library.
+// #cmakedefine BEAM_USE_MKL_CPARDISO
+
+// Enable interface to the MKL Pardiso library.
+// #cmakedefine BEAM_USE_MKL_PARDISO
+
+// Use forward mode for automatic differentiation.
+// #cmakedefine BEAM_USE_ADFORWARD
+
+// Enable the use of the CoDiPack library for AD.
+// #cmakedefine BEAM_USE_CODIPACK
+
+// Enable functionality based on the Google Benchmark library.
+// #cmakedefine BEAM_USE_BENCHMARK
+
+// Enable Enzyme for AD
+// #cmakedefine BEAM_USE_ENZYME
