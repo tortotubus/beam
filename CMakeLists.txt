@@ -122,7 +122,7 @@ if(BUILD_TESTS)
 endif()
 
 # Add Doxygen documentation
-option(BUILD_DOC "Build documentation" OFF)
+option(BUILD_DOC "Build documentation" ON)
 if (BUILD_DOC)
   find_package(Doxygen)
   if (DOXYGEN_FOUND)

@@ -3,11 +3,6 @@ if (BUILD_BASILISK_INTERFACE)
   add_subdirectory(interface)
 endif()
 
-option(BUILD_BASILISK_EXAMPLES "Build basilisk example programs" ON)
-if(BUILD_BASILISK_EXAMPLES)
-  add_subdirectory(examples)
-endif()
-
 include(ExternalProject)
 
 ExternalProject_Add(qcc_ep
@@ -20,23 +15,13 @@ ExternalProject_Add(qcc_ep
 )
 
 ExternalProject_Get_Property(qcc_ep install_dir)
+set(QCC_EXECUTABLE "${install_dir}/bin/qcc" CACHE FILEPATH "Path to built qcc")
+add_custom_target(ensure-qcc DEPENDS qcc_ep)
 
-# Locate QCC on the user’s PATH (or via -DQCC_EXECUTABLE)
-find_program(
-  QCC_EXECUTABLE
-  NAMES qcc
-  HINTS HINTS ${install_dir}/bin
-)
-
-if (NOT QCC_EXECUTABLE)
-  message(FATAL_ERROR
-    "Could not find 'qcc'.\n"
-    "Please install QCC or set PATH so that 'qcc' is on your shell's path,\n"
-    "or pass -DQCC_EXECUTABLE=/full/path/to/qcc to CMake.")
+option(BUILD_BASILISK_EXAMPLES "Build basilisk example programs" ON)
+if(BUILD_BASILISK_EXAMPLES)
+  add_subdirectory(examples)
 endif()
-
-message(STATUS "Using QCC compiler at ${QCC_EXECUTABLE}")
-
 
 set(SOURCES ${SOURCES} ${SRCS} PARENT_SCOPE)
 set(HEADERS ${HEADERS} ${HDRS} PARENT_SCOPE)

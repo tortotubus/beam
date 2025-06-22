@@ -63,6 +63,7 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
       -I"${CMAKE_SOURCE_DIR}/basilisk/"
       -source
     DEPENDS
+      qcc_ep
       ${BASILISK_LIBRARY_HDRS}
       ${example_basilisk_source}
   )
