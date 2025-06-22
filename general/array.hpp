@@ -509,8 +509,16 @@ template <class T> inline void Array<T>::DeleteAll() {
 }
 
 template <typename T> inline void Array<T>::Copy(Array &copy) const {
-  copy.SetSize(size);
+  // copy.SetSize(size);
+  // std::copy(data, data + size, copy.data);
+
+  if (copy.Capacity() < size) {
+    // Ensure enough memory is allocated
+    copy.GrowSize(size);
+  }
+  copy.size = size;
   std::copy(data, data + size, copy.data);
+  
 }
 
 template <class T>

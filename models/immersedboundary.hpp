@@ -2,6 +2,7 @@
 
 #include "../config/config.hpp"
 #include "../general/array.hpp"
+#include "../mesh/vertex.hpp"
 #include "../general/error.hpp"
 
 namespace beam {
@@ -12,9 +13,8 @@ namespace beam {
 class IBStructureMesh
 {
 protected:
-  Array<real_t> points;
-  Array<real_t> forces;
-  // Array<real_t> velocity;
+  Array<fem::Vertex> points;
+  Array<fem::Vertex> forces;
 
   int NumberOfPoints, Dimension;
 
@@ -22,15 +22,15 @@ public:
   IBStructureMesh(int Dimension, int NumberOfPoints)
     : Dimension(Dimension)
     , NumberOfPoints(NumberOfPoints)
-    , points(Dimension * NumberOfPoints)
-    , forces(Dimension * NumberOfPoints)
+    , points(NumberOfPoints)
+    , forces(NumberOfPoints)
   //, velocity(Dimension * NumberOfPoints)
   {};
 
   int GetNumberOfPoints() { return NumberOfPoints; }
   int GetDimension() { return Dimension; }
-  Array<real_t>& GetPoints() { return points; }
-  Array<real_t>& GetForces() { return forces; }
+  Array<fem::Vertex>& GetPoints() { return points; }
+  Array<fem::Vertex>& GetForces() { return forces; }
 };
 
 /**
@@ -42,24 +42,41 @@ class IBStructureModel
 protected:
   IBStructureMesh mesh, mesh_next;
 
-  void CopyCurrentToNext() { mesh_next.GetPoints().Copy(mesh.GetPoints()); }
+  void CopyCurrentToNext() { 
+    //mesh_next.GetPoints().Copy(mesh.GetPoints()); 
+    size_t nn = mesh.GetNumberOfPoints();
+    for(size_t i = 0; i < nn; ++i) {
+      mesh_next.GetPoints()[i](0) = mesh.GetPoints()[i](0);
+      mesh_next.GetPoints()[i](1) = mesh.GetPoints()[i](1);
+      mesh_next.GetPoints()[i](2) = mesh.GetPoints()[i](2);
+    }
+  }
 
   virtual void ComputeMidpointForces() = 0;
 
-  virtual void ComputeMidpointPoints(Array<real_t>& velocity, real_t dt)
+  virtual void ComputeMidpointPoints(Array<fem::Vertex>& velocity, real_t dt)
   {
-    int n = mesh_next.GetPoints().Size();
-    for (int i = 0; i < n; i++) {
-      mesh_next.GetPoints()[i] += 0.5 * dt * velocity[i];
+    Array<fem::Vertex> &midpoints = mesh_next.GetPoints();
+    int n = midpoints.Size();
+    int d = mesh_next.GetDimension();
+
+    for (int pi = 0; pi < n; pi++) {
+      midpoints[pi](0) += 0.5 * dt * velocity[pi](0);
+      midpoints[pi](1) += 0.5 * dt * velocity[pi](1);
+      midpoints[pi](2) += 0.5 * dt * velocity[pi](2);
     }
   };
 
-  virtual void ComputeNextPoints(Array<real_t>& velocity, real_t dt)
+  virtual void ComputeNextPoints(Array<fem::Vertex>& velocity, real_t dt)
   {
-    Array<real_t> &points = mesh.GetPoints();
+    Array<fem::Vertex> &points = mesh.GetPoints();
     int n = points.Size();
-    for (int i = 0; i < n; i++) {
-      points[i] += dt * velocity[i];
+    int d = mesh.GetDimension();
+
+    for (int pi = 0; pi < n; pi++) {
+      for (int di = 0; di < d; d++) {
+        points[pi](di) += dt * velocity[pi](di);
+      }
     }
   };
 
@@ -71,11 +88,9 @@ public:
   int GetNumberOfPoints() { return mesh.GetNumberOfPoints(); }
   int GetDimension() { return mesh.GetDimension(); }
 
-  virtual IBStructureMesh& GetCurrent() {
-    return mesh;
-  }
+  virtual IBStructureMesh& GetCurrent() { return mesh; }
   
-  virtual IBStructureMesh& GetMidpoint(Array<real_t>& velocity, real_t dt)
+  virtual IBStructureMesh& GetMidpoint(Array<fem::Vertex>& velocity, real_t dt)
   {
     BEAM_ASSERT(velocity.Size() == mesh.GetPoints().Size(),
                 "Velocity must match dimension and number of points");
@@ -86,7 +101,13 @@ public:
 
     return mesh_next;
   }
-  virtual IBStructureMesh& GetNext(Array<real_t>& velocity, real_t dt)
+
+  virtual IBStructureMesh& GetMidpoint(fem::Vertex *velocity, size_t n, real_t dt) {
+    Array<fem::Vertex> velocity_wrapper(velocity, n, false);
+    return GetMidpoint(velocity_wrapper, dt);
+  }
+
+  virtual IBStructureMesh& GetNext(Array<fem::Vertex>& velocity, real_t dt)
   {
     BEAM_ASSERT(velocity.Size() == mesh.GetPoints().Size(),
                 "Velocity must match dimension and number of points");
@@ -95,6 +116,12 @@ public:
 
     return mesh;
   }
+
+  virtual IBStructureMesh& GetNext(fem::Vertex *velocity, size_t n, real_t dt) {
+    Array<fem::Vertex> velocity_wrapper(velocity, n, false);
+    return GetNext(velocity_wrapper, dt);
+  }
+
 };
 
 } // namespace beam

@@ -8,33 +8,35 @@ if(BUILD_BASILISK_EXAMPLES)
   add_subdirectory(examples)
 endif()
 
-option(BUILD_BASILISK_QCC "Build basilisk compiler" OFF)
+include(ExternalProject)
 
-if(BUILD_BASILISK_QCC)
-  # # find GNU make
-  # find_program(MAKE_PROG NAMES make REQUIRED
-  #   DOC "The GNU Make executable")
+ExternalProject_Add(qcc_ep
+  SOURCE_DIR    ${CMAKE_SOURCE_DIR}/basilisk/basilisk
+  BINARY_DIR    ${CMAKE_BINARY_DIR}/basilisk/basilisk/build
+  INSTALL_DIR   ${CMAKE_BINARY_DIR}/basilisk/basilisk/build/install
+  CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+)
 
-  # # real source & out-of-tree copy
-  # set(BASILISK_SRC   ${CMAKE_SOURCE_DIR}/basilisk/basilisk/src)
-  # set(BASILISK_BUILD ${CMAKE_BINARY_DIR}/external/basilisk/src)
+ExternalProject_Get_Property(qcc_ep install_dir)
 
-  # add_custom_target(build_basilisk ALL
-  #   COMMENT "Fresh-copy & build Basilisk out-of-tree"
-  #   # 1) remove any previous copy
-  #   COMMAND ${CMAKE_COMMAND} -E remove_directory ${BASILISK_BUILD}
-  #   # 2) recreate the directory
-  #   COMMAND ${CMAKE_COMMAND} -E make_directory  ${BASILISK_BUILD}
-  #   # 3) copy pristine sources
-  #   COMMAND ${CMAKE_COMMAND} -E copy_directory ${BASILISK_SRC} ${BASILISK_BUILD}
-  #   # 4) symlink config→config.gcc
-  #   COMMAND ${CMAKE_COMMAND} -E remove -f ${BASILISK_BUILD}/config
-  #   COMMAND ${CMAKE_COMMAND} -E create_symlink config.gcc ${BASILISK_BUILD}/config
-  #   # 5) invoke GNU make in the copy
-  #   COMMAND ${MAKE_PROG} -C ${BASILISK_BUILD}
-  #   VERBATIM
-  # )
+# Locate QCC on the user’s PATH (or via -DQCC_EXECUTABLE)
+find_program(
+  QCC_EXECUTABLE
+  NAMES qcc
+  HINTS HINTS ${install_dir}/bin
+)
+
+if (NOT QCC_EXECUTABLE)
+  message(FATAL_ERROR
+    "Could not find 'qcc'.\n"
+    "Please install QCC or set PATH so that 'qcc' is on your shell's path,\n"
+    "or pass -DQCC_EXECUTABLE=/full/path/to/qcc to CMake.")
 endif()
+
+message(STATUS "Using QCC compiler at ${QCC_EXECUTABLE}")
+
 
 set(SOURCES ${SOURCES} ${SRCS} PARENT_SCOPE)
 set(HEADERS ${HEADERS} ${HDRS} PARENT_SCOPE)

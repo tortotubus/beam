@@ -1,9 +1,15 @@
 list(APPEND SRCS
-  basilisk_interface.cpp
+  dummy.cpp
+  immersedboundary.cpp
+  spring.cpp
+  #vertex.cpp
 )
 
 list(APPEND HDRS
-  basilisk_interface.h
+  dummy.h
+  immersedboundary.h
+  spring.h
+  #vertex.h
 )
 
 convert_filenames_to_full_paths(SRCS)
