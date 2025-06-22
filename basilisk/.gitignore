@@ -1,6 +1,0 @@
-*
-!.gitignore
-!examples
-!interface
-!library
-CMakeLists.txt
