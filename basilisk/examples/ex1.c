@@ -1,7 +1,7 @@
-#define DEBUG_PRINT_CALL_OR_EVENT 0
+#define DEBUG_PRINT_CALL_OR_EVENT 1
 
-#define LEVEL 6
-#define LENGTH 2.
+#define LEVEL 5
+#define LENGTH 10.
 #define T_END 0.25
 
 #include "grid/quadtree.h"
@@ -64,6 +64,12 @@ progress_output(i++)
   }
 }
 
+event adapt (i++) {
+  tag_stencils();
+  adapt_wavelet({stencils}, (double []){1.e-2}, maxlevel = LEVEL);
+  generate_stencils();
+}
+
 //event
 //movies(i += 5; t <= T_END)
 //{
@@ -77,7 +83,7 @@ vtk(i += 5; t <= T_END)
 {
   scalar omega[];
   vorticity(u, omega);
-  output_hdf_htg({omega,p},{u},"ex1");
+  output_hdf_htg({omega,p},{forcing},"ex1");
 }
 
 event
