@@ -14,6 +14,7 @@ typedef struct
   hid_t grp_lines_id;
   hid_t grp_vertices_id;
   hid_t grp_polygons_id;
+  hid_t grp_strips_id;
 
   /* Dataspace, datatype, and property-list identifiers */
   hid_t attr_space_id;
@@ -74,6 +75,7 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
     .grp_vertices_id = -1,
     .grp_lines_id = -1,
     .grp_polygons_id = -1,
+    .grp_strips_id = -1,
 
     .attr_space_id = -1,
     .attr_dtype_id = -1,
@@ -140,7 +142,7 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
   */
   // if (pid() == 0)
   {
-    int64_t vers_value[2] = { 2, 4 };
+    int64_t vers_value[2] = { 2, 0 };
     hsize_t dims_attr[1] = { 2 };
     vtk_hdf_polydata.attr_space_id = H5Screate_simple(1, dims_attr, dims_attr);
     if (vtk_hdf_polydata.attr_space_id < 0)
@@ -191,7 +193,7 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
     if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
-    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_STD_I64LE);
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
     if (vtk_hdf_polydata.dset_dtype_id < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
@@ -233,14 +235,14 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
                              (hsize_t)data->points.n_components };
     hsize_t chunk_dims[2] = { 1, (hsize_t)data->points.n_components };
 
-    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(2, dims_d, maxdims_d);
     if (vtk_hdf_polydata.dset_space_id < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
     vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
     if (vtk_hdf_polydata.dcpl_id < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
-    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 2, chunk_dims) < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
     vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_IEEE_F32LE);
@@ -282,7 +284,7 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
                H5P_DEFAULT,
                H5P_DEFAULT,
                H5P_DEFAULT);
-  if (vtk_hdf_polydata.grp_celldata_id < 0)
+  if (vtk_hdf_polydata.grp_vertices_id < 0)
     vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
   /*
@@ -290,9 +292,9 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
    */
 
   {
-    int64_t connectivity[] = {};
+    int64_t *connectivity = data->vertices.connectivity;
 
-    hsize_t dims_d[1] = { 0 };
+    hsize_t dims_d[1] = { data->vertices.n_cells };
     hsize_t maxdims_d[1] = { H5S_UNLIMITED };
     hsize_t chunk_dims[1] = { 1 };
 
@@ -306,7 +308,7 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
     if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
-    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_IEEE_F32LE);
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
     if (vtk_hdf_polydata.dset_dtype_id < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
@@ -355,7 +357,7 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
     if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
-    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_IEEE_F32LE);
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
     if (vtk_hdf_polydata.dset_dtype_id < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
@@ -404,7 +406,7 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
     if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
-    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_IEEE_F32LE);
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
     if (vtk_hdf_polydata.dset_dtype_id < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
@@ -433,7 +435,216 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
   }
 
   /*
-   * Vertices / NumberOfConnectivityIds
+   * Vertices / Offsets
+   */
+
+  {
+    int64_t *offsets = data->vertices.offsets;
+
+    hsize_t dims_d[1] = { data->vertices.n_cells + 1};
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = {1};
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_vertices_id,
+                                          "Offsets",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 offsets) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Lines
+   */
+
+  vtk_hdf_polydata.grp_lines_id =
+    H5Gcreate2(vtk_hdf_polydata.vtk_hdf.grp_vtkhdf_id,
+               "Lines",
+               H5P_DEFAULT,
+               H5P_DEFAULT,
+               H5P_DEFAULT);
+  if (vtk_hdf_polydata.grp_lines_id < 0)
+    vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+  /*
+   * Lines / Connectivity
+   */
+
+  {
+    int64_t connectivity[] = {};
+
+    hsize_t dims_d[1] = { 0 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_lines_id,
+                                          "Connectivity",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 connectivity) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Lines / NumberOfCells
+   */
+
+  {
+    int64_t number_of_cells = 0;
+
+    hsize_t dims_d[1] = { 1 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_lines_id,
+                                          "NumberOfCells",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 &number_of_cells) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Lines / NumberOfConnectivityIds
+   */
+
+  {
+    int64_t number_of_connectivity_ids = 0;
+
+    hsize_t dims_d[1] = { 1 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_lines_id,
+                                          "NumberOfConnectivityIds",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 &number_of_connectivity_ids) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Lines / NumberOfConnectivityIds
    */
 
   {
@@ -453,11 +664,11 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
     if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
-    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_IEEE_F32LE);
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
     if (vtk_hdf_polydata.dset_dtype_id < 0)
       vtk_HDF_polydata_error(&vtk_hdf_polydata);
 
-    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_vertices_id,
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_lines_id,
                                           "Offsets",
                                           vtk_hdf_polydata.dset_dtype_id,
                                           vtk_hdf_polydata.dset_space_id,
@@ -481,31 +692,427 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
     H5Sclose(vtk_hdf_polydata.dset_space_id);
   }
 
-  /*
-   * Lines
-   */
-
-  // vtk_hdf_polydata.grp_lines_id =
-  //   H5Gcreate2(vtk_hdf_polydata.vtk_hdf.grp_vtkhdf_id,
-  //              "Lines",
-  //              H5P_DEFAULT,
-  //              H5P_DEFAULT,
-  //              H5P_DEFAULT);
-  // if (vtk_hdf_polydata.grp_celldata_id < 0)
-  //   vtk_HDF_polydata_error(&vtk_hdf_polydata);
-
+  
   /*
    * Polygons
    */
 
-  // vtk_hdf_polydata.grp_lines_id =
-  //   H5Gcreate2(vtk_hdf_polydata.vtk_hdf.grp_vtkhdf_id,
-  //              "Polygons",
-  //              H5P_DEFAULT,
-  //              H5P_DEFAULT,
-  //              H5P_DEFAULT);
-  // if (vtk_hdf_polydata.grp_celldata_id < 0)
-  //   vtk_HDF_polydata_error(&vtk_hdf_polydata);
+  vtk_hdf_polydata.grp_polygons_id =
+    H5Gcreate2(vtk_hdf_polydata.vtk_hdf.grp_vtkhdf_id,
+               "Polygons",
+               H5P_DEFAULT,
+               H5P_DEFAULT,
+               H5P_DEFAULT);
+  if (vtk_hdf_polydata.grp_polygons_id < 0)
+    vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+  /*
+   * Polygons / Connectivity
+   */
+
+  {
+    int64_t connectivity[] = {};
+
+    hsize_t dims_d[1] = { 0 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_polygons_id,
+                                          "Connectivity",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 connectivity) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Polygons / NumberOfCells
+   */
+
+  {
+    int64_t number_of_cells = 0;
+
+    hsize_t dims_d[1] = { 1 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_polygons_id,
+                                          "NumberOfCells",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 &number_of_cells) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Polygons / NumberOfConnectivityIds
+   */
+
+  {
+    int64_t number_of_connectivity_ids = 0;
+
+    hsize_t dims_d[1] = { 1 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_polygons_id,
+                                          "NumberOfConnectivityIds",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 &number_of_connectivity_ids) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Polygons / NumberOfConnectivityIds
+   */
+
+  {
+    int64_t offsets = 0;
+
+    hsize_t dims_d[1] = { 1 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_polygons_id,
+                                          "Offsets",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 &offsets) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  
+  /*
+   * Strips
+   */
+
+  vtk_hdf_polydata.grp_strips_id =
+    H5Gcreate2(vtk_hdf_polydata.vtk_hdf.grp_vtkhdf_id,
+               "Strips",
+               H5P_DEFAULT,
+               H5P_DEFAULT,
+               H5P_DEFAULT);
+  if (vtk_hdf_polydata.grp_strips_id < 0)
+    vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+  /*
+   * Strips / Connectivity
+   */
+
+  {
+    int64_t connectivity[] = {};
+
+    hsize_t dims_d[1] = { 0 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_strips_id,
+                                          "Connectivity",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 connectivity) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Strips / NumberOfCells
+   */
+
+  {
+    int64_t number_of_cells = 0;
+
+    hsize_t dims_d[1] = { 1 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_strips_id,
+                                          "NumberOfCells",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 &number_of_cells) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Strips / NumberOfConnectivityIds
+   */
+
+  {
+    int64_t number_of_connectivity_ids = 0;
+
+    hsize_t dims_d[1] = { 1 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_strips_id,
+                                          "NumberOfConnectivityIds",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 &number_of_connectivity_ids) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  /*
+   * Strips / NumberOfConnectivityIds
+   */
+
+  {
+    int64_t offsets = 0;
+
+    hsize_t dims_d[1] = { 1 };
+    hsize_t maxdims_d[1] = { H5S_UNLIMITED };
+    hsize_t chunk_dims[1] = { 1 };
+
+    vtk_hdf_polydata.dset_space_id = H5Screate_simple(1, dims_d, maxdims_d);
+    if (vtk_hdf_polydata.dset_space_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    if (vtk_hdf_polydata.dcpl_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+    if (H5Pset_chunk(vtk_hdf_polydata.dcpl_id, 1, chunk_dims) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_dtype_id = H5Tcopy(H5T_NATIVE_INT64);
+    if (vtk_hdf_polydata.dset_dtype_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    vtk_hdf_polydata.dset_id = H5Dcreate2(vtk_hdf_polydata.grp_strips_id,
+                                          "Offsets",
+                                          vtk_hdf_polydata.dset_dtype_id,
+                                          vtk_hdf_polydata.dset_space_id,
+                                          H5P_DEFAULT,
+                                          vtk_hdf_polydata.dcpl_id,
+                                          H5P_DEFAULT);
+    if (vtk_hdf_polydata.dset_id < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    if (H5Dwrite(vtk_hdf_polydata.dset_id,
+                 vtk_hdf_polydata.dset_dtype_id,
+                 H5S_ALL,
+                 H5S_ALL,
+                 H5P_DEFAULT,
+                 &offsets) < 0)
+      vtk_HDF_polydata_error(&vtk_hdf_polydata);
+
+    H5Dclose(vtk_hdf_polydata.dset_id);
+    H5Tclose(vtk_hdf_polydata.dset_dtype_id);
+    H5Pclose(vtk_hdf_polydata.dcpl_id);
+    H5Sclose(vtk_hdf_polydata.dset_space_id);
+  }
+
+  
 
   return vtk_hdf_polydata;
 }

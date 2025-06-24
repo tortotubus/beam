@@ -2,18 +2,19 @@
 
 #define LEVEL 5
 #define LENGTH 10.
-#define T_END 0.25
+#define T_END 10
 
 #include "grid/quadtree.h"
 
 #include "library/ibm.h"
 #include "interface/spring.h"
+
 #include "library/output.h"
 
 int
 main()
 {
-  L0 = 1;
+  L0 = LENGTH;
   origin(-.5 * L0, -.5 * L0);
   init_grid(1 << LEVEL);
   periodic(left);
@@ -84,6 +85,7 @@ vtk(i += 5; t <= T_END)
   scalar omega[];
   vorticity(u, omega);
   output_hdf_htg({omega,p},{forcing},"ex1");
+  output_hdf_polydata("ex1");
 }
 
 event

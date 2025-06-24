@@ -13,17 +13,15 @@ main(void)
     return 1;
   }
 
-  // 2) Fill in the point coordinates
-  //    let's make a little triangle in the XY plane
+  // 2) Fill in the point coordinates (triangle in XY plane)
   float coords[9] = {
     0.0f, 0.0f, 0.0f, // point 0
     1.0f, 0.0f, 0.0f, // point 1
     0.0f, 1.0f, 0.0f  // point 2
   };
-  memcpy(pd.points.data, coords, 9 * sizeof(float));
+  memcpy(pd.points.data, coords, sizeof(coords));
 
-  // 3) Turn each point into its own “vertex” cell
-  //    VTK_VERTEX is a cell of size 1
+  // 3) Create 3 VTK_VERTEX cells (each of size 1)
   int64_t vertex_sizes[3] = { 1, 1, 1 };
   if (vtkCellArray_init(&pd.vertices, 3, vertex_sizes) != 0) {
     fprintf(stderr, "Failed to alloc vertex cell array\n");
@@ -36,25 +34,27 @@ main(void)
   pd.vertices.connectivity[2] = 2;
 
   // --- At this point, 'pd' holds three points and three vertex‐cells. ---
-  // You could now hand 'pd' off to your HDF writer or VTK exporter.
 
-  // For demonstration, print them back out:
+  // Print the points
   for (int i = 0; i < pd.points.n_points; i++) {
     float* p = &pd.points.data[i * pd.points.n_components];
     printf("Point %d: (%f, %f, %f)\n", i, p[0], p[1], p[2]);
   }
-  for (int c = 0; c < pd.vertices.n_cells; c++) {
-    int64_t start = (c == 0 ? 0 : pd.vertices.offsets[c - 1]);
-    int64_t end = pd.vertices.offsets[c];
-    printf("Vertex cell %d contains points:", c);
+
+  // Print the vertex cells using new offsets (length = n_cells+1)
+  for (int64_t c = 0; c < pd.vertices.n_cells; c++) {
+    int64_t start = pd.vertices.offsets[c];
+    int64_t end = pd.vertices.offsets[c + 1];
+    printf("Vertex cell %lld contains points:", (long long)c);
     for (int64_t idx = start; idx < end; idx++) {
       printf(" %lld", (long long)pd.vertices.connectivity[idx]);
     }
     printf("\n");
   }
 
-  vtk_HDF_polydata_init(&pd, "polyvertstest");
-  vtk_HDF_polydata_close(&pd);
+  // Write out to HDF5
+  vtkHDFPolyData hdf_pd = vtk_HDF_polydata_init(&pd, "polyvertstest.vtkhdf");
+  vtk_HDF_polydata_close(&hdf_pd);
 
   // 4) Clean up
   vtkPolyData_free(&pd);
