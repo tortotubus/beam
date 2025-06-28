@@ -501,7 +501,8 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
    */
 
   {
-    int64_t connectivity[] = {};
+    //int64_t connectivity[] = {};
+    int64_t *connectivity = NULL;
 
     hsize_t dims_d[1] = { 0 };
     hsize_t maxdims_d[1] = { H5S_UNLIMITED };
@@ -711,7 +712,8 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
    */
 
   {
-    int64_t connectivity[] = {};
+    //int64_t connectivity[] = {};
+    int64_t *connectivity = NULL;
 
     hsize_t dims_d[1] = { 0 };
     hsize_t maxdims_d[1] = { H5S_UNLIMITED };
@@ -921,7 +923,8 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
    */
 
   {
-    int64_t connectivity[] = {};
+    //int64_t connectivity[] = {};
+    int64_t *connectivity = NULL;
 
     hsize_t dims_d[1] = { 0 };
     hsize_t maxdims_d[1] = { H5S_UNLIMITED };

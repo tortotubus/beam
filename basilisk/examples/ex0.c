@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "interface/dummy.h"
 #include "interface/immersedboundary.h"

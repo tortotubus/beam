@@ -72,11 +72,10 @@ protected:
     Array<fem::Vertex> &points = mesh.GetPoints();
     int n = points.Size();
     int d = mesh.GetDimension();
-
     for (int pi = 0; pi < n; pi++) {
-      for (int di = 0; di < d; d++) {
-        points[pi](di) += dt * velocity[pi](di);
-      }
+      points[pi](0) += dt * velocity[pi](0);
+      points[pi](1) += dt * velocity[pi](1);
+      points[pi](2) += dt * velocity[pi](2);
     }
   };
 

@@ -62,14 +62,10 @@ protected:
     real_t inv_dtheta2 = 1. / (dtheta * dtheta);
 
     for (int i = 0; i < N; i++) {
-      int ip = (i - 1) % N;
+      int ip = (i - 1 + N) % N;
       int in = (i + 1) % N;
-      forces[i](0) =
-        K * (midpoints[ip](0) + midpoints[in](0) - 2 * midpoints[i](0)) *
-        inv_dtheta2;
-      forces[i](1) =
-        K * (midpoints[ip](1) + midpoints[in](1) - 2 * midpoints[i](1)) *
-        inv_dtheta2;
+      forces[i](0) = K * (midpoints[ip](0) + midpoints[in](0) - 2 * midpoints[i](0)) * inv_dtheta2;
+      forces[i](1) = K * (midpoints[ip](1) + midpoints[in](1) - 2 * midpoints[i](1)) * inv_dtheta2;
     }
   }
 

@@ -112,7 +112,7 @@ target_link_libraries(beam
     Eigen3::Eigen
 )
 
-option(BUILD_TESTS "Build unit & integration tests" OFF)
+option(BUILD_TESTS "Build unit & integration tests" ON)
 if(BUILD_TESTS)
   # Find GTest
   find_package(GTest REQUIRED)

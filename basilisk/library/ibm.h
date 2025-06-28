@@ -6,7 +6,7 @@
 
 #include "interface/immersedboundary.h"
 #include "navier-stokes/centered.h"
-//#include <stdlib.h>
+// #include <stdlib.h>
 
 /**
  * Distance functions
@@ -416,21 +416,84 @@ advect_mesh(IBMesh* mesh)
 #endif
 
   eul2lag(mesh);
-#if 1
-  for (int i = 0; i < mesh->nn; i++) {
-    foreach_dimension()
-    {
-      mesh->nodes[i].pos.x += dt * mesh->nodes[i].velocity.x;
-    }
-  }
-#else
-  IBMesh buffer_mesh;
-  buffer_mesh.is_active = true;
-  buffer_mesh.nn = mesh->nn;
-  buffer_mesh.nodes = calloc(mesh->nn, sizeof(IBNode));
+#if 1 // First order
+  vertex_t *velocity = calloc(mesh->nn, sizeof(vertex_t));
 
   for (int ni = 0; ni < mesh->nn; ni++) {
+    velocity[ni].x = mesh->nodes[ni].velocity.x;
+    velocity[ni].y = mesh->nodes[ni].velocity.y;
+    velocity[ni].z = mesh->nodes[ni].velocity.z;
+    // printf("velocity[%d].x = %f\n", ni, velocity[ni].x);
+    // printf("mesh->nodes[%d].velocity.x = %f\n", ni, mesh->nodes[ni].velocity.x);
   }
+
+  ib_structure_mesh_t smesh = ib_structure_model_get_next(mesh->model, velocity, mesh->nn, dt);
+
+  free(velocity);  
+
+  for (int ni = 0; ni < mesh->nn; ni++) {
+    mesh->nodes[ni].pos.x = smesh.points[ni].x;
+    mesh->nodes[ni].pos.y = smesh.points[ni].y;
+    mesh->nodes[ni].pos.z = smesh.points[ni].z;
+  }
+
+  ib_structure_mesh_free(&smesh);
+
+#else // Second order
+
+  vertex_t* velocity = calloc(mesh->nn, sizeof(vertex_t));
+
+  for (int ni = 0; ni < mesh->nn; ni++) {
+    velocity[ni].x = mesh->nodes[ni].velocity.x;
+    velocity[ni].y = mesh->nodes[ni].velocity.y;
+    velocity[ni].z = mesh->nodes[ni].velocity.z;
+  }
+
+  ib_structure_mesh_t smesh =
+    ib_structure_model_get_midpoint(mesh->model, velocity, mesh->nn, dt);
+
+  free(velocity);
+
+  IBMesh buffer_mesh;
+  ib_mesh_init(&buffer_mesh, mesh->nn);
+  buffer_mesh.model = mesh->model;
+
+  // buffer_mesh.isactive = true;
+  // buffer_mesh.nn = mesh->nn;
+  // buffer_mesh.nodes = calloc(mesh->nn, sizeof(IBNode));
+
+  for (int ni = 0; ni < mesh->nn; ni++) {
+    buffer_mesh.nodes[ni].pos.x = smesh.points[ni].x;
+    buffer_mesh.nodes[ni].pos.y = smesh.points[ni].y;
+    buffer_mesh.nodes[ni].pos.z = smesh.points[ni].z;
+
+    buffer_mesh.nodes[ni].stencil.n = STENCIL_SIZE;
+    buffer_mesh.nodes[ni].stencil.nm = STENCIL_SIZE;
+    buffer_mesh.nodes[ni].stencil.p = malloc(STENCIL_SIZE * sizeof(Index));
+  }
+
+  generate_stencil(&buffer_mesh);
+  eul2lag(&buffer_mesh);
+
+  velocity = calloc(mesh->nn, sizeof(vertex_t));
+
+  for (int ni = 0; ni < mesh->nn; ni++) {
+    velocity[ni].x = buffer_mesh.nodes[ni].velocity.x;
+    velocity[ni].y = buffer_mesh.nodes[ni].velocity.y;
+    velocity[ni].z = buffer_mesh.nodes[ni].velocity.z;
+  }
+
+  ib_structure_mesh_free(&smesh);
+  smesh = ib_structure_model_get_next(buffer_mesh.model, velocity, buffer_mesh.nn, dt);
+  free(velocity);
+
+  for (int ni = 0; ni < mesh->nn; ni++) {
+    mesh->nodes[ni].pos.x = smesh.points[ni].x;
+    mesh->nodes[ni].pos.y = smesh.points[ni].y;
+    mesh->nodes[ni].pos.z = smesh.points[ni].z;
+  }
+
+  ib_mesh_free(&buffer_mesh);
 #endif
 
   generate_stencil(mesh);
@@ -495,26 +558,28 @@ acceleration(i++)
   for (int mi = 0; mi < ib_mesh_manager->nm; mi++) {
     if (IBMESH(mi).isactive) {
 
-      // NEW
-      vertex_t *ve = calloc((size_t) IBMESH(mi).nn, sizeof(vertex_t));
-      for (int ni = 0; ni < IBMESH(mi).nn; ni++) { 
-        ve[ni].x = IBMESH(mi).nodes[ni].velocity.x;
-        ve[ni].y = IBMESH(mi).nodes[ni].velocity.y;
-        ve[ni].z = IBMESH(mi).nodes[ni].velocity.z;
+      // // NEW
+
+      vertex_t* velocity = calloc((size_t)IBMESH(mi).nn, sizeof(vertex_t));
+      for (int ni = 0; ni < IBMESH(mi).nn; ni++) {
+        velocity[ni].x = IBMESH(mi).nodes[ni].velocity.x;
+        velocity[ni].y = IBMESH(mi).nodes[ni].velocity.y;
+        velocity[ni].z = IBMESH(mi).nodes[ni].velocity.z;
       }
 
-      ib_structure_mesh_t midpoint_mesh = ib_structure_model_get_midpoint(IBMESH(mi).model, ve, IBMESH(mi).nn, DT);
-      free(ve);
-      
-      for (int ni = 0; ni < IBMESH(mi).nn; ni++) { 
-        IBMESH(mi).nodes[ni].force.x = midpoint_mesh.forces[ni].x;
-        IBMESH(mi).nodes[ni].force.y = midpoint_mesh.forces[ni].y;
-        IBMESH(mi).nodes[ni].force.z = midpoint_mesh.forces[ni].z;
+      ib_structure_mesh_t mesh_midpoint = ib_structure_model_get_midpoint(
+        IBMESH(mi).model, velocity, IBMESH(mi).nn, dt);
+      free(velocity);
+
+      for (int ni = 0; ni < IBMESH(mi).nn; ni++) {
+        IBMESH(mi).nodes[ni].force.x = mesh_midpoint.forces[ni].x;
+        IBMESH(mi).nodes[ni].force.y = mesh_midpoint.forces[ni].y;
+        IBMESH(mi).nodes[ni].force.z = mesh_midpoint.forces[ni].z;
       }
 
-      ib_structure_mesh_free(&midpoint_mesh);
-      // END NEW
-      
+      ib_structure_mesh_free(&mesh_midpoint);
+      // // END NEW
+
       lag2eul(forcing, &IBMESH(mi));
     }
   }

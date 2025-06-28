@@ -85,15 +85,15 @@ extern "C"
     IBStructureMesh& mesh = model->GetMidpoint(velocity_arr, dt);
     Array<Vertex>& points = mesh.GetPoints();
     Array<Vertex>& forces = mesh.GetForces();
-    int nm = mesh.GetNumberOfPoints();
+    int nn = mesh.GetNumberOfPoints();
 
     // Pack the IBStructureMesh into our C struct
-    ib_structure_mesh_t mesh_str = { .n = nm, .points = NULL, .forces = NULL };
+    ib_structure_mesh_t mesh_str = { .n = nn, .points = NULL, .forces = NULL };
 
-    mesh_str.points = (vertex_t*)calloc(nm, sizeof(vertex_t));
-    mesh_str.forces = (vertex_t*)calloc(nm, sizeof(vertex_t));
+    mesh_str.points = (vertex_t*) calloc(nn, sizeof(vertex_t));
+    mesh_str.forces = (vertex_t*) calloc(nn, sizeof(vertex_t));
 
-    for (int i = 0; i < nm; ++i) {
+    for (int i = 0; i < nn; ++i) {
       mesh_str.points[i].x = points[i](0);
       mesh_str.points[i].y = points[i](1);
       mesh_str.points[i].z = points[i](2);
@@ -123,7 +123,7 @@ extern "C"
     }
 
     // Call GetMidpoint() and receive a reference to the proteced member
-    IBStructureMesh& mesh = model->GetMidpoint(velocity_arr, dt);
+    IBStructureMesh& mesh = model->GetNext(velocity_arr, dt);
     Array<Vertex>& points = mesh.GetPoints();
     Array<Vertex>& forces = mesh.GetForces();
     int nm = mesh.GetNumberOfPoints();
