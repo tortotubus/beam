@@ -1,17 +1,14 @@
 set(HDRS
   immersedboundary.hpp
   spring/Spring.hpp
-  #beam/EulerBeam.hpp
-  #beam/InextensibleEulerBeam.hpp
-  #beam/StaticEulerBeam.hpp
+  beam/EulerBeamStaticInextensible.hpp
+  beam/Shapes.hpp
 )
 
 set(SRCS
   immersedboundary.cpp
   spring/Spring.cpp
-  #beam/EulerBeam.cpp
-  #beam/InextensibleEulerBeam.cpp
-  #beam/StaticEulerBeam.cpp
+  beam/EulerBeamStaticInextensible.cpp
 )
 
 convert_filenames_to_full_paths(HDRS)

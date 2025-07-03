@@ -23,7 +23,7 @@
 #define POS_PBC_Z(Z) ((u.x.boundary[front] != periodic_bc) ? (Z) : (((Z - (Z0 + L0 / 2)) > L0 / 2.) ? (Z) - L0 : (Z)))
 
 /**
- * IBNode
+ * DFNode
  */
 #if dimension == 1
 #define STENCIL_SIZE 5
@@ -39,10 +39,10 @@ typedef struct
   vertex_t velocity;
   vertex_t force;
   Cache stencil;
-} IBNode;
+} DFNode;
 
 void
-ibnode_init_stencil(IBNode* n)
+ibnode_init_stencil(DFNode* n)
 {
   n->stencil.n = STENCIL_SIZE;
   n->stencil.nm = STENCIL_SIZE;
@@ -50,37 +50,37 @@ ibnode_init_stencil(IBNode* n)
 }
 
 void
-ibnode_free_stencil(IBNode* n)
+ibnode_free_stencil(DFNode* n)
 {
   free(n->stencil.p);
 }
 
 void
-ibnode_init(IBNode* n)
+ibnode_init(DFNode* n)
 {
   ibnode_init_stencil(n);
 }
 
 void
-ibnode_free(IBNode* n)
+ibnode_free(DFNode* n)
 {
   ibnode_free_stencil(n);
 }
 
 /**
- * IBMesh
+ * DFMesh
  */
 
 typedef struct
 {
-  ib_structure_model_t model;
-  IBNode* nodes;
+  df_structure_model_t model;
+  DFNode* nodes;
   int nn;
   bool isactive;
-} IBMesh;
+} DFMesh;
 
 void
-ib_mesh_free(IBMesh* mesh)
+df_mesh_free(DFMesh* mesh)
 {
   if (mesh->nodes) {
     for (int i = 0; i < mesh->nn; i++) {
@@ -91,9 +91,9 @@ ib_mesh_free(IBMesh* mesh)
 }
 
 void
-ib_mesh_init(IBMesh* mesh, int nn)
+df_mesh_init(DFMesh* mesh, int nn)
 {
-  mesh->nodes = (IBNode*)calloc(nn, sizeof(IBNode));
+  mesh->nodes = (DFNode*)calloc(nn, sizeof(DFNode));
   mesh->nn = nn;
   mesh->isactive = true;
   for (int i = 0; i < nn; i++) {
@@ -102,21 +102,21 @@ ib_mesh_init(IBMesh* mesh, int nn)
 }
 
 void
-ib_mesh_set_model(IBMesh* mesh, ib_structure_model_t model)
+df_mesh_set_model(DFMesh* mesh, df_structure_model_t model)
 {
-  ib_mesh_free(mesh);
+  df_mesh_free(mesh);
   mesh->model = model;
-  int nn = ib_structure_model_get_number_of_nodes(model);
-  ib_mesh_init(mesh, nn);
-  ib_structure_mesh_t cpp_mesh = ib_structure_model_get_current(model);
+  int nn = df_structure_model_get_number_of_nodes(model);
+  df_mesh_init(mesh, nn);
+  df_structure_mesh_t cpp_mesh = df_structure_model_get_current(model);
   for (int i = 0; i < nn; i++) {
     mesh->nodes[i].pos = cpp_mesh.points[i];
   }
-  ib_structure_mesh_free(&cpp_mesh);
+  df_structure_mesh_free(&cpp_mesh);
 }
 
 vertex_t
-ib_mesh_get_centroid(IBMesh* mesh)
+df_mesh_get_centroid(DFMesh* mesh)
 {
   vertex_t centroid = { .x = 0, .y = 0, .z = 0 };
   for (int i = 0; i < mesh->nn; i++) {
@@ -141,7 +141,7 @@ ib_mesh_get_centroid(IBMesh* mesh)
 }
 
 void
-ib_mesh_print_pos(IBMesh* mesh)
+df_mesh_print_pos(DFMesh* mesh)
 {
   printf("{");
   for (int ni = 0; ni < mesh->nn; ni++) {
@@ -174,38 +174,38 @@ ib_mesh_print_pos(IBMesh* mesh)
 
 typedef struct
 {
-  IBMesh* meshes;
+  DFMesh* meshes;
   int nm;
 } IBMeshManager;
 
-#define IBMESH(i) (ib_mesh_manager->meshes[i])
+#define DFMesh(i) (df_mesh_manager->meshes[i])
 
-IBMeshManager* ib_mesh_manager = NULL;
+IBMeshManager* df_mesh_manager = NULL;
 
 void
-ib_mesh_manager_init(int nm)
+df_mesh_manager_init(int nm)
 {
-  if (ib_mesh_manager != NULL)
+  if (df_mesh_manager != NULL)
     return;
-  ib_mesh_manager = (IBMeshManager*)malloc(sizeof(IBMeshManager));
-  ib_mesh_manager->nm = nm;
-  ib_mesh_manager->meshes = (IBMesh*)calloc(nm, sizeof(IBMesh));
+  df_mesh_manager = (IBMeshManager*)malloc(sizeof(IBMeshManager));
+  df_mesh_manager->nm = nm;
+  df_mesh_manager->meshes = (DFMesh*)calloc(nm, sizeof(DFMesh));
 }
 
 void
-ib_mesh_manager_free()
+df_mesh_manager_free()
 {
-  if (ib_mesh_manager == NULL)
+  if (df_mesh_manager == NULL)
     return;
-  for (int i = 0; i < ib_mesh_manager->nm; i++) {
-    ib_mesh_free(&IBMESH(i));
+  for (int i = 0; i < df_mesh_manager->nm; i++) {
+    df_mesh_free(&DFMesh(i));
   }
-  free(ib_mesh_manager);
-  ib_mesh_manager = NULL;
+  free(df_mesh_manager);
+  df_mesh_manager = NULL;
 }
 
 void
-generate_stencil(IBMesh* mesh)
+generate_stencil(DFMesh* mesh)
 {
 #if DEBUG_PRINT_CALL_OR_EVENT
   printf("Function: generate_stencil\n");
@@ -240,15 +240,15 @@ generate_stencils()
 #if DEBUG_PRINT_CALL_OR_EVENT
   printf("Function: generate_stencils\n");
 #endif
-  for (int i = 0; i < ib_mesh_manager->nm; ++i) {
-    generate_stencil(&IBMESH(i));
+  for (int i = 0; i < df_mesh_manager->nm; ++i) {
+    generate_stencil(&DFMesh(i));
   }
 }
 
 vector forcing[];
 
 trace void
-lag2eul(vector forcing, IBMesh* mesh)
+lag2eul(vector forcing, DFMesh* mesh)
 {
 #if DEBUG_PRINT_CALL_OR_EVENT
   printf("Function: lag2eul\n");
@@ -294,7 +294,7 @@ lag2eul(vector forcing, IBMesh* mesh)
 }
 
 trace void
-eul2lag(IBMesh* mesh)
+eul2lag(DFMesh* mesh)
 {
 #if DEBUG_PRINT_CALL_OR_EVENT
   printf("Function: eul2lag \n");
@@ -344,7 +344,7 @@ eul2lag(IBMesh* mesh)
 scalar stencils[];
 
 trace void
-tag_stencil(IBMesh* mesh)
+tag_stencil(DFMesh* mesh)
 {
 #if DEBUG_PRINT_CALL_OR_EVENT
   printf("Function: tag_stencil \n");
@@ -385,15 +385,15 @@ tag_stencils()
   foreach () {
     stencils[] = 0.;
   }
-  for (int i = 0; i < ib_mesh_manager->nm; i++) {
-    if (IBMESH(i).isactive) {
-      tag_stencil(&IBMESH(i));
+  for (int i = 0; i < df_mesh_manager->nm; i++) {
+    if (DFMesh(i).isactive) {
+      tag_stencil(&DFMesh(i));
     }
   }
 }
 
 trace void
-advect_mesh(IBMesh* mesh)
+advect_mesh(DFMesh* mesh)
 {
 #if DEBUG_PRINT_CALL_OR_EVENT
   printf("Function: advect_mesh\n");
@@ -411,7 +411,7 @@ advect_mesh(IBMesh* mesh)
     // printf("mesh->nodes[%d].velocity.x = %f\n", ni, mesh->nodes[ni].velocity.x);
   }
 
-  ib_structure_mesh_t smesh = ib_structure_model_get_next(mesh->model, velocity, mesh->nn, dt);
+  df_structure_mesh_t smesh = df_structure_model_get_next(mesh->model, velocity, mesh->nn, dt);
 
   free(velocity);  
 
@@ -421,7 +421,7 @@ advect_mesh(IBMesh* mesh)
     mesh->nodes[ni].pos.z = smesh.points[ni].z;
   }
 
-  ib_structure_mesh_free(&smesh);
+  df_structure_mesh_free(&smesh);
 
 #else // Second order
 
@@ -433,18 +433,18 @@ advect_mesh(IBMesh* mesh)
     velocity[ni].z = mesh->nodes[ni].velocity.z;
   }
 
-  ib_structure_mesh_t smesh =
-    ib_structure_model_get_midpoint(mesh->model, velocity, mesh->nn, dt);
+  df_structure_mesh_t smesh =
+    df_structure_model_get_midpoint(mesh->model, velocity, mesh->nn, dt);
 
   free(velocity);
 
-  IBMesh buffer_mesh;
-  ib_mesh_init(&buffer_mesh, mesh->nn);
+  DFMesh buffer_mesh;
+  df_mesh_init(&buffer_mesh, mesh->nn);
   buffer_mesh.model = mesh->model;
 
   // buffer_mesh.isactive = true;
   // buffer_mesh.nn = mesh->nn;
-  // buffer_mesh.nodes = calloc(mesh->nn, sizeof(IBNode));
+  // buffer_mesh.nodes = calloc(mesh->nn, sizeof(DFNode));
 
   for (int ni = 0; ni < mesh->nn; ni++) {
     buffer_mesh.nodes[ni].pos.x = smesh.points[ni].x;
@@ -467,8 +467,8 @@ advect_mesh(IBMesh* mesh)
     velocity[ni].z = buffer_mesh.nodes[ni].velocity.z;
   }
 
-  ib_structure_mesh_free(&smesh);
-  smesh = ib_structure_model_get_next(buffer_mesh.model, velocity, buffer_mesh.nn, dt);
+  df_structure_mesh_free(&smesh);
+  smesh = df_structure_model_get_next(buffer_mesh.model, velocity, buffer_mesh.nn, dt);
   free(velocity);
 
   for (int ni = 0; ni < mesh->nn; ni++) {
@@ -477,7 +477,7 @@ advect_mesh(IBMesh* mesh)
     mesh->nodes[ni].pos.z = smesh.points[ni].z;
   }
 
-  ib_mesh_free(&buffer_mesh);
+  df_mesh_free(&buffer_mesh);
 #endif
 
   generate_stencil(mesh);
@@ -507,16 +507,16 @@ tracer_advection(i++)
   printf("Event: tracer_advection\n");
 #endif
 
-  // printf("IBMESH(%d).isactive == %s", 0, IBMESH(0).isactive ? "true" :
+  // printf("DFMesh(%d).isactive == %s", 0, DFMesh(0).isactive ? "true" :
   // "false");
 
-  for (int i = 0; i < ib_mesh_manager->nm; i++) {
-    if (IBMESH(i).isactive) {
-      advect_mesh(&IBMESH(i));
-      for (int j = 0; j < IBMESH(i).nn; j++) {
+  for (int i = 0; i < df_mesh_manager->nm; i++) {
+    if (DFMesh(i).isactive) {
+      advect_mesh(&DFMesh(i));
+      for (int j = 0; j < DFMesh(i).nn; j++) {
         foreach_dimension()
         {
-          IBMESH(i).nodes[j].force.x = 0.;
+          DFMesh(i).nodes[j].force.x = 0.;
         }
       }
     }
@@ -539,32 +539,32 @@ acceleration(i++)
     if (cm[] > 1.e-20)
       foreach_dimension() forcing.x[] = 0.;
   }
-  for (int mi = 0; mi < ib_mesh_manager->nm; mi++) {
-    if (IBMESH(mi).isactive) {
+  for (int mi = 0; mi < df_mesh_manager->nm; mi++) {
+    if (DFMesh(mi).isactive) {
 
       // // NEW
 
-      vertex_t* velocity = calloc((size_t)IBMESH(mi).nn, sizeof(vertex_t));
-      for (int ni = 0; ni < IBMESH(mi).nn; ni++) {
-        velocity[ni].x = IBMESH(mi).nodes[ni].velocity.x;
-        velocity[ni].y = IBMESH(mi).nodes[ni].velocity.y;
-        velocity[ni].z = IBMESH(mi).nodes[ni].velocity.z;
+      vertex_t* velocity = calloc((size_t)DFMesh(mi).nn, sizeof(vertex_t));
+      for (int ni = 0; ni < DFMesh(mi).nn; ni++) {
+        velocity[ni].x = DFMesh(mi).nodes[ni].velocity.x;
+        velocity[ni].y = DFMesh(mi).nodes[ni].velocity.y;
+        velocity[ni].z = DFMesh(mi).nodes[ni].velocity.z;
       }
 
-      ib_structure_mesh_t mesh_midpoint = ib_structure_model_get_midpoint(
-        IBMESH(mi).model, velocity, IBMESH(mi).nn, dt);
+      df_structure_mesh_t mesh_midpoint = df_structure_model_get_midpoint(
+        DFMesh(mi).model, velocity, DFMesh(mi).nn, dt);
       free(velocity);
 
-      for (int ni = 0; ni < IBMESH(mi).nn; ni++) {
-        IBMESH(mi).nodes[ni].force.x = mesh_midpoint.forces[ni].x;
-        IBMESH(mi).nodes[ni].force.y = mesh_midpoint.forces[ni].y;
-        IBMESH(mi).nodes[ni].force.z = mesh_midpoint.forces[ni].z;
+      for (int ni = 0; ni < DFMesh(mi).nn; ni++) {
+        DFMesh(mi).nodes[ni].force.x = mesh_midpoint.forces[ni].x;
+        DFMesh(mi).nodes[ni].force.y = mesh_midpoint.forces[ni].y;
+        DFMesh(mi).nodes[ni].force.z = mesh_midpoint.forces[ni].z;
       }
 
-      ib_structure_mesh_free(&mesh_midpoint);
+      df_structure_mesh_free(&mesh_midpoint);
       // // END NEW
 
-      lag2eul(forcing, &IBMESH(mi));
+      lag2eul(forcing, &DFMesh(mi));
     }
   }
   foreach_face()
@@ -583,5 +583,5 @@ cleanup(t = end)
 #endif
 
   // free_all_caps(&allCaps);
-  ib_mesh_manager_free();
+  df_mesh_manager_free();
 }

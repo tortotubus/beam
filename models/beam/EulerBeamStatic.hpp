@@ -1,12 +1,20 @@
 #pragma once
 
+#include <Eigen/Dense>
+#include <Eigen/IterativeLinearSolvers>
+
+#include "EulerBeam.hpp"
+#include "Shapes.hpp"
+#include "config/config.hpp"
+
 namespace beam {
 
 /**
  * @brief A class to solve the static Euler–Bernoulli beam equation.
  *
- * The strong form of an Euler–Bernoulli beam of length \f(L\f), bending stiffness \f(EI\f),
- * subjected to a distributed transverse load \f(q(x)\f), seeks the transverse displacement
+ * The strong form of an Euler–Bernoulli beam of length \f(L\f), bending
+ * stiffness \f(EI\f), subjected to a distributed transverse load \f(q(x)\f),
+ * seeks the transverse displacement
  * \f(w(x)\f) satisfying
  * \f[
  *   EI \,\frac{d^4 w}{d x^4}(x) \;=\; q(x),
@@ -45,8 +53,9 @@ namespace beam {
  *   \quad\forall\,v\in V_0.
  * \f]
  *
- * In a finite‐element discretization, choose a subspace \f(V_h = \mathrm{span}\{N_i\})\f)
- * of \f(V\f), with \f(w_h(x)=\sum_j w_j N_j(x)\f). The Galerkin condition
+ * In a finite‐element discretization, choose a subspace \f(V_h =
+ * \mathrm{span}\{N_i\})\f) of \f(V\f), with \f(w_h(x)=\sum_j w_j N_j(x)\f). The
+ * Galerkin condition
  * \f(a(w_h,N_i)=\ell(N_i)\;\forall i)\f) leads to the linear system
  * \f[
  *   K\,\mathbf w = \mathbf f,
@@ -61,5 +70,285 @@ namespace beam {
  * and load vector.
  */
 
- class EulerBeamStatic {};
-} // namespace beam
+class EulerBeamStatic : public EulerBeam
+{
+public:
+  EulerBeamStatic(real_t length,
+                  real_t EI,
+                  real_t load, // renamed to avoid conflict
+                  real_t area,
+                  size_t nodes,
+                  EulerBeamBCs bcs)
+    : EulerBeam(length, EI, area, nodes, bcs)
+    , elements(nodes - 1)
+    , dof(2 * nodes)
+    , K_global(Eigen::MatrixXd::Zero(dof, dof))
+    , F_global(Eigen::VectorXd::Zero(dof))
+    , M_global(Eigen::MatrixXd::Zero(dof, dof))
+    , u(Eigen::VectorXd::Zero(dof))
+    , residual(Eigen::VectorXd::Zero(dof))
+  {
+    set_load({ load, 0., 0. });
+  }
+
+  EulerBeamStatic(
+    real_t length,
+    real_t EI,
+    std::vector<std::array<real_t, 3>> load, // renamed to avoid conflict
+    real_t area,
+    size_t nodes,
+    EulerBeamBCs bcs)
+    : EulerBeam(length, EI, area, nodes, bcs)
+    , elements(nodes - 1)
+    , dof(2 * nodes)
+    , K_global(Eigen::MatrixXd::Zero(dof, dof))
+    , F_global(Eigen::VectorXd::Zero(dof))
+    , M_global(Eigen::MatrixXd::Zero(dof, dof))
+    , u(Eigen::VectorXd::Zero(dof))
+    , residual(Eigen::VectorXd::Zero(dof))
+  {
+    set_load(load);
+  }
+
+  ~EulerBeamStatic() = default;
+
+  /// example of how you might compute the residual
+  void solve()
+  {
+    assemble_load();
+    assemble_stiffness();
+    assemble_residual();
+    apply_boundary_conditions();
+
+    // Eigen::LLT<Eigen::MatrixXd> chol(K_global);
+    // if (chol.info() != Eigen::Success)
+    //   BEAM_ABORT("Cholesky factorization failed in
+    //   EulerBeamStatic::solve()");
+    // u = chol.solve(F_global);
+
+    Eigen::ConjugateGradient<
+      Eigen::MatrixXd,                      // or SparseMatrix<double>
+      Eigen::Lower | Eigen::Upper,          // tell it K is symmetric
+      Eigen::DiagonalPreconditioner<double> // Jacobi preconditioner
+      >
+      cg;
+
+    cg.compute(K_global);
+    if (cg.info() != Eigen::Success)
+      BEAM_ABORT("CG decomposition failed");
+
+    u = cg.solve(F_global);
+    if (cg.info() != Eigen::Success)
+      BEAM_ABORT("CG did not converge");
+
+    std::cout << "CG iters: " << cg.iterations()
+              << ", final error est.: " << cg.error() << "\n";
+
+    update_mesh();
+  }
+
+  void assemble_residual() { residual = F_global - K_global * u; }
+
+  void assemble_load()
+  {
+    switch (load_type) {
+      case UNIFORM: {
+        real_t h = mesh.get_ds();
+        // zero out the global load
+        F_global.setZero();
+
+        // 3-point Gauss–Legendre
+        constexpr std::array<real_t, 3> q_points = { real_t(0.1127016654),
+                                                     real_t(0.5),
+                                                     real_t(0.8872983346) };
+        constexpr std::array<real_t, 3> q_weights = { real_t(0.2777777778),
+                                                      real_t(0.4444444444),
+                                                      real_t(0.2777777778) };
+
+        // local element load (4 DOFs per beam element)
+        Eigen::Matrix<real_t, 4, 1> F_e = Eigen::Matrix<real_t, 4, 1>::Zero();
+
+        // integrate q(x) * H(xi) over the element
+        for (int i = 0; i < 3; ++i) {
+          auto H_arr = CubicHermite<real_t>::values(q_points[i], h);
+          // wrap it in a 4×1 Eigen vector (no copy)
+          Eigen::Map<const Eigen::Matrix<real_t, 4, 1>> H_map(H_arr.data());
+
+          // then assemble
+          F_e += q_weights[i] * (h * uniform_load[0]) * H_map;
+        }
+
+        // assemble into the global vector
+        for (size_t e = 0; e < elements; ++e) {
+          const int idx[4] = {
+            int(2 * e), int(2 * e + 1), int(2 * (e + 1)), int(2 * (e + 1) + 1)
+          };
+          for (int a = 0; a < 4; ++a)
+            F_global(idx[a]) += F_e(a);
+        }
+        break;
+      }
+      case NONUNIFORM: {
+        assemble_mass_matrix();
+        size_t n = mesh.get_n_nodes();
+        Eigen::VectorXd q_vec = Eigen::VectorXd::Zero(dof);
+        for (size_t i = 0; i < n; i++) {
+          q_vec(2 * i) = nonuniform_load[i][1];
+        }
+        F_global = M_global * q_vec;
+        break;
+      }
+      case NONE: {
+        break;
+      }
+      case INVALID: {
+        BEAM_ABORT("Invalid load type.");
+        break;
+      }
+    }
+  }
+
+  void assemble_stiffness()
+  {
+    real_t h = mesh.get_ds();
+
+    // zero out the global stiffness
+    K_global.setZero();
+
+    // 3-point Gauss–Legendre on [0,1]
+    constexpr std::array<real_t, 3> q_points = { real_t(0.1127016654),
+                                                 real_t(0.5),
+                                                 real_t(0.8872983346) };
+    constexpr std::array<real_t, 3> q_weights = { real_t(0.2777777778),
+                                                  real_t(0.4444444444),
+                                                  real_t(0.2777777778) };
+
+    // element stiffness (4×4) accumulator
+    Eigen::Matrix<real_t, 4, 4> K_e = Eigen::Matrix<real_t, 4, 4>::Zero();
+
+    // integrate EI/h³ ∫ (d²H/dxi² ⊗ d²H/dxi²) dxi
+    for (int q = 0; q < 3; ++q) {
+      auto d2H_arr = CubicHermite<real_t>::second_derivs(q_points[q], h);
+      Eigen::Map<const Eigen::Matrix<real_t, 4, 1>> d2H_map(d2H_arr.data());
+
+      // then accumulate
+      const real_t factor = (EI)*q_weights[q] * (h);
+      // outer product yields a 4×4 matrix
+      K_e.noalias() += factor * (d2H_map * d2H_map.transpose());
+    }
+
+    // scatter into global K
+    for (size_t e = 0; e < elements; ++e) {
+      const int idx[4] = {
+        int(2 * e), int(2 * e + 1), int(2 * (e + 1)), int(2 * (e + 1) + 1)
+      };
+      for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+          K_global(idx[i], idx[j]) += K_e(i, j);
+    }
+  }
+
+  void assemble_mass_matrix()
+  {
+    const real_t h = mesh.get_ds();
+    M_global.setZero();
+
+    // 3-point Gauss–Legendre on [0,1]
+    constexpr std::array<real_t, 3> q_points = { real_t(0.1127016654),
+                                                 real_t(0.5),
+                                                 real_t(0.8872983346) };
+    constexpr std::array<real_t, 3> q_weights = { real_t(0.2777777778),
+                                                  real_t(0.4444444444),
+                                                  real_t(0.2777777778) };
+
+    // Local element matrix (4×4 for cubic Hermite)
+    for (size_t e = 0; e < elements; ++e) {
+      Eigen::Matrix<real_t, 4, 4> M_e = Eigen::Matrix<real_t, 4, 4>::Zero();
+
+      // Quadrature
+      for (int qp = 0; qp < 3; ++qp) {
+        auto H_arr = CubicHermite<real_t>::values(q_points[qp], h);
+        Eigen::Map<const Eigen::Matrix<real_t, 4, 1>> H_map(H_arr.data());
+
+        // accumulate: ∫ N_i N_j dx ≈ ∑ h * w_q * H * H^T
+        M_e.noalias() += (h * q_weights[qp]) * (H_map * H_map.transpose());
+      }
+
+      // scatter into global M_global
+      const int idx[4] = {
+        int(2 * e), int(2 * e + 1), int(2 * (e + 1)), int(2 * (e + 1) + 1)
+      };
+      for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j)
+          M_global(idx[i], idx[j]) += M_e(i, j);
+    }
+  }
+
+  void apply_boundary_conditions()
+  {
+    size_t nodes = mesh.get_n_nodes();
+
+    size_t ndof_y = 2 * nodes;
+    size_t offset_y = 0;
+
+    for (size_t bi = 0; bi < 2; ++bi) {
+      EulerBeamBCEnd bcend = boundary_conditions.end[bi];
+      size_t ni = 0;
+      std::vector<size_t> idx(2);
+
+      switch (bcend) {
+        case left:
+          ni = 0;
+          break;
+        case right:
+          ni = nodes - 1;
+          break;
+      }
+
+      EulerBeamBCType bctype = boundary_conditions.type[bi];
+      EulerBeamBCVals bcvals = boundary_conditions.vals[bi];
+      std::vector<double> vals(2);
+
+      switch (bctype) {
+        case free_bc:
+          idx = {};
+          vals = {};
+          break;
+        case simple_bc:
+          idx = { offset_y + 2 * ni + 0 };
+          vals = { bcvals.position[1] };
+          break;
+        case clamped_bc:
+          idx = { offset_y + 2 * ni + 0, offset_y + 2 * ni + 1 };
+          vals = { bcvals.position[1], bcvals.slope[1] };
+          break;
+      }
+
+      for (size_t i = 0; i < vals.size(); ++i) {
+        K_global.row(idx[i]).setZero();
+        K_global.col(idx[i]).setZero();
+        K_global(idx[i], idx[i]) = 1.;
+        F_global(idx[i]) = vals[i];
+      }
+    }
+  }
+
+  void update_mesh()
+  {
+    size_t n_nodes = mesh.get_n_nodes();
+    std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
+    std::vector<real_t>& s = mesh.get_curvilinear_axis();
+    for (size_t i = 0; i < n_nodes; ++i) {
+      centerline[i][0] = s[i];
+      centerline[i][1] = u(2 * i);
+      centerline[i][2] = 0.;
+    }
+  }
+
+  size_t elements, dof;
+
+  Eigen::MatrixXd K_global, M_global;
+  Eigen::VectorXd F_global, u, residual;
+};
+
+}

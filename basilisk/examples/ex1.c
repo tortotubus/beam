@@ -1,14 +1,13 @@
 #define DEBUG_PRINT_CALL_OR_EVENT 0
 
-#define LEVEL 7
+#define LEVEL 8
 #define LENGTH 10.
-#define T_END 10
+#define T_END 0.5
 
 #include "grid/quadtree.h"
 
 #include "interface/spring.h"
 #include "library/ibm.h"
-
 #include "library/output.h"
 
 int
@@ -18,8 +17,8 @@ main()
   origin(-.5 * L0, -.5 * L0);
   init_grid(1 << LEVEL);
   periodic(left);
+  //stokes = true;
   DT = 5.e-3;
-
   run();
 }
 
@@ -34,16 +33,16 @@ defaults(i = 0)
   double radius_x, radius_y;
   double center_x, center_y;
 
-  n_points = 30;
-  K = 1.0;
+  n_points = 100;
+  K = .1;
   radius_x = 0.5, radius_y = 0.8;
   center_x = -.1, center_y = 0.1;
   ib_spring_circle_t spr_c0 = ib_spring_circle_create_ellipse(
     n_points, K, radius_x, radius_y, center_x, center_y);
   ib_mesh_set_model(&IBMESH(0), spr_c0);
 
-  n_points = 30;
-  K = 1.0;
+  n_points = 100;
+  K = .1;
   radius_x = 0.6, radius_y = 0.4;
   center_x = 2., center_y = 1.;
   ib_spring_circle_t spr_c1 = ib_spring_circle_create_ellipse(

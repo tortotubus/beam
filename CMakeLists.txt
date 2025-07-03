@@ -112,7 +112,7 @@ target_link_libraries(beam
     Eigen3::Eigen
 )
 
-option(BUILD_TESTS "Build unit & integration tests" ON)
+option(BUILD_TESTS "Build unit & integration tests" OFF)
 if(BUILD_TESTS)
   # Find GTest
   find_package(GTest REQUIRED)
@@ -122,7 +122,7 @@ if(BUILD_TESTS)
 endif()
 
 # Add Doxygen documentation
-option(BUILD_DOC "Build documentation" ON)
+option(BUILD_DOC "Build documentation" OFF)
 if (BUILD_DOC)
   find_package(Doxygen)
   if (DOXYGEN_FOUND)
