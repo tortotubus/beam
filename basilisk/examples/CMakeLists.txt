@@ -58,12 +58,12 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
             "${CMAKE_SOURCE_DIR}/basilisk/examples/${example_name}.c"
             "${CMAKE_BINARY_DIR}/basilisk/examples/${example_name}.c"
     # 3) compile
-    COMMAND ${QCC_EXECUTABLE}
+    COMMAND $<TARGET_FILE:qcc-source>
       "${example_name}.c" 
       -I"${CMAKE_SOURCE_DIR}/basilisk/"
       -source
     DEPENDS
-      qcc_ep
+      qcc-source
       ${BASILISK_LIBRARY_HDRS}
       ${example_basilisk_source}
   )
