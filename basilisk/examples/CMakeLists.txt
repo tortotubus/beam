@@ -75,9 +75,13 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/basilisk/examples"
   )
 
+  # Find HDF5 package
+  find_package(HDF5)
+
   # 4. Include your headers
   target_include_directories(${example_name} PRIVATE
     "${CMAKE_SOURCE_DIR}/basilisk"
+    ${HDF5_INCLUDE_DIRS}
   )
 
   target_compile_options(${example_name} PRIVATE
@@ -88,13 +92,16 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
     -pipe
   )
 
-  target_link_libraries(${example_name} PRIVATE
-    beam
-    hdf5
-    hdf5_hl
-    m            # math library
+  target_link_libraries(${example_name}
+    PRIVATE
+      beam
+      ${HDF5_HL_LIBRARIES}
+      ${HDF5_LIBRARIES}
+      # hdf5::hdf5
+      # hdf5::hdf5_hl
+      m
   )
-
+  
   set_target_properties(${example_name} PROPERTIES
     BUILD_RPATH "${CMAKE_BINARY_DIR}"
   )
