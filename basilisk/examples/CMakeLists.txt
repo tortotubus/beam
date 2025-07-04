@@ -4,9 +4,7 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 # Enable C language
 enable_language(C)
 
-# Find HDF5 package
 find_package(HDF5)
-# 1) Find MPI
 find_package(MPI REQUIRED)
 
 file(GLOB BASILISK_C_EXAMPLE_SRCS "${CMAKE_SOURCE_DIR}/basilisk/examples/*.c")
@@ -26,14 +24,14 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
             "${CMAKE_SOURCE_DIR}/basilisk/examples/${example_name}.c"
             "${CMAKE_BINARY_DIR}/basilisk/examples/${example_name}.c"
     # 3) compile
-    COMMAND $<TARGET_FILE:qcc-source>
+    COMMAND ${QCC_EXECUTABLE}
       "${example_name}.c" 
       -I"${CMAKE_SOURCE_DIR}/basilisk/"
-      -I "${MPI_INCLUDE_PATHS}"
-      -I "${HDF5_INCLUDE_DIRS}"
+      -I"${MPI_C_INCLUDE_DIRS}"
+      -I"${HDF5_INCLUDE_DIRS}"
       -source
     DEPENDS
-      qcc-source
+      basilisk #source
       ${BASILISK_LIBRARY_HDRS}
       ${example_basilisk_source}
   )
@@ -49,7 +47,7 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
   # 4. Include your headers
   target_include_directories(${example_name} PRIVATE
     "${CMAKE_SOURCE_DIR}/basilisk"
-    ${MPI_INCLUDE_PATHS}
+    ${MPI_C_INCLUDE_DIRS}
     ${HDF5_INCLUDE_DIRS}
   )
 
@@ -66,8 +64,6 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
       beam
       ${HDF5_HL_LIBRARIES}
       ${HDF5_LIBRARIES}
-      # hdf5::hdf5
-      # hdf5::hdf5_hl
       m
   )
   
