@@ -1,43 +1,38 @@
-name: CMake CI
+# This starter workflow is for a CMake project running on a single platform. There is a different starter workflow if you need cross-platform coverage.
+# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
+name: CMake on a single platform
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
 
 jobs:
-  build-and-test:
+  build:
+    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
+    # You can convert this to a matrix build if you need cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out your code
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-      # 2. Install system dependencies (build tools + GTest)
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake libgtest-dev 
+    - name: Configure CMake
+      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
+      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
 
-          # On Ubuntu, libgtest-dev only installs sources. We must build & install it:
-          pushd /usr/src/gtest
-          sudo cmake .
-          sudo cmake --build . --target install 
-          popd
+    - name: Build
+      # Build your program with the given configuration
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} -DBUILD_TESTS=ON
 
-      # 3. Configure CMake with BUILD_TESTS=ON
-      - name: Configure CMake
-        run: cmake -S . -B build \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DBUILD_TESTS=ON
-
-      # 4. Build all targets (including your tests)
-      - name: Build
-        run: cmake --build build --parallel
-
-      # 5. Run the tests via CTest (activates enable_testing())
-      - name: Run Unit Tests
-        working-directory: build
-        run: ctest --output-on-failure --parallel 2
+    - name: Test
+      working-directory: ${{github.workspace}}/build
+      # Execute tests defined by the CMake configuration.
+      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
+      run: ctest -C ${{env.BUILD_TYPE}}
