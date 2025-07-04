@@ -1,0 +1,43 @@
+name: CMake CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out your code
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # 2. Install system dependencies (build tools + GTest)
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libgtest-dev 
+
+          # On Ubuntu, libgtest-dev only installs sources. We must build & install it:
+          pushd /usr/src/gtest
+          sudo cmake .
+          sudo cmake --build . --target install 
+          popd
+
+      # 3. Configure CMake with BUILD_TESTS=ON
+      - name: Configure CMake
+        run: cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_TESTS=ON
+
+      # 4. Build all targets (including your tests)
+      - name: Build
+        run: cmake --build build --parallel
+
+      # 5. Run the tests via CTest (activates enable_testing())
+      - name: Run Unit Tests
+        working-directory: build
+        run: ctest --output-on-failure --parallel 2
