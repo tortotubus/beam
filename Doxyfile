@@ -10,10 +10,7 @@ USE_MDFILE_AS_MAINPAGE = README.md
 GENERATE_LATEX = YES
 GENERATE_HTML = YES
 HTML_OUTPUT = html
-#HTML_EXTRA_STYLESHEET = doxygen-awesome.css
-#HTML_EXTRA_FILES = doxygen-awesome-fragment-copy-button.js \
-# doxygen-awesome-paragraph-link.js \
-# doxygen-awesome-interactive-toc.js
+HTML_EXTRA_STYLESHEET = docs/theme/doxygen-awesome.css
 HTML_COLORSTYLE = DARK
 HTML_DYNAMIC_SECTIONS = YES
 HTML_TIMESTAMP = NO
