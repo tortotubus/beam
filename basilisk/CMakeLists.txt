@@ -6,8 +6,8 @@ endif()
 include(ExternalProject)
 
 ExternalProject_Add(basilisk
-	GIT_REPOSITORY        git@gitlab.math.ubc.ca:colive/beam-basilisk
-	UPDATE_DISCONNECTED   1
+	GIT_REPOSITORY        https://github.com/tortotubus/beam-basilisk
+  UPDATE_DISCONNECTED   1
 	SOURCE_DIR            ${CMAKE_BINARY_DIR}/_ext/basilisk-src/
 	BINARY_DIR            ${CMAKE_BINARY_DIR}/_ext/basilisk-bin/
 	INSTALL_DIR           ${CMAKE_BINARY_DIR}/_ext/basilisk-install/
