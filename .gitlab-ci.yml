@@ -1,0 +1,44 @@
+# .gitlab-ci.yml
+image: ubuntu:20.04
+
+stages:
+  - build
+
+variables:
+  # customize as needed
+  BUILD_TYPE: "Release"
+
+before_script:
+  # install compiler, cmake, MPI, GTest, HDF5, Eigen
+  - apt-get update -qq
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      build-essential cmake git libeigen3-dev libhdf5-dev libopenmpi-dev libgtest-dev
+  # Ubuntu’s libgtest-dev comes only as sources—build & install the libraries
+  - pushd /usr/src/gtest
+  -   cmake . && make && cp lib/*.a /usr/lib && cp -r include/gtest /usr/include
+  - popd
+
+build_and_test:
+  stage: build
+  script:
+    # 1. configure
+    - mkdir -p build && cd build
+    - cmake \
+        -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+        -DBUILD_TESTS=ON \
+        ..
+    # 2. build (parallel)
+    - cmake --build . --parallel
+    # 3. run tests
+    - ctest --output-on-failure -C ${BUILD_TYPE}
+  artifacts:
+    when: always
+    paths:
+      - build/               # save logs, binaries, etc.
+      - build/Testing/       # CTest XML/CTEST files
+    expire_in: 1 week
+  # optional: only run on main branch or merge requests
+  only:
+    refs:
+      - main
+      - merge_requests
