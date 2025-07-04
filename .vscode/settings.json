@@ -1,0 +1,6 @@
+{
+  "cmake.configureSettings": {
+    "BUILD_TESTS": "ON",
+    "BUILD_DOC": "ON"
+  },
+}

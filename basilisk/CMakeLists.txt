@@ -3,9 +3,6 @@ if (BUILD_BASILISK_INTERFACE)
   add_subdirectory(interface)
 endif()
 
-
-
-if(TRUE)
 include(ExternalProject)
 
 ExternalProject_Add(basilisk
@@ -31,31 +28,13 @@ ExternalProject_Add(basilisk
 	--prefix <INSTALL_DIR>
 	--config ${CMAKE_BUILD_TYPE}
 	--component QCC
-
 )
 
 ExternalProject_Get_Property(basilisk install_dir)
 ExternalProject_Get_Property(basilisk binary_dir)
 
 set(QCC_EXECUTABLE "${install_dir}/bin/qcc" CACHE FILEPATH "Path to built qcc")
-#add_custom_target(ensure-qcc DEPENDS qcc_ep)
 
-else() 
-#
-#
-#
-
-#find_program(
-#	QCC_EXECUTABLE
-#	NAMES qcc-source
-#	HINTS HINTS /home/colive1/projects/colive1/beam-basilisk/build/src/
-#)
-
-#if (NOT QCC_EXECUTABLE)
-#	message(FATAL_ERROR "Could not find qcc.")
-#endif()
-
-endif()
 
 #
 #

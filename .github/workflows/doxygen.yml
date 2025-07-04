@@ -1,0 +1,30 @@
+name: Deploy Doxygen via Pages
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read        # for checkout
+      pages: write          # to publish
+      id-token: write       # needed by deploy-pages@v1
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Install Doxygen & Graphviz
+        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
+
+      - name: Build docs
+        run: doxygen Doxyfile
+
+      - name: Upload artifact for Pages
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: docs/html
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v1
