@@ -40,18 +40,18 @@ typedef struct
 class EulerBeamMesh
 {
 protected:
-  size_t n_nodes;
+  size_t nodes;
   real_t curvlinear_length, ds;
   std::vector<real_t> s;
   std::vector<std::array<real_t, 3>> centerline;
 
 public:
-  EulerBeamMesh(size_t n_nodes, real_t length)
-    : n_nodes(n_nodes)
+  EulerBeamMesh(size_t nodes, real_t length)
+    : nodes(nodes)
     , curvlinear_length(length)
-    , ds(curvlinear_length / (n_nodes-1))
-    , s(n_nodes)
-    , centerline(n_nodes)
+    , ds(curvlinear_length / (nodes-1))
+    , s(nodes)
+    , centerline(nodes)
   {
     set_curvilinear_axis();
     set_centerline_x_axis_aligned();
@@ -63,8 +63,8 @@ public:
   inline std::vector<real_t>& get_curvilinear_axis() { return s; }
   inline real_t get_curvilinear_axis(size_t i) { return s[i]; }
 
-  inline real_t get_ds() { return ds; }
-  inline size_t get_n_nodes() { return n_nodes; }
+  inline real_t get_ds()     const { return ds; }
+  inline size_t get_nodes()  const { return nodes; }
 
   void plot_gnuplot() {
     FILE *pipe = popen("gnuplot -persist", "w");
@@ -91,17 +91,43 @@ public:
     pclose(pipe);
   }
 
+
+  void plot_gnuplot(std::string title) {
+    FILE *pipe = popen("gnuplot -persist", "w");
+    if (!pipe) {
+      BEAM_ABORT("Failed to open pipe to gnuplot");
+    }
+
+
+    // Configure the plot
+    fprintf(pipe, "set title '%s'\n", title.c_str());
+    fprintf(pipe, "set xlabel 'x'\n");
+    fprintf(pipe, "set ylabel 'y'\n");
+    fprintf(pipe, "set grid\n");
+    fprintf(pipe, "set autoscale fix\n");      // <= disable extension to tics :contentReference[oaicite:0]{index=0}  
+    fprintf(pipe, "plot '-' using 1:2 with lines title 'beam' smooth csplines\n");
+
+    // Send the data points
+    for (size_t i = 0; i < centerline.size(); ++i) {
+      fprintf(pipe, "%f %f\n", centerline[i][0], centerline[i][1]);
+    }
+    fprintf(pipe, "e\n"); // End of data marker for gnuplot
+
+    // Clean up
+    pclose(pipe);
+  }
+
 private:
   void set_curvilinear_axis()
   {
-    for (size_t i = 0; i < n_nodes; ++i) {
+    for (size_t i = 0; i < nodes; ++i) {
       s[i] = ds * i;
     }
   }
 
   void set_centerline_x_axis_aligned()
   {
-    for (size_t i = 0; i < n_nodes; ++i) {
+    for (size_t i = 0; i < nodes; ++i) {
       centerline[i] = { ds * i, 0., 0. };
     }
   }
@@ -132,13 +158,15 @@ public:
 
   virtual void plot() { mesh.plot_gnuplot(); }
 
+  virtual void plot(std::string title) { mesh.plot_gnuplot(title); }
+
   virtual void set_load(std::array<real_t,3> load) {
     load_type = UNIFORM;
     uniform_load = load;
   }
 
   virtual void set_load(std::vector<std::array<real_t,3>> load) {
-    BEAM_ASSERT(load.size() == mesh.get_n_nodes(), "Nonuniform load vector must have the same size as the mesh nodes.");
+    BEAM_ASSERT(load.size() == mesh.get_nodes(), "Nonuniform load vector must have the same size as the mesh nodes.");
     load_type = NONUNIFORM;
     nonuniform_load = load;
   }

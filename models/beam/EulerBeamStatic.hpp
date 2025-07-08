@@ -10,7 +10,8 @@
 namespace beam {
 
 /**
- * @brief A class to solve the static Euler–Bernoulli beam equation.
+ * @brief A class to solve the static Euler–Bernoulli beam equation; this
+ * model is valid for only small deflections.
  *
  * The strong form of an Euler–Bernoulli beam of length \f(L\f), bending
  * stiffness \f(EI\f), subjected to a distributed transverse load \f(q(x)\f),
@@ -88,7 +89,7 @@ public:
     , u(Eigen::VectorXd::Zero(dof))
     , residual(Eigen::VectorXd::Zero(dof))
   {
-    set_load({ load, 0., 0. });
+    set_load({ 0., load, 0. });
   }
 
   EulerBeamStatic(
@@ -119,12 +120,6 @@ public:
     assemble_stiffness();
     assemble_residual();
     apply_boundary_conditions();
-
-    // Eigen::LLT<Eigen::MatrixXd> chol(K_global);
-    // if (chol.info() != Eigen::Success)
-    //   BEAM_ABORT("Cholesky factorization failed in
-    //   EulerBeamStatic::solve()");
-    // u = chol.solve(F_global);
 
     Eigen::ConjugateGradient<
       Eigen::MatrixXd,                      // or SparseMatrix<double>
@@ -175,7 +170,7 @@ public:
           Eigen::Map<const Eigen::Matrix<real_t, 4, 1>> H_map(H_arr.data());
 
           // then assemble
-          F_e += q_weights[i] * (h * uniform_load[0]) * H_map;
+          F_e += q_weights[i] * (h * uniform_load[1]) * H_map;
         }
 
         // assemble into the global vector
@@ -190,7 +185,7 @@ public:
       }
       case NONUNIFORM: {
         assemble_mass_matrix();
-        size_t n = mesh.get_n_nodes();
+        size_t n = mesh.get_nodes();
         Eigen::VectorXd q_vec = Eigen::VectorXd::Zero(dof);
         for (size_t i = 0; i < n; i++) {
           q_vec(2 * i) = nonuniform_load[i][1];
@@ -286,7 +281,7 @@ public:
 
   void apply_boundary_conditions()
   {
-    size_t nodes = mesh.get_n_nodes();
+    size_t nodes = mesh.get_nodes();
 
     size_t ndof_y = 2 * nodes;
     size_t offset_y = 0;
@@ -335,10 +330,10 @@ public:
 
   void update_mesh()
   {
-    size_t n_nodes = mesh.get_n_nodes();
+    size_t nodes = mesh.get_nodes();
     std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
     std::vector<real_t>& s = mesh.get_curvilinear_axis();
-    for (size_t i = 0; i < n_nodes; ++i) {
+    for (size_t i = 0; i < nodes; ++i) {
       centerline[i][0] = s[i];
       centerline[i][1] = u(2 * i);
       centerline[i][2] = 0.;

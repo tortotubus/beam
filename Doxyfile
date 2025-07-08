@@ -1,5 +1,5 @@
-PROJECT_NAME = "Basilisk Beam"
-PROJECT_BRIEF = "A C++ library for beam mechanics"
+PROJECT_NAME = "Beam"
+PROJECT_BRIEF = "A C++ library for beam mechanics FSI"
 OUTPUT_DIRECTORY = docs
 CREATE_SUBDIRS = YES
 EXTRACT_ALL = YES

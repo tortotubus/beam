@@ -18,10 +18,10 @@ TEST(EulerBeamStaticTest, DumpLoadAndStiffness) {
     .type = {clamped_bc, free_bc},
     .vals = {{
       .position = {0,0,0},
-      .slope = {0,0,0}
+      .slope = {1,0,0}
     }, {
       .position = {1,0,0},
-      .slope = {0,0,0}
+      .slope = {1,0,0}
     }}
   };
 
@@ -61,10 +61,10 @@ TEST(EulerBeamStaticTest, SolveUniformLoadAndPlot) {
     .type = {clamped_bc, free_bc},
     .vals = {{
       .position = {0,0,0},
-      .slope = {0,0,0}
+      .slope = {1,0,0}
     }, {
-      .position = {0,0,0},
-      .slope = {0,0,0}
+      .position = {1,0,0},
+      .slope = {1,0,0}
     }}
   };
 
@@ -77,7 +77,7 @@ TEST(EulerBeamStaticTest, SolveUniformLoadAndPlot) {
   GTEST_LOG_(INFO) << "K_global =\n" << static_beam.K_global << "\n";
   GTEST_LOG_(INFO) << "u =\n" << static_beam.u << "\n";
 
-  static_beam.plot();
+  static_beam.plot("Euler Bernoulli Beam with Uniform Load");
 
   // Optionally, add some real checks:
   // EXPECT_NEAR(F(0), expected_value, 1e-12);
@@ -95,10 +95,10 @@ TEST(EulerBeamStaticTest, SolveNonUniformLoadAndPlot) {
     .type = {clamped_bc, free_bc},
     .vals = {{
       .position = {0,0,0},
-      .slope = {0,0,0}
+      .slope = {1,0,0}
     }, {
-      .position = {0,0,0},
-      .slope = {0,0,0}
+      .position = {1,0,0},
+      .slope = {1,0,0}
     }}
   };
 
@@ -116,7 +116,7 @@ TEST(EulerBeamStaticTest, SolveNonUniformLoadAndPlot) {
   GTEST_LOG_(INFO) << "K_global =\n" << static_beam.K_global << "\n";
   GTEST_LOG_(INFO) << "u =\n" << static_beam.u << "\n";
 
-  static_beam.plot();
+  static_beam.plot("Euler Bernoulli Beam with Non-Uniform Load");
 
   // Optionally, add some real checks:
   // EXPECT_NEAR(F(0), expected_value, 1e-12);

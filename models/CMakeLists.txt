@@ -1,7 +1,9 @@
 set(HDRS
   immersedboundary.hpp
   spring/Spring.hpp
+  beam/EulerBeamStatic.hpp
   beam/EulerBeamStaticInextensible.hpp
+  beam/EulerBeamStaticInextensibleADDM.hpp
   beam/Shapes.hpp
 )
 
