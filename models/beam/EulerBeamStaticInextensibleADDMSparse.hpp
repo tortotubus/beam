@@ -14,14 +14,15 @@
 
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
+#include <Eigen/SparseCholesky>              // for SimplicialLLT
 #include <unsupported/Eigen/AutoDiff>
 
 namespace beam {
 
-class EulerBeamStaticInextensibleADDM : public EulerBeam
+class EulerBeamStaticInextensibleADDMSparse : public EulerBeam
 {
 public:
-  EulerBeamStaticInextensibleADDM(real_t length,
+  EulerBeamStaticInextensibleADDMSparse(real_t length,
                                   real_t EI,
                                   real_t load,
                                   real_t area,
@@ -32,7 +33,7 @@ public:
     , elements(nodes - 1)
     , dimension(2)
     , dof((2 * nodes * dimension))
-    , jacobian(Eigen::MatrixXd::Zero(dof, dof))
+    , jacobian(Eigen::SparseMatrix<real_t>(dof, dof))
     , residual(Eigen::VectorXd::Zero(dof))
     , lambda(Eigen::VectorXd::Zero(nodes))
     , u(Eigen::VectorXd::Zero(dof))
@@ -41,17 +42,17 @@ public:
     set_load({ 0., load, 0. });
   };
 
-  ~EulerBeamStaticInextensibleADDM() {};
+  ~EulerBeamStaticInextensibleADDMSparse() {};
 
   const Eigen::VectorXd& get_solution() const { return u; }
   const Eigen::VectorXd& get_residual() const { return residual; }
   const Eigen::VectorXd& get_lambda() const { return lambda; }
-  const Eigen::MatrixXd& get_jacobian() const { return jacobian; }
+  const Eigen::SparseMatrix<real_t>& get_jacobian() const { return jacobian; }
 
   void set_solution(Eigen::VectorXd s) { this->u = s; }
   void set_residual(Eigen::VectorXd r) { this->residual = r; }
   void set_lambda(Eigen::VectorXd l) { this->lambda = l; }
-  void set_jacobian(Eigen::MatrixXd j) { this->jacobian = j; }
+  void set_jacobian(Eigen::SparseMatrix<real_t> j) { this->jacobian = j; }
 
   void solve()
   {
@@ -61,23 +62,14 @@ public:
     real_t tol_inner = 1e-6;
     real_t tol_outer = 1e-6;
 
-    Eigen::LDLT<Eigen::MatrixXd> ldlt;
-
     Eigen::ConjugateGradient<
-      Eigen::MatrixXd,                      // or SparseMatrix<double>
+      Eigen::SparseMatrix<real_t>,          // or SparseMatrix<double>
       Eigen::Lower | Eigen::Upper,          // tell it K is symmetric
       Eigen::DiagonalPreconditioner<real_t> // Jacobi preconditioner
-      >
-      cg;
+      // Eigen::SimplicialLLT<Eigen::SparseMatrix<real_t>>
+    > solver;
 
     apply_initial_condition();
-    assemble_system();
-    apply_boundary_conditions();
-
-    cg.compute(jacobian);
-    if (cg.info() != Eigen::Success) {
-      throw std::runtime_error("IC preconditioner failed");
-    }
 
     for (size_t it_o = 0; it_o < max_iter_outer; it_o++) {
 
@@ -90,11 +82,12 @@ public:
 
       for (size_t it_i = 0; it_i < max_iter_inner; it_i++) {
 
-        update_residual();
+        assemble_system();
         apply_boundary_conditions();
 
         double res_norm = residual.norm();
         std::cout << "iter " << it_i << "  ‖R‖ = " << res_norm << "\n";
+
         if (res_norm < tol_inner) {
           std::cout << "Converged in " << it_i << " iters.\n";
           break;
@@ -104,9 +97,14 @@ public:
 
         Eigen::VectorXd delta_u;
 
-        delta_u = cg.solve(-residual);
+        solver.compute(jacobian);
 
         std::cout << "‖J‖ =" << jacobian.norm() << std::endl;
+
+        if (solver.info() != Eigen::Success) {
+          throw std::runtime_error("IC preconditioner failed");
+        }
+        delta_u = solver.solve(-residual);
 
         // 4) update
         u += delta_u;
@@ -117,7 +115,7 @@ public:
     update_mesh();
   }
 
-  void update_residual() { residual = update_residual_template<real_t>(u); }
+  void assemble_residual() { residual = assemble_residual_template<real_t>(u); }
 
   real_t update_lambda()
   {
@@ -165,26 +163,79 @@ public:
     }
   }
 
+  // void assemble_system()
+  // {
+  //   using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
+  //   using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+  //   ADVec x_ad(dof);
+  //   for (int i = 0; i < int(dof); ++i) {
+  //     Eigen::VectorXd seed = Eigen::VectorXd::Zero(dof);
+  //     seed(i) = 1.0;
+  //     x_ad(i) = AD(u(i), seed);
+  //   }
+  //   ADVec R_ad = assemble_residual_template<AD>(x_ad);
+  //   residual.resize(dof);
+  //   jacobian.resize(dof, dof);
+  //   for (int i = 0; i < int(dof); ++i) {
+  //     residual(i) = R_ad(i).value();
+  //     jacobian.row(i) = R_ad(i).derivatives().transpose();
+  //   }
+  // }
+
   void assemble_system()
   {
     using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
     using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+    using Tpl = Eigen::Triplet<real_t>;
 
+    // --- 1) Build the AutoDiff input vector x_ad ---
     ADVec x_ad(dof);
-    for (int i = 0; i < int(dof); ++i) {
+    for (int i = 0; i < dof; ++i) {
       Eigen::VectorXd seed = Eigen::VectorXd::Zero(dof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
 
+    // --- 2) Compute AD residuals ---
     ADVec R_ad = assemble_residual_template<AD>(x_ad);
 
+    // --- 3) Extract values + build Jacobian triplets ---
     residual.resize(dof);
-    jacobian.resize(dof, dof);
-    for (int i = 0; i < int(dof); ++i) {
+
+    // If you know roughly how many nonzeros per row, you can reserve:
+    std::vector<Tpl> triplets;
+    triplets.reserve(dof * 5); // e.g. assume 5 nnz/row on average
+
+    for (int i = 0; i < dof; ++i) {
       residual(i) = R_ad(i).value();
-      jacobian.row(i) = R_ad(i).derivatives().transpose();
+
+      // Access the derivative vector for row i
+      const Eigen::VectorXd& dRi = R_ad(i).derivatives();
+
+      // OPTION A: Filter zeros on the fly
+      for (int j = 0; j < dof; ++j) {
+        real_t dj = dRi[j];
+        if (dj != 0.0) {
+          triplets.emplace_back(i, j, dj);
+        }
+      }
+
+      /*
+      // OPTION B: If you have a precomputed sparsity pattern
+      //   (e.g. std::vector<std::vector<int>> sparsity where
+      //    sparsity[i] lists the column-indices that can be nonzero in row i)
+      for (int j : sparsity[i]) {
+        real_t dj = dRi[j];
+        if (dj != 0.0)
+          triplets.emplace_back(i, j, dj);
+      }
+      */
     }
+
+    // --- 4) Assemble the sparse matrix ---
+    jacobian.resize(dof, dof);
+    jacobian.setFromTriplets(triplets.begin(), triplets.end());
+    jacobian.makeCompressed();
   }
 
   void apply_initial_condition()
@@ -266,13 +317,39 @@ public:
           break;
       }
 
-      for (size_t i = 0; i < vals.size(); ++i) {
-        for (size_t j = 0; j < dof; ++j) {
-          jacobian(idx[i], j) = 0.;
-          jacobian(j, idx[i]) = 0.;
+      // for (size_t i = 0; i < vals.size(); ++i) {
+      //   for (size_t j = 0; j < dof; ++j) {
+      //     jacobian(idx[i], j) = 0.;
+      //     jacobian(j, idx[i]) = 0.;
+      //   }
+      //   residual(idx[i]) = u(idx[i]) - vals[i];
+      //   jacobian(idx[i], idx[i]) = 1.;
+      // }
+      for (auto i : idx) {
+        // 1) Zero out column i:
+        for (Eigen::SparseMatrix<real_t>::InnerIterator it(jacobian, i); it;
+             ++it) {
+          it.valueRef() = 0.0;
         }
-        residual(idx[i]) = u(idx[i]) - vals[i];
-        jacobian(idx[i], idx[i]) = 1.;
+
+        // 2) Zero out row i:
+        //    because Eigen is column‐major, we loop over each column
+        for (int col = 0; col < jacobian.outerSize(); ++col) {
+          for (Eigen::SparseMatrix<real_t>::InnerIterator it(jacobian, col); it;
+               ++it) {
+            if (it.row() == i) {
+              it.valueRef() = 0.0;
+            }
+          }
+        }
+
+        // 3) Reinstate the diagonal entry A(i,i) = 1:
+        jacobian.coeffRef(i, i) = 1.0;
+      }
+
+      for (size_t i = 0; i < vals.size(); i++) {
+        // 4) Overwrite the residual to enforce u(i)=vals:
+        residual[idx[i]] = u[idx[i]] - vals[i];
       }
     }
   }
@@ -339,7 +416,7 @@ public:
 
         auto H = CubicHermite<real_t>::values(xi, h);
         auto dH = CubicHermite<real_t>::derivs(xi, h);
-        auto ddH = CubicHermite<real_t>::second_derivs(xi, h);        
+        auto ddH = CubicHermite<real_t>::second_derivs(xi, h);
         auto M = LinearShape<real_t>::values(xi);
 
         T x = 0, xp = 0, xpp = 0;
@@ -353,28 +430,23 @@ public:
           ypp += ddH[i] * uy[i];
         }
 
-        // T l = 0;
-        // for (size_t i = 0; i < 2; i++) {
-        //   l += M[i] * ul[i];
-        // }
+        T l = 0;
+        for (size_t i = 0; i < 2; i++) {
+          l += M[i] * ul[i];
+        }
 
-        // T S = 0;
-        // if (constraint) {
-        //   S = xp * xp + yp * yp - 1.0;
-        // }
+        T S = xp * xp + yp * yp - 1.0;
 
         for (size_t a = 0; a < 4; ++a) {
           // Bending Energy Contributions
           R_loc_x[a] += EI * xpp * ddH[a] * w * h;
           R_loc_y[a] += EI * ypp * ddH[a] * w * h;
-          // External load contribution
+          // External load contribution in y
           R_loc_x[a] -= uniform_load[0] * H[a] * w * h;
           R_loc_y[a] -= uniform_load[1] * H[a] * w * h;
           // Constraint contributions
-          // if (constraint) {
-          //   R_loc_x[a] += 2 * (l + r_penalty * S) * xp * dH[a] * w * h;
-          //   R_loc_y[a] += 2 * (l + r_penalty * S) * yp * dH[a] * w * h;
-          // }
+          R_loc_x[a] += 2 * (l + r_penalty * S) * xp * dH[a] * w * h;
+          R_loc_y[a] += 2 * (l + r_penalty * S) * yp * dH[a] * w * h;
         }
 
         // for (size_t a = 0; a < 2; ++a) {
@@ -396,105 +468,13 @@ public:
     return residual;
   }
 
-  template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> update_residual_template(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u)
-  {
-    real_t h = mesh.get_ds();
-    size_t nodes = mesh.get_nodes();
-
-    real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
-    real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
-
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-
-    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
-      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(dof);
-
-    for (size_t e = 0; e < elements; ++e) {
-      std::vector<size_t> elem_nodes = { e, e + 1 };
-      std::vector<size_t> idx_x = { offset_x + 2 * elem_nodes[0],
-                                    offset_x + 2 * elem_nodes[0] + 1,
-                                    offset_x + 2 * elem_nodes[1],
-                                    offset_x + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_y = { offset_y + 2 * elem_nodes[0],
-                                    offset_y + 2 * elem_nodes[0] + 1,
-                                    offset_y + 2 * elem_nodes[1],
-                                    offset_y + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_l = { elem_nodes[0], elem_nodes[1] };
-
-      std::array<T, 4> ux = {
-        u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
-      };
-      std::array<T, 4> uy = {
-        u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
-      };
-      std::array<T, 2> ul = { lambda[idx_l[0]], lambda[idx_l[1]] };
-
-      std::vector<T> R_loc_x(4, 0);
-      std::vector<T> R_loc_y(4, 0);
-
-      for (size_t qi = 0; qi < 3; ++qi) {
-        real_t xi = xi_q[qi];
-        real_t w = w_q[qi];
-
-        auto H = CubicHermite<real_t>::values(xi, h);
-        auto dH = CubicHermite<real_t>::derivs(xi, h);
-        auto ddH = CubicHermite<real_t>::second_derivs(xi, h);        
-        auto M = LinearShape<real_t>::values(xi);
-
-        T x = 0, xp = 0, xpp = 0;
-        T y = 0, yp = 0, ypp = 0;
-        for (size_t i = 0; i < 4; i++) {
-          x += H[i] * ux[i];
-          xp += dH[i] * ux[i];
-          xpp += ddH[i] * ux[i];
-          y += H[i] * uy[i];
-          yp += dH[i] * uy[i];
-          ypp += ddH[i] * uy[i];
-        }
-
-        T l = 0;
-        for (size_t i = 0; i < 2; i++) {
-          l += M[i] * ul[i];
-        }
-
-        T S = 0;
-        S = xp * xp + yp * yp - 1.0;
-
-        for (size_t a = 0; a < 4; ++a) {
-          // Bending Energy Contributions
-          R_loc_x[a] += EI * xpp * ddH[a] * w * h;
-          R_loc_y[a] += EI * ypp * ddH[a] * w * h;
-          // External load contribution in y
-          R_loc_x[a] -= uniform_load[0] * H[a] * w * h;
-          R_loc_y[a] -= uniform_load[1] * H[a] * w * h;
-          // Constraint contributions
-          R_loc_x[a] += 2 * (l + r_penalty * S) * xp * dH[a] * w * h;
-          R_loc_y[a] += 2 * (l + r_penalty * S) * yp * dH[a] * w * h;
-        }
-      }
-
-      // Scatter local residual contribution to global residual
-      for (size_t i = 0; i < 4; ++i) {
-        residual[idx_x[i]] += R_loc_x[i];
-        residual[idx_y[i]] += R_loc_y[i];
-      }
-    }
-    return residual;
-  }
-
   size_t dimension;
   size_t elements;
   size_t dof;
   real_t r_penalty;
 
   Eigen::VectorXd residual, lambda;
-  Eigen::MatrixXd jacobian;
+  Eigen::SparseMatrix<real_t> jacobian;
   Eigen::VectorXd u;
 };
 

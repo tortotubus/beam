@@ -1,9 +1,9 @@
 
 
 #include <gtest/gtest.h>
-#include "models/beam/EulerBeamStaticInextensibleADDM.hpp"
+#include "models/beam/EulerBeamStaticInextensibleADDMSparse.hpp"
 
-using beam::EulerBeamStaticInextensibleADDM;
+using beam::EulerBeamStaticInextensibleADDMSparse;
 using beam::EulerBeam;
 using beam::EulerBeamBCs;
 using beam::real_t;
@@ -12,7 +12,7 @@ using beam::right;
 using beam::clamped_bc;
 using beam::free_bc;
 
-TEST(EulerBeamStaticInextensibleADDMTest, DumpLoadAndStiffness) {
+TEST(EulerBeamStaticInextensibleADDMSparseTest, DumpLoadAndStiffness) {
 
   EulerBeamBCs boundary_conditions = {
     .end = {left, right},
@@ -29,11 +29,12 @@ TEST(EulerBeamStaticInextensibleADDMTest, DumpLoadAndStiffness) {
   real_t length = 1., EI = 1., load = -1., area = 1., r_penalty = 1e4;
   size_t nodes = 3;
 
-  EulerBeamStaticInextensibleADDM static_beam(length, EI, load, area, nodes, boundary_conditions, r_penalty);
+  EulerBeamStaticInextensibleADDMSparse static_beam(length, EI, load, area, nodes, boundary_conditions, r_penalty);
 
   //static_beam.update_lambda();
   static_beam.apply_initial_condition();
   static_beam.assemble_system();
+
   static_beam.apply_boundary_conditions();
 
   auto J = static_beam.jacobian;
@@ -51,10 +52,10 @@ TEST(EulerBeamStaticInextensibleADDMTest, DumpLoadAndStiffness) {
 };
 
 
-TEST(EulerBeamStaticInextensibleADDMTest, SolveUniformLoadAndPlot) {
+TEST(EulerBeamStaticInextensibleADDMSparseTest, SolveUniformLoadAndPlot) {
 
   real_t length = 1., EI = 1., area = 1., r_pentalty = 1e4, load = -10;
-  size_t nodes = 15;
+  size_t nodes = 100;
 
   EulerBeamBCs boundary_conditions = {
     .end = {left, right},
@@ -68,7 +69,7 @@ TEST(EulerBeamStaticInextensibleADDMTest, SolveUniformLoadAndPlot) {
     }}
   };
 
-  EulerBeamStaticInextensibleADDM static_beam(length, EI, load, area, nodes, boundary_conditions, r_pentalty);
+  EulerBeamStaticInextensibleADDMSparse static_beam(length, EI, load, area, nodes, boundary_conditions, r_pentalty);
 
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
   static_beam.solve();

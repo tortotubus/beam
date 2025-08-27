@@ -1,1 +1,1 @@
-#include "StaticEulerBeam.hpp"
+#include "EulerBeamStatic.hpp"
