@@ -1,9 +1,9 @@
 
 
 #include <gtest/gtest.h>
-#include "models/beam/EulerBeamStaticInextensibleADDMSparse.hpp"
+#include "models/beam/EulerBeamStaticInextensibleMoMSparse.hpp"
 
-using beam::EulerBeamStaticInextensibleADDMSparse;
+using beam::EulerBeamStaticInextensibleMoMSparse;
 using beam::EulerBeam;
 using beam::EulerBeamBCs;
 using beam::real_t;
@@ -12,7 +12,7 @@ using beam::right;
 using beam::clamped_bc;
 using beam::free_bc;
 
-TEST(EulerBeamStaticInextensibleADDMSparseTest, DumpLoadAndStiffness) {
+TEST(EulerBeamStaticInextensibleMoMSparseTest, DumpLoadAndStiffness) {
 
   EulerBeamBCs boundary_conditions = {
     .end = {left, right},
@@ -29,7 +29,7 @@ TEST(EulerBeamStaticInextensibleADDMSparseTest, DumpLoadAndStiffness) {
   real_t length = 1., EI = 1., load = -1., area = 1., r_penalty = 1e4;
   size_t nodes = 3;
 
-  EulerBeamStaticInextensibleADDMSparse static_beam(length, EI, load, area, nodes, boundary_conditions, r_penalty);
+  EulerBeamStaticInextensibleMoMSparse static_beam(length, EI, load, area, nodes, boundary_conditions, r_penalty);
 
   //static_beam.update_lambda();
   static_beam.apply_initial_condition();
@@ -52,7 +52,7 @@ TEST(EulerBeamStaticInextensibleADDMSparseTest, DumpLoadAndStiffness) {
 };
 
 
-TEST(EulerBeamStaticInextensibleADDMSparseTest, SolveUniformLoadAndPlot) {
+TEST(EulerBeamStaticInextensibleMoMSparseTest, SolveUniformLoadAndPlot) {
 
   real_t length = 1., EI = 1., area = 1., r_pentalty = 1e4, load = -10;
   size_t nodes = 100;
@@ -69,7 +69,7 @@ TEST(EulerBeamStaticInextensibleADDMSparseTest, SolveUniformLoadAndPlot) {
     }}
   };
 
-  EulerBeamStaticInextensibleADDMSparse static_beam(length, EI, load, area, nodes, boundary_conditions, r_pentalty);
+  EulerBeamStaticInextensibleMoMSparse static_beam(length, EI, load, area, nodes, boundary_conditions, r_pentalty);
 
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
   static_beam.solve();

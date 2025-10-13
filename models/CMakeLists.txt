@@ -4,7 +4,8 @@ set(HDRS
   beam/EulerBeamStatic.hpp
   beam/EulerBeamStaticInextensible.hpp
   beam/EulerBeamStaticInextensibleADDM.hpp
-  beam/EulerBeamStaticInextensibleADDMSparse.hpp
+  beam/EulerBeamStaticInextensibleMoM.hpp
+  beam/EulerBeamStaticInextensibleMoMSparse.hpp
   beam/Shapes.hpp
 )
 
@@ -14,7 +15,8 @@ set(SRCS
   beam/EulerBeamStatic.cpp
   beam/EulerBeamStaticInextensible.cpp
   beam/EulerBeamStaticInextensibleADDM.cpp
-  beam/EulerBeamStaticInextensibleADDMSparse.cpp
+  beam/EulerBeamStaticInextensibleMoM.cpp
+  beam/EulerBeamStaticInextensibleMoMSparse.cpp
 )
 
 convert_filenames_to_full_paths(HDRS)

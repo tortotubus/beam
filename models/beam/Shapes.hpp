@@ -61,3 +61,17 @@ struct LinearShape
         return { M1(xi), M2(xi) };
     }
 };
+
+/// Simple linear (hat) shape on [0,1]
+template <class T>
+struct QuadraticLagrange
+{
+    static T L0(T xi) noexcept { return 2.0*(xi-0.5)*(xi-1.0); }
+    static T Lm(T xi) noexcept { return 4.0*xi*(1.0-xi); }
+    static T L1(T xi) noexcept { return 2.0*xi*(xi-0.5); }
+
+    static std::array<T,3> values(T xi) noexcept {
+        return { L0(xi), Lm(xi), L1(xi) };
+    }
+};
+

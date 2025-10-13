@@ -75,6 +75,7 @@ endif()
 find_package(Eigen3 REQUIRED)
 
 
+
 # Headers and sources
 set(SOURCES "")
 set(HEADERS "")
@@ -98,6 +99,14 @@ configure_file(
 
 # Declaring the library
 add_library(beam SHARED ${SOURCES} ${HEADERS})
+
+# --- OpenMP (optional) ---
+option(BEAM_USE_OPENMP "Build BEAM with OpenMP" ON)
+if (BEAM_USE_OPENMP)
+  find_package(OpenMP COMPONENTS CXX REQUIRED)
+  target_link_libraries(beam PRIVATE OpenMP::OpenMP_CXX)
+  target_compile_definitions(beam PUBLIC BEAM_WITH_OPENMP=1)
+endif()
 
 # Add binary dir to include paths to find generated config.hpp
 target_include_directories(beam 

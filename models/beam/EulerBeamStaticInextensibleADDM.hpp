@@ -18,8 +18,54 @@
 
 namespace beam {
 
+/**
+ * @brief A class to solve the static inextensible Euler–Bernoulli beam
+ * equation; this model is valid for large deflections. The strong form of the
+ * system that we seek to solve is
+ * \f[
+ *    \frac{\partial^2}{\partial s^2} \left(EI \frac{\partial^2
+ * \mathbf{r}}{\partial s^2}\right) = \mathbf{q}(s)
+ * \f]
+ * where \f(EI\f) is a bending stiffness, \f(\mathbf{r}(s) = (x(s),y(s))\f) is
+ * the deflection of our beam. Unlike the classic Euler-Bernouli beam equation,
+ * where inextensibility is implicitly enforced, in the \f(n > 1\f) dimensional
+ * version, we consider the deflection of the beam in each dimension along a
+ * curvilinear coordinate system, and our inextensbility must be enforced
+ * explicitly. Then, in addition, we enforce on the solution a pointwise
+ * constraint
+ * \f[
+ *    ||\mathbf{r}'(s)||^2 = 1.
+ * \f]
+ * To derive a weak form, we introduce a smooth test function
+ * ...
+ * \f[
+ *    \mathcal{L}_R(x,y,p,q,\lambda,\mu) = J(x,y) + \int_0^L \left[\lambda(p-x')
+ * + \mu(q-y')\right] ds + \frac{r}{2} \int_0^L \left[(p-x')^2 + (q-y')^2\right]
+ * ds.
+ * \f]
+ */
+
 class EulerBeamStaticInextensibleADDM : public EulerBeam
 {
+public:
+  size_t dimension;
+  size_t elements;
+  size_t dof;
+  real_t r_penalty, alpha;
+
+  Eigen::MatrixXd A; 
+  Eigen::VectorXd x, y;
+  Eigen::VectorXd f_x, f_y;
+
+  Eigen::LLT<Eigen::MatrixXd> llt;
+
+  Eigen::VectorXd lambda, mu;
+  Eigen::VectorXd p, q;
+  Eigen::VectorXd xp, yp;
+
+  size_t max_outer;
+  real_t tol_outer;
+
 public:
   EulerBeamStaticInextensibleADDM(real_t length,
                                   real_t EI,
@@ -29,210 +75,132 @@ public:
                                   beam::EulerBeamBCs bcs,
                                   real_t r_penalty)
     : EulerBeam(length, EI, area, nodes, bcs)
+
     , elements(nodes - 1)
     , dimension(2)
-    , dof((2 * nodes * dimension))
-    , jacobian(Eigen::MatrixXd::Zero(dof, dof))
-    , residual(Eigen::VectorXd::Zero(dof))
-    , lambda(Eigen::VectorXd::Zero(nodes))
-    , u(Eigen::VectorXd::Zero(dof))
+    , dof((2 * nodes))
+
+    , A(Eigen::MatrixXd::Zero(dof, dof))
+    , f_x(Eigen::VectorXd::Zero(dof))
+    , f_y(Eigen::VectorXd::Zero(dof))
+    , x(Eigen::VectorXd::Zero(dof))
+    , y(Eigen::VectorXd::Zero(dof))
+    , llt()
+
+    , xp(Eigen::VectorXd::Zero(nodes + elements))
+    , yp(Eigen::VectorXd::Zero(nodes + elements))
+    , lambda(Eigen::VectorXd::Zero(nodes + elements))
+    , mu(Eigen::VectorXd::Zero(nodes + elements))
+    , p(Eigen::VectorXd::Ones(nodes + elements))
+    , q(Eigen::VectorXd::Zero(nodes + elements))
+
     , r_penalty(r_penalty)
+    , tol_outer(1e-6)
+    , max_outer(10000)
   {
     set_load({ 0., load, 0. });
   };
 
   ~EulerBeamStaticInextensibleADDM() {};
 
-  const Eigen::VectorXd& get_solution() const { return u; }
-  const Eigen::VectorXd& get_residual() const { return residual; }
   const Eigen::VectorXd& get_lambda() const { return lambda; }
-  const Eigen::MatrixXd& get_jacobian() const { return jacobian; }
+  const Eigen::VectorXd& get_mu() const { return mu; }
+  const Eigen::MatrixXd& get_A() const { return A; }
 
-  void set_solution(Eigen::VectorXd s) { this->u = s; }
-  void set_residual(Eigen::VectorXd r) { this->residual = r; }
-  void set_lambda(Eigen::VectorXd l) { this->lambda = l; }
-  void set_jacobian(Eigen::MatrixXd j) { this->jacobian = j; }
+  // void set_lambda(Eigen::VectorXd l) { this->lambda = l; }
+  // void set_mu(Eigen::VectorXd m) { this->mu = m; }
+  // void set_A(Eigen::MatrixXd A) { this->A = A; }
 
-  void solve()
-  {
-    real_t S_norm = 0;
-    size_t max_iter_inner = 3;
-    size_t max_iter_outer = 50;
-    real_t tol_inner = 1e-6;
-    real_t tol_outer = 1e-6;
-
-    Eigen::LDLT<Eigen::MatrixXd> ldlt;
-
-    Eigen::ConjugateGradient<
-      Eigen::MatrixXd,                      // or SparseMatrix<double>
-      Eigen::Lower | Eigen::Upper,          // tell it K is symmetric
-      Eigen::DiagonalPreconditioner<real_t> // Jacobi preconditioner
-      >
-      cg;
-
-    apply_initial_condition();
-    assemble_system();
-    apply_boundary_conditions();
-
-    cg.compute(jacobian);
-    if (cg.info() != Eigen::Success) {
-      throw std::runtime_error("IC preconditioner failed");
-    }
-
-    for (size_t it_o = 0; it_o < max_iter_outer; it_o++) {
-
-      std::cout << "iter " << it_o << "  ‖S‖ = " << S_norm << "\n";
-
-      if (S_norm < tol_outer && it_o > 0) {
-        std::cout << "Converged in " << it_o << " iters.\n";
-        break;
-      }
-
-      for (size_t it_i = 0; it_i < max_iter_inner; it_i++) {
-
-        update_residual();
-        apply_boundary_conditions();
-
-        double res_norm = residual.norm();
-        std::cout << "iter " << it_i << "  ‖R‖ = " << res_norm << "\n";
-        if (res_norm < tol_inner) {
-          std::cout << "Converged in " << it_i << " iters.\n";
-          break;
-        } else if(std::isnan(res_norm) || std::isinf(res_norm)) {
-          BEAM_ABORT("Divergence");
-        }
-
-        Eigen::VectorXd delta_u;
-
-        delta_u = cg.solve(-residual);
-
-        std::cout << "‖J‖ =" << jacobian.norm() << std::endl;
-
-        // 4) update
-        u += delta_u;
-      }
-
-      S_norm = update_lambda();
-    }
-    update_mesh();
-  }
-
-  void update_residual() { residual = update_residual_template<real_t>(u); }
-
-  real_t update_lambda()
-  {
-    size_t nodes = mesh.get_nodes();
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_l = nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-
-    Eigen::VectorXd S = Eigen::VectorXd::Zero(ndof_l);
-
-    for (size_t i = 0; i < nodes; i++) {
-      real_t xp = u[2 * i + offset_x + 1];
-      real_t yp = u[2 * i + offset_y + 1];
-
-      S[i] = xp * xp + yp * yp - 1.0;
-
-      lambda[i] += S[i] * r_penalty;
-    }
-
-    return S.norm();
-  }
-
-  void update_mesh()
-  {
+  // Update this->mesh object based on the solution
+  void update_mesh() {
     size_t nodes = this->mesh.get_nodes();
 
     size_t ndof_x = 2 * nodes;
     size_t ndof_y = 2 * nodes;
-    size_t ndof_l = nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_l = ndof_x + ndof_y;
 
     std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
     std::vector<real_t>& s = mesh.get_curvilinear_axis();
 
     for (size_t i = 0; i < nodes; ++i) {
-      centerline[i][0] = u(offset_x + 2 * i);
-      centerline[i][1] = u(offset_y + 2 * i);
+      centerline[i][0] = x(2 * i);
+      centerline[i][1] = y(2 * i);
       centerline[i][2] = 0.;
     }
   }
 
-  void assemble_system()
-  {
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
-
-    ADVec x_ad(dof);
-    for (int i = 0; i < int(dof); ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(dof);
-      seed(i) = 1.0;
-      x_ad(i) = AD(u(i), seed);
-    }
-
-    ADVec R_ad = assemble_residual_template<AD>(x_ad);
-
-    residual.resize(dof);
-    jacobian.resize(dof, dof);
-    for (int i = 0; i < int(dof); ++i) {
-      residual(i) = R_ad(i).value();
-      jacobian.row(i) = R_ad(i).derivatives().transpose();
-    }
+  void apply_initial_condition() {
+    apply_initial_condition_xy();
+    apply_initial_condition_pq();
   }
 
-  void apply_initial_condition()
-  {
+  // Set initial condition
+  void apply_initial_condition_xy() {
     real_t h = mesh.get_ds();
     size_t nodes = mesh.get_nodes();
-
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
 
     for (size_t i = 0; i < nodes; i++) {
-      u(offset_x + 2 * i + 0) = h * i;
-      u(offset_x + 2 * i + 1) = 1.;
-      u(offset_y + 2 * i + 0) = 0.;
-      u(offset_y + 2 * i + 1) = 0.;
+      x(2*i + 0) = h*i;
+      x(2*i + 1) = 1.;
+      y(2*i + 0) = 0.;
+      y(2*i + 1) = 0.;
     }
   }
 
-  /**
-   * @brief Apply boundary conditions to the residual and jacobian
-   *
-   * Modifies the residual and jacobian according to boundary conditions:
-   * - free_bc: No constraints
-   * - simple_bc: Position constraints only
-   * - clamped_bc: Position and slope constraints
-   */
+  //
+  void compute_slopes_collocation() {
+    xp.setZero(); yp.setZero();
+    const real_t h = this->mesh.get_ds();
+    const size_t nodes = this->mesh.get_nodes();
 
-  void apply_boundary_conditions()
-  {
+    // Node collocation: Take the slope directly from the xy-solution
+    for (size_t ni = 0; ni < nodes; ni++) {
+      xp[ni] = x[2*ni + 1];
+      yp[ni] = y[2*ni + 1];
+    }
+
+    // Midpoint colloation: Evaulate slope via Hermite derivatives at xi = 0.5
+    for (size_t ei = 0; ei < elements; ei++) {
+      std::array<real_t,4> dH = CubicHermite<real_t>::derivs(0.5,h);
+
+      size_t edofs[4] = {
+        2*(ei+0)+0, 
+        2*(ei+0)+1, 
+        2*(ei+1)+0, 
+        2*(ei+1)+1
+      };
+
+      xp[nodes + ei] = dH[0]*x[edofs[0]] + dH[1]*x[edofs[1]] + dH[2]*x[edofs[2]] + dH[3]*x[edofs[3]];
+      yp[nodes + ei] = dH[0]*y[edofs[0]] + dH[1]*y[edofs[1]] + dH[2]*y[edofs[2]] + dH[3]*y[edofs[3]];
+    }
+  }
+
+  void apply_initial_condition_pq() {
+    const size_t nodes = this->mesh.get_nodes();
+    compute_slopes_collocation();
+    for (size_t ci = 0; ci < nodes + elements; ci++) {
+      real_t xprime = xp[ci];
+      real_t yprime = yp[ci];
+      real_t den = std::max(1e-14,sqrt(xprime*xprime + yprime*yprime));
+      p[ci] = xprime / den;
+      q[ci] = yprime / den;
+    }
+  }
+
+  // Apply boundary conditions to the matrix A
+  void apply_boundary_condition_A() {
     size_t nodes = mesh.get_nodes();
     real_t h = mesh.get_ds();
-
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_l = nodes;
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_l = ndof_x + ndof_y;
 
     for (size_t bi = 0; bi < 2; ++bi) {
       EulerBeamBCEnd bcend = boundary_conditions.end[bi];
       size_t ni = 0;
-      std::vector<size_t> idx(4);
 
-      switch (bcend) {
+      std::vector<size_t> idx;   //idx.reserve(2);   // (<=2);
+      std::vector<real_t> xvals; //xvals.reserve(2); // (<=2);
+      std::vector<real_t> yvals; //yvals.reserve(2); // (<=2);
+
+      switch (bcend)
+      {
         case left:
           ni = 0;
           break;
@@ -243,259 +211,275 @@ public:
 
       EulerBeamBCType bctype = boundary_conditions.type[bi];
       EulerBeamBCVals bcvals = boundary_conditions.vals[bi];
-      std::vector<real_t> vals(4);
 
-      switch (bctype) {
+      switch(bctype) {
         case free_bc:
           idx = {};
-          vals = {};
+          xvals = {};
+          yvals = {};
           break;
         case simple_bc:
-          idx = { offset_x + 2 * ni + 0, offset_y + 2 * ni + 0 };
-          vals = { bcvals.position[0], bcvals.position[1] };
+          idx = {2 * ni + 0};
+          xvals = {bcvals.position[0]};
+          yvals = {bcvals.position[1]};
           break;
         case clamped_bc:
-          idx = { offset_x + 2 * ni + 0,
-                  offset_x + 2 * ni + 1,
-                  offset_y + 2 * ni + 0,
-                  offset_y + 2 * ni + 1 };
-          vals = { bcvals.position[0],
-                   bcvals.slope[0],
-                   bcvals.position[1],
-                   bcvals.slope[1] };
+          idx = {2 * ni + 0};//, 2 * ni + 1};
+          xvals = {bcvals.position[0]}; //, bcvals.slope[0]};
+          yvals = {bcvals.position[1]}; //, bcvals.slope[1]};
           break;
       }
 
-      for (size_t i = 0; i < vals.size(); ++i) {
-        for (size_t j = 0; j < dof; ++j) {
-          jacobian(idx[i], j) = 0.;
-          jacobian(j, idx[i]) = 0.;
+      // Set boundary conditions in the matrix A
+      for (size_t i = 0; i < xvals.size(); i++) {
+        for (size_t j = 0; j < dof; ++ j) {
+          A(idx[i],j) = 0.;
+          A(j,idx[i]) = 0.;
         }
-        residual(idx[i]) = u(idx[i]) - vals[i];
-        jacobian(idx[i], idx[i]) = 1.;
+        A(idx[i], idx[i]) = 1.;
       }
     }
   }
 
-  /**
-   * @brief Assemble the residual vector for the nonlinear system
-   *
-   * @tparam T Scalar type (real_t or autodiff)
-   * @param u Current solution vector
-   * @param lambda Lagrangian multiplier
-   * @return Assembled residual vector containing:
-   *         - Bending energy terms
-   *         - External load contributions
-   *         - Inextensibility constraints
-   *
-   * Uses Gauss quadrature with 3 points for numerical integration.
-   */
-  template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_template(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u)
+  // Assemble the matrix A
+  void assemble_A()
   {
-    real_t h = mesh.get_ds();
-    size_t nodes = mesh.get_nodes();
+    const real_t h = this->mesh.get_ds();
+    const real_t xi_q[3] = { 0.1127016654, 0.5, 0.8872983346 };
+    const real_t w_q[3] = { 0.2777777778, 0.4444444444, 0.2777777778 };
 
-    real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
-    real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+    // Local stiffness matrices
+    Eigen::MatrixXd K4 = Eigen::MatrixXd::Zero(this->dof, this->dof);
+    Eigen::MatrixXd K2 = Eigen::MatrixXd::Zero(this->dof, this->dof);
 
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
+    for (size_t e = 0; e < this->elements; ++e) {
+      const size_t edofs[4] = {
+        2 * (e + 0) + 0, 
+        2 * (e + 0) + 1, 
+        2 * (e + 1) + 0, 
+        2 * (e + 1) + 1
+      };
 
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
+      real_t K4e[4][4] = { { 0 } };
+      real_t K2e[4][4] = { { 0 } };
 
-    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
-      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(dof);
+      // Quadtrature
+      for (size_t q = 0; q < 3; ++q) {
+        const real_t xi = xi_q[q];
+        const real_t w = w_q[q];
+
+        auto H = CubicHermite<real_t>::values(xi, h);
+        auto dH = CubicHermite<real_t>::derivs(xi, h);
+        auto ddH = CubicHermite<real_t>::second_derivs(xi, h);
+
+        // Accumulate local K4e and K2e
+        for (size_t a = 0; a < 4; ++a) {
+          for (size_t b = 0; b < 4; ++b) {
+            K4e[a][b] += ddH[a] * ddH[b] * w * h;
+            K2e[a][b] +=  dH[a] *  dH[b] * w * h;
+          }
+        }
+      }
+
+      // Scatter to global triplets
+      for (size_t a = 0; a < 4; ++a) {
+        for (size_t b = 0; b < 4; ++b) {
+          K4(edofs[a], edofs[b]) += K4e[a][b];
+          K2(edofs[a], edofs[b]) += K2e[a][b];
+        }
+      }
+    }
+
+    this->A = this->EI * K4 + this->r_penalty * K2;
+  }
+
+  // Cholesky decompose the matrix A
+  void decompose_A() { 
+    llt.compute(A); 
+  }
+
+  // Assemble the rhs vector for x-axis
+  void assemble_f()
+  {
+    f_x.setZero();
+    f_y.setZero();
+
+    const real_t h = this->mesh.get_ds();
+    const size_t nodes = this->mesh.get_nodes();
+
+    const real_t xi_q[3] = { 0.1127016654, 0.5, 0.8872983346 };
+    const real_t w_q[3] = { 0.2777777778, 0.4444444444, 0.2777777778 };
 
     for (size_t e = 0; e < elements; ++e) {
-      std::vector<size_t> elem_nodes = { e, e + 1 };
-      std::vector<size_t> idx_x = { offset_x + 2 * elem_nodes[0],
-                                    offset_x + 2 * elem_nodes[0] + 1,
-                                    offset_x + 2 * elem_nodes[1],
-                                    offset_x + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_y = { offset_y + 2 * elem_nodes[0],
-                                    offset_y + 2 * elem_nodes[0] + 1,
-                                    offset_y + 2 * elem_nodes[1],
-                                    offset_y + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_l = { elem_nodes[0], elem_nodes[1] };
-
-      std::array<T, 4> ux = {
-        u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
+      size_t edofs[4] = {
+        2 * (e + 0) + 0, 
+        2 * (e + 0) + 1, 
+        2 * (e + 1) + 0, 
+        2 * (e + 1) + 1
       };
-      std::array<T, 4> uy = {
-        u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
-      };
-      std::array<T, 2> ul = { lambda[idx_l[0]], lambda[idx_l[1]] };
-
-      std::vector<T> R_loc_x(4, 0);
-      std::vector<T> R_loc_y(4, 0);
-      // std::vector<T> R_loc_l(2, 0);
+      real_t fxe[4] = { 0, 0, 0, 0 };
+      real_t fye[4] = { 0, 0, 0, 0 };
 
       for (size_t qi = 0; qi < 3; ++qi) {
         real_t xi = xi_q[qi];
         real_t w = w_q[qi];
 
+        auto L = QuadraticLagrange<real_t>::values(xi);
         auto H = CubicHermite<real_t>::values(xi, h);
         auto dH = CubicHermite<real_t>::derivs(xi, h);
-        auto ddH = CubicHermite<real_t>::second_derivs(xi, h);        
-        auto M = LinearShape<real_t>::values(xi);
 
-        T x = 0, xp = 0, xpp = 0;
-        T y = 0, yp = 0, ypp = 0;
-        for (size_t i = 0; i < 4; i++) {
-          x += H[i] * ux[i];
-          xp += dH[i] * ux[i];
-          xpp += ddH[i] * ux[i];
-          y += H[i] * uy[i];
-          yp += dH[i] * uy[i];
-          ypp += ddH[i] * uy[i];
-        }
+        size_t l = e;
+        size_t m = nodes + e;
+        size_t r = e + 1;
 
-        // T l = 0;
-        // for (size_t i = 0; i < 2; i++) {
-        //   l += M[i] * ul[i];
-        // }
-
-        // T S = 0;
-        // if (constraint) {
-        //   S = xp * xp + yp * yp - 1.0;
-        // }
+        real_t p_val      = L[0] * p[l]      + L[1] * p[m]      + L[2] * p[r];
+        real_t lambda_val = L[0] * lambda[l] + L[1] * lambda[m] + L[2] * lambda[r];
+        real_t q_val      = L[0] * q[l]      + L[1] * q[m]      + L[2] * q[r];
+        real_t mu_val     = L[0] * mu[l]     + L[1] * mu[m]     + L[2] * mu[r];
 
         for (size_t a = 0; a < 4; ++a) {
-          // Bending Energy Contributions
-          R_loc_x[a] += EI * xpp * ddH[a] * w * h;
-          R_loc_y[a] += EI * ypp * ddH[a] * w * h;
-          // External load contribution
-          R_loc_x[a] -= uniform_load[0] * H[a] * w * h;
-          R_loc_y[a] -= uniform_load[1] * H[a] * w * h;
-          // Constraint contributions
-          // if (constraint) {
-          //   R_loc_x[a] += 2 * (l + r_penalty * S) * xp * dH[a] * w * h;
-          //   R_loc_y[a] += 2 * (l + r_penalty * S) * yp * dH[a] * w * h;
-          // }
+          fxe[a] += (lambda_val + r_penalty * p_val) * dH[a] * w * h;
+          fye[a] += (mu_val     + r_penalty * q_val) * dH[a] * w * h;
+          fxe[a] += uniform_load[0] * H[a] * w * h;
+          fye[a] += uniform_load[1] * H[a] * w * h;
         }
-
-        // for (size_t a = 0; a < 2; ++a) {
-        //   // Variation w.r.t. lambda
-        //   R_loc_l[a] += S * M[a] * w * h;
-        // }
       }
-
-      // Scatter local residual contribution to global residual
-      for (size_t i = 0; i < 4; ++i) {
-        residual[idx_x[i]] += R_loc_x[i];
-        residual[idx_y[i]] += R_loc_y[i];
+      for (size_t a = 0; a < 4; ++a) {
+        f_x(edofs[a]) += fxe[a];
+        f_y(edofs[a]) += fye[a];
       }
-
-      // for (size_t i = 0; i < 2; ++i) {
-      //   residual[idx_l[i]] += R_loc_l[i];
-      // }
     }
-    return residual;
   }
 
-  template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> update_residual_template(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u)
-  {
-    real_t h = mesh.get_ds();
+  // Apply the boundary condition to the f vector(s)
+  void apply_boundary_condition_f() {
     size_t nodes = mesh.get_nodes();
+    real_t h = mesh.get_ds();
 
-    real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
-    real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+    for (size_t bi = 0; bi < 2; ++bi) {
+      EulerBeamBCEnd bcend = boundary_conditions.end[bi];
+      size_t ni = 0;
 
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
+      std::vector<size_t> idx;   //idx.reserve(2);   // (<=2);
+      std::vector<real_t> xvals; //xvals.reserve(2); // (<=2);
+      std::vector<real_t> yvals; //yvals.reserve(2); // (<=2);
 
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-
-    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
-      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(dof);
-
-    for (size_t e = 0; e < elements; ++e) {
-      std::vector<size_t> elem_nodes = { e, e + 1 };
-      std::vector<size_t> idx_x = { offset_x + 2 * elem_nodes[0],
-                                    offset_x + 2 * elem_nodes[0] + 1,
-                                    offset_x + 2 * elem_nodes[1],
-                                    offset_x + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_y = { offset_y + 2 * elem_nodes[0],
-                                    offset_y + 2 * elem_nodes[0] + 1,
-                                    offset_y + 2 * elem_nodes[1],
-                                    offset_y + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_l = { elem_nodes[0], elem_nodes[1] };
-
-      std::array<T, 4> ux = {
-        u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
-      };
-      std::array<T, 4> uy = {
-        u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
-      };
-      std::array<T, 2> ul = { lambda[idx_l[0]], lambda[idx_l[1]] };
-
-      std::vector<T> R_loc_x(4, 0);
-      std::vector<T> R_loc_y(4, 0);
-
-      for (size_t qi = 0; qi < 3; ++qi) {
-        real_t xi = xi_q[qi];
-        real_t w = w_q[qi];
-
-        auto H = CubicHermite<real_t>::values(xi, h);
-        auto dH = CubicHermite<real_t>::derivs(xi, h);
-        auto ddH = CubicHermite<real_t>::second_derivs(xi, h);        
-        auto M = LinearShape<real_t>::values(xi);
-
-        T x = 0, xp = 0, xpp = 0;
-        T y = 0, yp = 0, ypp = 0;
-        for (size_t i = 0; i < 4; i++) {
-          x += H[i] * ux[i];
-          xp += dH[i] * ux[i];
-          xpp += ddH[i] * ux[i];
-          y += H[i] * uy[i];
-          yp += dH[i] * uy[i];
-          ypp += ddH[i] * uy[i];
-        }
-
-        T l = 0;
-        for (size_t i = 0; i < 2; i++) {
-          l += M[i] * ul[i];
-        }
-
-        T S = 0;
-        S = xp * xp + yp * yp - 1.0;
-
-        for (size_t a = 0; a < 4; ++a) {
-          // Bending Energy Contributions
-          R_loc_x[a] += EI * xpp * ddH[a] * w * h;
-          R_loc_y[a] += EI * ypp * ddH[a] * w * h;
-          // External load contribution in y
-          R_loc_x[a] -= uniform_load[0] * H[a] * w * h;
-          R_loc_y[a] -= uniform_load[1] * H[a] * w * h;
-          // Constraint contributions
-          R_loc_x[a] += 2 * (l + r_penalty * S) * xp * dH[a] * w * h;
-          R_loc_y[a] += 2 * (l + r_penalty * S) * yp * dH[a] * w * h;
-        }
+      switch (bcend)
+      {
+        case left:
+          ni = 0;
+          break;
+        case right:
+          ni = nodes - 1;
+          break;
       }
 
-      // Scatter local residual contribution to global residual
-      for (size_t i = 0; i < 4; ++i) {
-        residual[idx_x[i]] += R_loc_x[i];
-        residual[idx_y[i]] += R_loc_y[i];
+      EulerBeamBCType bctype = boundary_conditions.type[bi];
+      EulerBeamBCVals bcvals = boundary_conditions.vals[bi];
+
+      switch(bctype) {
+        case free_bc:
+          idx = {};
+          xvals = {};
+          yvals = {};
+          break;
+        case simple_bc:
+          idx = {2 * ni + 0};
+          xvals = {bcvals.position[0]};
+          yvals = {bcvals.position[1]};
+          break;
+        case clamped_bc:
+          idx = {2 * ni + 0 }; // 2 * ni + 1};
+          xvals = {bcvals.position[0]}; //, bcvals.slope[0]};
+          yvals = {bcvals.position[1]}; //, bcvals.slope[1]};
+          break;
+      }
+
+      // Set boundary conditions in the matrix A
+      for (size_t i = 0; i < xvals.size(); i++) {
+        // Set boundary conditions in f_x 
+        f_x(idx[i]) = xvals[i];
+        // Set boundary conditions in f_y 
+        f_y(idx[i]) = yvals[i];
       }
     }
-    return residual;
   }
 
-  size_t dimension;
-  size_t elements;
-  size_t dof;
-  real_t r_penalty;
+  // Perform one update of the linear system
+  void update_xy() {
+    assemble_f();
+    apply_boundary_condition_f();
 
-  Eigen::VectorXd residual, lambda;
-  Eigen::MatrixXd jacobian;
-  Eigen::VectorXd u;
+    x = llt.solve(f_x);
+    y = llt.solve(f_y);
+  }
+
+  // Perform a pointwise projection of (p^n, q^n) onto the unit circle to obtain (p^{n+1}, q^{n+1}) 
+  void update_pq() {
+    const real_t h = mesh.get_ds();
+    const size_t nodes = mesh.get_nodes();
+    compute_slopes_collocation();
+
+    //#pragma omp parallel for schedule(static)
+    for (size_t ci = 0; ci < nodes + elements; ci++) {
+      const real_t xprime = xp[ci];
+      const real_t yprime = yp[ci];
+      real_t X = xprime - lambda[ci] / r_penalty; 
+      real_t Y = yprime -     mu[ci] / r_penalty; 
+      real_t norm = std::max(1e-6,sqrt(X*X + Y*Y));             
+      p[ci] = X/norm;
+      q[ci] = Y/norm;
+    }
+  }
+
+  // Update the lagrange multipliers \lambda and \mu
+  void update_multipliers() {
+    const real_t h = mesh.get_ds();
+    const size_t nodes = mesh.get_nodes();
+    compute_slopes_collocation();
+
+    //#pragma omp parallel for schedule(static)
+    for (size_t ci = 0; ci < nodes + elements; ci++) {
+      lambda[ci] += r_penalty * (p[ci] - xp[ci]);
+      mu[ci]     += r_penalty * (q[ci] - yp[ci]);
+    }
+  }
+
+  // Solve 
+  void solve() {
+    apply_initial_condition_xy();
+    apply_initial_condition_pq();
+
+    assemble_A();
+    apply_boundary_condition_A();
+    decompose_A();
+
+    for (size_t iter = 0; iter < max_outer; ++iter) {
+      // std::cout << "Iter " << iter << std::endl;
+      update_pq();
+      p[0] = 1.;
+      q[0] = 0.;
+      update_xy();
+      update_multipliers();
+      if (is_converged()) { break; }
+    }
+
+    update_mesh();
+  };
+
+  // compute the inf norm ||\mathbf{p} - \mathbf{x}'||_{\infty} and ||\mathbf{q} - \mathbf{y}'||_{\infty}
+bool is_converged(bool recompute_slopes = true) {
+  if (recompute_slopes) {
+    compute_slopes_collocation();   // fills xp, yp from current x,y
+  }
+  const real_t res_p = (p - xp).cwiseAbs().maxCoeff();
+  const real_t res_q = (q - yp).cwiseAbs().maxCoeff();
+  const real_t res   = std::max(res_p, res_q);
+
+  // std::cout << "max|p-x'|=" << res_p << ", max|q-y'|=" << res_q << '\n';
+  return res < tol_outer;
+}
+
 };
 
 } // namespace beam

@@ -19,10 +19,10 @@
 
 namespace beam {
 
-class EulerBeamStaticInextensibleADDMSparse : public EulerBeam
+class EulerBeamStaticInextensibleMoMSparse : public EulerBeam
 {
 public:
-  EulerBeamStaticInextensibleADDMSparse(real_t length,
+  EulerBeamStaticInextensibleMoMSparse(real_t length,
                                   real_t EI,
                                   real_t load,
                                   real_t area,
@@ -42,7 +42,7 @@ public:
     set_load({ 0., load, 0. });
   };
 
-  ~EulerBeamStaticInextensibleADDMSparse() {};
+  ~EulerBeamStaticInextensibleMoMSparse() {};
 
   const Eigen::VectorXd& get_solution() const { return u; }
   const Eigen::VectorXd& get_residual() const { return residual; }
