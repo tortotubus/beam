@@ -184,6 +184,7 @@ public:
       p[ci] = xprime / den;
       q[ci] = yprime / den;
     }
+    apply_boundary_condition_pq();
   }
 
   // Apply boundary conditions to the matrix A
@@ -405,6 +406,26 @@ public:
     }
   }
 
+  // Apply the boundary condition to the p,q variables
+  void apply_boundary_condition_pq() {
+    const size_t nodes = mesh.get_nodes();
+    for (size_t bi = 0; bi < 2; bi++) {
+      if (boundary_conditions.type[bi] == clamped_bc) {
+        switch (boundary_conditions.end[bi])
+        {
+          case left:
+            p(0) = boundary_conditions.vals[bi].slope[0];
+            q(0) = boundary_conditions.vals[bi].slope[1];
+            break;
+          case right:
+            p(nodes-1) = boundary_conditions.vals[bi].slope[0];
+            q(nodes-1) = boundary_conditions.vals[bi].slope[1];
+            break;
+        }
+      }
+    }
+  }
+
   // Perform one update of the linear system
   void update_xy() {
     assemble_f();
@@ -430,6 +451,8 @@ public:
       p[ci] = X/norm;
       q[ci] = Y/norm;
     }
+
+    apply_boundary_condition_pq();
   }
 
   // Update the lagrange multipliers \lambda and \mu
@@ -457,8 +480,6 @@ public:
     for (size_t iter = 0; iter < max_outer; ++iter) {
       // std::cout << "Iter " << iter << std::endl;
       update_pq();
-      p[0] = 1.;
-      q[0] = 0.;
       update_xy();
       update_multipliers();
       if (is_converged()) { break; }
