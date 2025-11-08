@@ -74,12 +74,13 @@ endif()
 # Find Eigen3 package
 find_package(Eigen3 REQUIRED)
 
-
+# Find HDF5 package
+find_package(HDF5 COMPONENTS CXX REQUIRED)
 
 # Headers and sources
 set(SOURCES "")
 set(HEADERS "")
-set(BEAM_SOURCE_DIRS general models basilisk)
+set(BEAM_SOURCE_DIRS general models io basilisk)
 
 # Collect from the specified subdirectories
 foreach(DIR IN LISTS BEAM_SOURCE_DIRS)
@@ -119,6 +120,8 @@ target_include_directories(beam
 target_link_libraries(beam 
   PUBLIC
     Eigen3::Eigen
+    HDF5::HDF5
+    hdf5::hdf5_cpp
 )
 
 option(BUILD_TESTS "Build unit & integration tests" OFF)

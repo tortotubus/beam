@@ -1,9 +1,15 @@
 list(APPEND SRCS
-  vertex.cpp
+  VTKPolyData.cpp
+  HDF.cpp
+  VTKHDF.cpp
+  VTKHDFPolyData.cpp
 )
 
 list(APPEND HDRS
-  vertex.hpp
+  VTKPolyData.hpp
+  HDF.hpp
+  VTKHDF.hpp
+  VTKHDFPolyData.hpp
 )
 
 convert_filenames_to_full_paths(SRCS)

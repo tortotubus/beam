@@ -1,8 +1,9 @@
 set(HDRS
   immersedboundary.hpp
   spring/Spring.hpp
+  beam/EulerBeamDynamicInextensibleADDM.hpp
+  beam/EulerBeamDynamicInextensibleMoM.hpp
   beam/EulerBeamStatic.hpp
-  beam/EulerBeamStaticInextensible.hpp
   beam/EulerBeamStaticInextensibleADDM.hpp
   beam/EulerBeamStaticInextensibleMoM.hpp
   beam/EulerBeamStaticInextensibleMoMSparse.hpp
@@ -13,7 +14,6 @@ set(SRCS
   immersedboundary.cpp
   spring/Spring.cpp
   beam/EulerBeamStatic.cpp
-  beam/EulerBeamStaticInextensible.cpp
   beam/EulerBeamStaticInextensibleADDM.cpp
   beam/EulerBeamStaticInextensibleMoM.cpp
   beam/EulerBeamStaticInextensibleMoMSparse.cpp

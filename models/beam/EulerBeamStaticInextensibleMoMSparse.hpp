@@ -24,12 +24,11 @@ class EulerBeamStaticInextensibleMoMSparse : public EulerBeam
 public:
   EulerBeamStaticInextensibleMoMSparse(real_t length,
                                   real_t EI,
-                                  real_t load,
-                                  real_t area,
                                   size_t nodes,
                                   beam::EulerBeamBCs bcs,
-                                  real_t r_penalty)
-    : EulerBeam(length, EI, area, nodes, bcs)
+                                  real_t r_penalty
+                                )
+    : EulerBeam(length, EI, nodes, bcs)
     , elements(nodes - 1)
     , dimension(2)
     , dof((2 * nodes * dimension))
@@ -39,7 +38,7 @@ public:
     , u(Eigen::VectorXd::Zero(dof))
     , r_penalty(r_penalty)
   {
-    set_load({ 0., load, 0. });
+    
   };
 
   ~EulerBeamStaticInextensibleMoMSparse() {};
@@ -54,7 +53,7 @@ public:
   void set_lambda(Eigen::VectorXd l) { this->lambda = l; }
   void set_jacobian(Eigen::SparseMatrix<real_t> j) { this->jacobian = j; }
 
-  void solve()
+  void solve(std::array<real_t, 3> load) override
   {
     real_t S_norm = 0;
     size_t max_iter_inner = 3;
@@ -82,7 +81,7 @@ public:
 
       for (size_t it_i = 0; it_i < max_iter_inner; it_i++) {
 
-        assemble_system();
+        assemble_system(load);
         apply_boundary_conditions();
 
         double res_norm = residual.norm();
@@ -115,7 +114,7 @@ public:
     update_mesh();
   }
 
-  void assemble_residual() { residual = assemble_residual_template<real_t>(u); }
+  void assemble_residual(std::array<real_t,3> load) { residual = assemble_residual_template<real_t>(u, load); }
 
   real_t update_lambda()
   {
@@ -182,7 +181,7 @@ public:
   //   }
   // }
 
-  void assemble_system()
+  void assemble_system(std::array<real_t, 3> load)
   {
     using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
     using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
@@ -197,7 +196,7 @@ public:
     }
 
     // --- 2) Compute AD residuals ---
-    ADVec R_ad = assemble_residual_template<AD>(x_ad);
+    ADVec R_ad = assemble_residual_template<AD>(x_ad, load);
 
     // --- 3) Extract values + build Jacobian triplets ---
     residual.resize(dof);
@@ -238,9 +237,30 @@ public:
     jacobian.makeCompressed();
   }
 
+  void apply_initial_condition(EulerBeamMesh &bmesh) override {
+    size_t nodes = mesh.get_nodes();
+    size_t ndof_x = 2 * nodes;
+    size_t ndof_y = 2 * nodes;
+    size_t offset_x = 0;
+    size_t offset_y = ndof_x;
+
+    BEAM_ASSERT(nodes == bmesh.get_nodes(), "Provided mesh must have same node count as the previous mesh.\n");
+
+    auto centerline = bmesh.get_centerline();
+    auto slopes = bmesh.get_slope();
+
+    for (size_t ni = 0; ni < nodes; ni++) {
+      u(offset_x + 2 * ni + 0) = centerline[ni][0];
+      u(offset_x + 2 * ni + 1) = slopes[ni][0];
+      u(offset_y + 2 * ni + 0) = centerline[ni][1];
+      u(offset_y + 2 * ni + 1) = slopes[ni][1];
+    }
+  }
+
   void apply_initial_condition()
   {
     real_t h = mesh.get_ds();
+    real_t L = mesh.get_length();
     size_t nodes = mesh.get_nodes();
 
     size_t ndof_x = 2 * nodes;
@@ -369,7 +389,7 @@ public:
    */
   template<typename T>
   Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_template(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u)
+    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u, const std::array<real_t, 3> load)
   {
     real_t h = mesh.get_ds();
     size_t nodes = mesh.get_nodes();
@@ -382,6 +402,8 @@ public:
 
     size_t offset_x = 0;
     size_t offset_y = ndof_x;
+
+    // std::vector<std::array<real_t,3>> load = get_load();
 
     Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
       Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(dof);
@@ -408,7 +430,7 @@ public:
 
       std::vector<T> R_loc_x(4, 0);
       std::vector<T> R_loc_y(4, 0);
-      // std::vector<T> R_loc_l(2, 0);
+      std::vector<T> R_loc_l(2, 0);
 
       for (size_t qi = 0; qi < 3; ++qi) {
         real_t xi = xi_q[qi];
@@ -442,17 +464,17 @@ public:
           R_loc_x[a] += EI * xpp * ddH[a] * w * h;
           R_loc_y[a] += EI * ypp * ddH[a] * w * h;
           // External load contribution in y
-          R_loc_x[a] -= uniform_load[0] * H[a] * w * h;
-          R_loc_y[a] -= uniform_load[1] * H[a] * w * h;
+          R_loc_x[a] -= load[0] * H[a] * w * h;
+          R_loc_y[a] -= load[1] * H[a] * w * h;
           // Constraint contributions
           R_loc_x[a] += 2 * (l + r_penalty * S) * xp * dH[a] * w * h;
           R_loc_y[a] += 2 * (l + r_penalty * S) * yp * dH[a] * w * h;
         }
 
-        // for (size_t a = 0; a < 2; ++a) {
-        //   // Variation w.r.t. lambda
-        //   R_loc_l[a] += S * M[a] * w * h;
-        // }
+        for (size_t a = 0; a < 2; ++a) {
+          // Variation w.r.t. lambda
+          R_loc_l[a] += S * M[a] * w * h;
+        }
       }
 
       // Scatter local residual contribution to global residual
@@ -461,9 +483,9 @@ public:
         residual[idx_y[i]] += R_loc_y[i];
       }
 
-      // for (size_t i = 0; i < 2; ++i) {
-      //   residual[idx_l[i]] += R_loc_l[i];
-      // }
+      for (size_t i = 0; i < 2; ++i) {
+        residual[idx_l[i]] += R_loc_l[i];
+      }
     }
     return residual;
   }
