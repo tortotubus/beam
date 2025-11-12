@@ -44,7 +44,8 @@ typedef struct
 void
 ibnode_init_stencil(IBNode* n)
 {
-  n->stencil.n = STENCIL_SIZE;
+  // n->stencil.n = STENCIL_SIZE;
+  n->stencil.n = 0;
   n->stencil.nm = STENCIL_SIZE;
   n->stencil.p = (Index*)malloc(STENCIL_SIZE * sizeof(Index));
 }

@@ -27,8 +27,8 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
     COMMAND ${QCC_EXECUTABLE}
       "${example_name}.c" 
       -I"${CMAKE_SOURCE_DIR}/basilisk/"
-      -I"${MPI_C_INCLUDE_DIRS}"
-      -I"${HDF5_INCLUDE_DIRS}"
+      # -I"${MPI_C_INCLUDE_DIRS}"
+      # -I"${HDF5_INCLUDE_DIRS}"
       -source
     DEPENDS
       basilisk #source
@@ -47,8 +47,8 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
   # 4. Include your headers
   target_include_directories(${example_name} PRIVATE
     "${CMAKE_SOURCE_DIR}/basilisk"
-    ${MPI_C_INCLUDE_DIRS}
-    ${HDF5_INCLUDE_DIRS}
+    # ${MPI_C_INCLUDE_DIRS}
+    # ${HDF5_INCLUDE_DIRS}
   )
 
   target_compile_options(${example_name} PRIVATE
@@ -62,8 +62,8 @@ foreach(example_basilisk_source ${BASILISK_C_EXAMPLE_SRCS})
   target_link_libraries(${example_name}
     PRIVATE
       beam
-      ${HDF5_HL_LIBRARIES}
-      ${HDF5_LIBRARIES}
+      hdf5::hdf5
+      hdf5::hdf5_hl
       m
   )
   
