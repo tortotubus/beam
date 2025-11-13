@@ -1,1 +1,0 @@
-#include "coefficient.hpp"
