@@ -22,7 +22,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y libeigen3-dev libhdf5-dev libgtest-dev libopenmpi-dev cmake gcc 
+      run: sudo apt-get update && sudo apt-get install -y libeigen3-dev libhdf5-openmpi-dev libgtest-dev libopenmpi-dev cmake gcc 
 
     - name: Configure CMake
       run: |
