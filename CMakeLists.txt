@@ -59,6 +59,7 @@ else()
   set(BEAM_DEBUG OFF)
 endif()
 
+
 # BLAS, LAPACK
 if (BEAM_USE_LAPACK)
   find_package(BLAS REQUIRED)
@@ -71,11 +72,18 @@ if (MFEM_USE_CODIPACK)
   # find_package updates CODIPACK_FOUND, CODIPACK_INCLUDE_DIRS, CODIPACK_LIBRARIES
 endif()
 
+option (BEAM_USE_MPI "Build beam with MPI" ON)
+find_package(MPI REQUIRED)
+
 # Find Eigen3 package
 find_package(Eigen3 REQUIRED)
 
 # Find HDF5 package
-find_package(HDF5 COMPONENTS C CXX HL REQUIRED)
+
+set(HDF5_PREFER_PARALLEL TRUE)
+# set(HDF5_DIR "/usr/lib64/openmpi/lib/cmake/hdf5") 
+find_package(HDF5 COMPONENTS C HL REQUIRED)
+# find_package(HDF5 COMPONENTS C CXX HL REQUIRED)
 
 # Headers and sources
 set(SOURCES "")
@@ -119,10 +127,12 @@ target_include_directories(beam
 # Link in numeric libs
 target_link_libraries(beam 
   PUBLIC
+    hdf5::hdf5
+    hdf5::hdf5_hl
+    MPI::MPI_CXX
     Eigen3::Eigen
     OpenMP::OpenMP_CXX
-    hdf5::hdf5_cpp       # C++ API
-    hdf5::hdf5
+    # hdf5::hdf5_cpp       # C++ API
 )
 
 option(BUILD_TESTS "Build unit & integration tests" OFF)

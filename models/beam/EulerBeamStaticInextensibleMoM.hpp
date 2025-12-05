@@ -14,6 +14,8 @@
 #include <vector>
 
 #include <Eigen/Dense>
+#include <Eigen/IterativeLinearSolvers>
+#include <Eigen/SparseCholesky> // for SimplicialLLT
 #include <unsupported/Eigen/AutoDiff>
 
 namespace beam {
@@ -28,77 +30,131 @@ public:
                                  real_t r_penalty)
     : EulerBeam(length, EI, nodes, bcs)
     , elements(nodes - 1)
-    , dof((2 * nodes * 3) + nodes)
+    , nodes(nodes)
+    , ds(mesh.get_ds())
+    , ndof_x(2 * nodes)
+    , ndof_y(2 * nodes)
+    , ndof_z(2 * nodes)
+    , ndof_l(1 * nodes)
+    , ndof(ndof_x + ndof_y + ndof_z)
+    , offset_x(0)
+    , offset_y(ndof_x)
+    , offset_z(ndof_x + ndof_y)
+    , offset_l(ndof_x + ndof_y + ndof_z)
     , r_penalty(r_penalty)
-    , jacobian(Eigen::MatrixXd::Zero(dof, dof))
-    , residual(Eigen::VectorXd::Zero(dof))
-    , u(Eigen::VectorXd::Zero(dof))
+    , max_iter_outer(1000)
+    , max_iter_inner(1000)
+    , tol_outer(1e-5)
+    , tol_inner(1e-5)
+    , jacobian(Eigen::MatrixXd::Zero(ndof, ndof))
+    , residual(Eigen::VectorXd::Zero(ndof))
+    , u(Eigen::VectorXd::Zero(ndof))
+    , lambda(Eigen::VectorXd::Zero(ndof_l))
   {
     apply_initial_condition(this->mesh);
   };
 
   ~EulerBeamStaticInextensibleMoM() {};
 
+  /**
+   *
+   */
+  virtual void solve() override { solve({ 0., 0., 0. }); }
 
   /**
-   * 
+   *
    */
-  virtual void solve() override {
-    solve({0.,0.,0.});
-  }
 
-  /**
-   * 
-   */
-  virtual void solve(std::array<real_t, 3> load) override
+  void solve(std::array<real_t, 3> load) override
   {
-    real_t tol = 1e-6;
-    size_t max_iter = 100;
+    real_t S_norm = 0;
 
-    Eigen::LLT<Eigen::MatrixXd> cholesky;
-    Eigen::LDLT<Eigen::MatrixXd> ldlt;
+    Eigen::LDLT<Eigen::MatrixXd> solver;
+    // Eigen::LLT<Eigen::MatrixXd> solver;
+    // Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver;
+    // Eigen::BiCGSTAB<Eigen::MatrixXd> solver;
+    // Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Upper | Eigen::Lower> solver; solver.setTolerance(tol_inner);
 
-    for (size_t it = 0; it < max_iter; it++) {
+    for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
       assemble_system(load);
       apply_boundary_conditions();
 
       real_t res_norm = residual.norm();
-      std::cout << "iter " << it << "  ‖R‖ = " << res_norm << "\n";
-      if (res_norm < tol) {
-        std::cout << "Converged in " << it << " iters.\n";
+
+      if (res_norm < tol_outer) {
+        std::cout << iter_outer << ": ||r|| = " << res_norm;
+        std::cout << "\t ||S|| = " << S_norm << std::endl;
         break;
-      }
-
-      Eigen::VectorXd delta_u;
-      ldlt.compute(jacobian);
-      if (1 == 1) { // ldlt.info() == Eigen::Success) {
-        delta_u = jacobian.colPivHouseholderQr().solve(-residual);
+      } else if (iter_outer == max_iter_outer - 1) {
+        BEAM_ABORT(
+          "EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
       } else {
-        delta_u = ldlt.solve(-residual);
+        std::cout << iter_outer << ": ||r|| = " << res_norm;
+        std::cout << "\t ||S|| = " << S_norm << std::endl;
       }
 
-      // 4) update
+      solver.compute(jacobian);
+
+      if (solver.info() != Eigen::Success) {
+        BEAM_ABORT("EulerBeamStaticInextensibleMoM::solve(): "
+                   "Preconditioner failed.\n");
+      }
+
+      Eigen::VectorXd delta_u = solver.solve(-residual);
       u += delta_u;
 
-      update_mesh();
+      S_norm = update_lambda();
     }
+
+    update_mesh();
+  }
+
+  void solve(std::vector<std::array<real_t,3>> load)
+  {
+    real_t S_norm = 0;
+
+    Eigen::LDLT<Eigen::MatrixXd> solver;
+    //Eigen::LLT<Eigen::MatrixXd> solver;
+    // Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver;
+    // Eigen::BiCGSTAB<Eigen::MatrixXd> solver;
+    //Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Upper | Eigen::Lower> solver; solver.setTolerance(tol_inner);
+
+    for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
+      assemble_system(load);
+      apply_boundary_conditions();
+
+      real_t res_norm = residual.norm();
+
+      if (res_norm < tol_outer) {
+        std::cout << iter_outer << ": ||r|| = " << res_norm;
+        std::cout << "\t ||S|| = " << S_norm << std::endl;
+        break;
+      } else if (iter_outer == max_iter_outer - 1) {
+        BEAM_ABORT(
+          "EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
+      } else {
+        std::cout << iter_outer << ": ||r|| = " << res_norm;
+        std::cout << "\t ||S|| = " << S_norm << std::endl;
+      }
+
+      solver.compute(jacobian);
+
+      if (solver.info() != Eigen::Success) {
+        BEAM_ABORT("EulerBeamStaticInextensibleMoM::solve(): "
+                   "Preconditioner failed.\n");
+      }
+
+      Eigen::VectorXd delta_u = solver.solve(-residual);
+      u += delta_u;
+
+      S_norm = update_lambda();
+    }
+
+    update_mesh();
   }
 
   virtual void apply_initial_condition()
   {
-    size_t nodes = mesh.get_nodes();
-    real_t ds = mesh.get_ds();
-
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_z = 2 * nodes;
-    size_t ndof_l = nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_z = ndof_x + ndof_y;
-    size_t offset_l = ndof_x + ndof_y + ndof_z;
-
     for (size_t i = 0; i < nodes; i++) {
       u(offset_x + 2 * i + 0) = ds * i;
       u(offset_x + 2 * i + 1) = 1.;
@@ -106,15 +162,13 @@ public:
       u(offset_y + 2 * i + 1) = 0.;
       u(offset_z + 2 * i + 0) = 0.;
       u(offset_z + 2 * i + 1) = 0.;
-      u(offset_l + i) = 0.;
+      lambda(i) = 0.;
     }
+    update_mesh();
   }
 
   virtual void apply_initial_condition(EulerBeamMesh& bmesh) override
   {
-
-    size_t nodes = bmesh.get_nodes();
-
     if (bmesh.get_nodes() != mesh.get_nodes()) {
       BEAM_ABORT("");
     }
@@ -122,36 +176,34 @@ public:
     auto centerline = bmesh.get_centerline();
     auto slope = bmesh.get_slope();
 
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_z = 2 * nodes;
-    size_t ndof_l = nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_z = ndof_x + ndof_y;
-    size_t offset_l = ndof_x + ndof_y + ndof_z;
-
     for (size_t i = 0; i < nodes; i++) {
       u(offset_x + 2 * i + 0) = centerline[i][0];
-      u(offset_x + 2 * i + 1) = slope[i][0];
       u(offset_y + 2 * i + 0) = centerline[i][1];
-      u(offset_y + 2 * i + 1) = slope[i][1];
       u(offset_z + 2 * i + 0) = centerline[i][2];
+      u(offset_x + 2 * i + 1) = slope[i][0];
+      u(offset_y + 2 * i + 1) = slope[i][1];
       u(offset_z + 2 * i + 1) = slope[i][2];
-      u(offset_l + i) = 0.;
+
+      lambda(i) = 0.;
     }
+
+    update_mesh();
   }
 
 protected:
   size_t dimension;
-  size_t elements;
-  size_t dof;
+  size_t elements, nodes;
+  real_t ds;
+  size_t ndof_x, ndof_y, ndof_z, ndof_l;
+  size_t offset_x, offset_y, offset_z, offset_l;
+  size_t ndof;
   real_t r_penalty;
+  size_t max_iter_outer, max_iter_inner;
+  real_t tol_outer, tol_inner;
 
   Eigen::VectorXd residual;
-  Eigen::MatrixXd jacobian;
-  Eigen::VectorXd u;
+  Eigen::MatrixXd jacobian, mass;
+  Eigen::VectorXd u, lambda;
 
   EulerBeamStaticInextensibleMoM(real_t length,
                                  real_t EI,
@@ -161,40 +213,177 @@ protected:
                                  real_t r_penalty)
     : EulerBeam(length, EI, mu, nodes, bcs)
     , elements(nodes - 1)
-    , dof((2 * nodes * 3) + nodes)
+    , nodes(nodes)
+    , ds(mesh.get_ds())
+    , ndof_x(2 * nodes)
+    , ndof_y(2 * nodes)
+    , ndof_z(2 * nodes)
+    , ndof_l(1 * nodes)
+    , ndof(ndof_x + ndof_y + ndof_z)
+    , offset_x(0)
+    , offset_y(ndof_x)
+    , offset_z(ndof_x + ndof_y)
     , r_penalty(r_penalty)
-    , jacobian(Eigen::MatrixXd::Zero(dof, dof))
-    , residual(Eigen::VectorXd::Zero(dof))
-    , u(Eigen::VectorXd::Zero(dof))
+    , max_iter_outer(1000)
+    , max_iter_inner(1000)
+    , tol_outer(1e-5)
+    , tol_inner(1e-5)
+    , jacobian(Eigen::MatrixXd::Zero(ndof, ndof))
+    , residual(Eigen::VectorXd::Zero(ndof))
+    , u(Eigen::VectorXd::Zero(ndof))
+    , lambda(Eigen::VectorXd::Zero(ndof_l))
   {
     apply_initial_condition(this->mesh);
   };
 
   /**
-   * 
+   *
    */
-  void assemble_residual(std::array<real_t, 3> load) { residual = assemble_residual_impl<real_t>(u, load); }
+  real_t update_lambda(real_t omega = 1.0)
+  {
+
+    static constexpr std::array<real_t, 3> xi_q = { 0.1127016654,
+                                                    0.5,
+                                                    0.8872983346 };
+    static constexpr std::array<real_t, 3> w_q = { 0.2777777778,
+                                                   0.4444444444,
+                                                   0.2777777778 };
+    Eigen::Matrix<real_t, Eigen::Dynamic, 1> lambda_n =
+      Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(ndof_l);
+
+    // #pragma omp for
+    for (size_t e = 0; e < elements; ++e) {
+
+      size_t elem_nodes[] = { e, e + 1 };
+      size_t idx_x[] = { offset_x + 2 * elem_nodes[0],
+                         offset_x + 2 * elem_nodes[0] + 1,
+                         offset_x + 2 * elem_nodes[1],
+                         offset_x + 2 * elem_nodes[1] + 1 };
+      size_t idx_y[] = { offset_y + 2 * elem_nodes[0],
+                         offset_y + 2 * elem_nodes[0] + 1,
+                         offset_y + 2 * elem_nodes[1],
+                         offset_y + 2 * elem_nodes[1] + 1 };
+      size_t idx_z[] = { offset_z + 2 * elem_nodes[0],
+                         offset_z + 2 * elem_nodes[0] + 1,
+                         offset_z + 2 * elem_nodes[1],
+                         offset_z + 2 * elem_nodes[1] + 1 };
+      size_t idx_l[] = { elem_nodes[0], elem_nodes[1] };
+
+      real_t ux[] = {
+        u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
+      };
+      real_t uy[] = {
+        u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
+      };
+      real_t uz[] = {
+        u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]]
+      };
+      real_t ul[] = { lambda[idx_l[0]], lambda[idx_l[1]] };
+
+      real_t R_loc_l[2] = {0.,0.};
+
+      for (size_t qi = 0; qi < 3; ++qi) {
+        real_t xi = xi_q[qi];
+        real_t w = w_q[qi];
+
+        auto dH = CubicHermite<real_t>::derivs(xi, ds);
+        auto M = LinearShape<real_t>::values(xi);
+
+        real_t xp = 0;
+        real_t yp = 0;
+        real_t zp = 0;
+
+        for (size_t i = 0; i < 4; i++) {
+          xp += dH[i] * ux[i];
+          yp += dH[i] * uy[i];
+          zp += dH[i] * uz[i];
+        }
+
+        real_t l = 0;
+        for (size_t i = 0; i < 2; i++) {
+          l += M[i] * ul[i];
+        }
+
+        real_t S = xp * xp + yp * yp + zp * zp - 1.0;
+
+        for (size_t a = 0; a < 2; ++a) {
+          // Variation w.r.t. lambda
+          R_loc_l[a] += S * M[a] * w * ds;
+        }
+      }
+
+      for (size_t i = 0; i < 2; ++i) {
+        lambda_n[idx_l[i]] += R_loc_l[i];
+      }
+    }
+
+    lambda = lambda_n;
+
+    return lambda_n.norm();
+  }
 
   /**
-   * 
+   *
+   */
+  void assemble_residual(std::array<real_t, 3> load)
+  {
+    residual = assemble_residual_template<real_t>(u, load);
+  }
+
+
+  /**
+   *
+   */
+  void assemble_residual(std::vector<std::array<real_t, 3>> load)
+  {
+    residual = assemble_residual_template<real_t>(u, load);
+  }
+
+  /**
+   *
    */
   virtual void assemble_system(std::array<real_t, 3> load)
   {
     using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
     using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
 
-    ADVec x_ad(dof);
-    for (int i = 0; i < int(dof); ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(dof);
+    ADVec x_ad(ndof);
+    for (int i = 0; i < int(ndof); ++i) {
+      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
 
-    ADVec R_ad = assemble_residual_impl<AD>(x_ad, load);
+    ADVec R_ad = assemble_residual_template<AD>(x_ad, load);
 
-    residual.resize(dof);
-    jacobian.resize(dof, dof);
-    for (int i = 0; i < int(dof); ++i) {
+    residual.resize(ndof);
+    jacobian.resize(ndof, ndof);
+    for (int i = 0; i < int(ndof); ++i) {
+      residual(i) = R_ad(i).value();
+      jacobian.row(i) = R_ad(i).derivatives().transpose();
+    }
+  }
+
+  /**
+   *
+   */
+  virtual void assemble_system(std::vector<std::array<real_t, 3>> load)
+  {
+    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
+    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+
+    ADVec x_ad(ndof);
+    for (int i = 0; i < int(ndof); ++i) {
+      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      seed(i) = 1.0;
+      x_ad(i) = AD(u(i), seed);
+    }
+
+    ADVec R_ad = assemble_residual_template<AD>(x_ad, load);
+
+    residual.resize(ndof);
+    jacobian.resize(ndof, ndof);
+    for (int i = 0; i < int(ndof); ++i) {
       residual(i) = R_ad(i).value();
       jacobian.row(i) = R_ad(i).derivatives().transpose();
     }
@@ -208,21 +397,20 @@ protected:
    * - simple_bc: Position constraints only
    * - clamped_bc: Position and slope constraints
    */
-  void apply_boundary_conditions()
+  void apply_boundary_conditions() {
+    apply_boundary_conditions(jacobian, residual);
+  }
+
+  /**
+   * @brief Apply boundary conditions to the residual and jacobian
+   *
+   * Modifies the residual and jacobian according to boundary conditions:
+   * - free_bc: No constraints
+   * - simple_bc: Position constraints only
+   * - clamped_bc: Position and slope constraints
+   */
+  void apply_boundary_conditions(Eigen::MatrixXd &A, Eigen::VectorXd &R)
   {
-    size_t nodes = mesh.get_nodes();
-    real_t h = mesh.get_ds();
-
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_z = 2 * nodes;
-    size_t ndof_l = nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_z = ndof_x + ndof_y;
-    size_t offset_l = ndof_x + ndof_y + ndof_z;
-
     for (size_t bi = 0; bi < 2; ++bi) {
       EulerBeamBCEnd bcend = boundary_conditions.end[bi];
       size_t ni = 0;
@@ -319,17 +507,6 @@ protected:
    */
   void update_mesh()
   {
-    size_t nodes = this->mesh.get_nodes();
-
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_z = 2 * nodes;
-    size_t ndof_l = nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_z = ndof_x + ndof_y;
-    size_t offset_l = ndof_x + ndof_y + ndof_z;
 
     std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
     std::vector<std::array<real_t, 3>>& slope = mesh.get_slope();
@@ -349,7 +526,8 @@ protected:
    * @brief Assemble the residual vector for the nonlinear system
    *
    * @tparam T Scalar type (real_t or autodiff)
-   * @param u Current solution vector
+   * @param u Current solution vector 
+   * @param load Current load on the beam
    * @return Assembled residual vector containing:
    *         - Bending energy terms
    *         - External load contributions
@@ -358,111 +536,97 @@ protected:
    * Uses Gauss quadrature with 3 points for numerical integration.
    */
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_impl(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u, const std::array<real_t,3> load) const
+  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_template(
+    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
+    const std::array<real_t, 3> load) const
   {
-    size_t nodes = mesh.get_nodes();
-    real_t h = mesh.get_ds();
-
-    real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
-    real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
-
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_z = 2 * nodes;
-    size_t ndof_l = nodes;
-
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_z = ndof_x + ndof_y;
-    size_t offset_l = ndof_x + ndof_y + ndof_z;
+    static constexpr real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+    static constexpr real_t w_q[] = { 0.2777777778,
+                                      0.4444444444,
+                                      0.2777777778 };
 
     Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
-      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(dof);
+      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(ndof);
 
+    real_t Hq[3][4], dHq[3][4], ddHq[3][4], Mq[3][2];
+    for (int qi = 0; qi < 3; ++qi) {
+      auto H = CubicHermite<real_t>::values(xi_q[qi], ds);
+      auto dH = CubicHermite<real_t>::derivs(xi_q[qi], ds);
+      auto ddH = CubicHermite<real_t>::second_derivs(xi_q[qi], ds);
+      auto M = LinearShape<real_t>::values(xi_q[qi]);
+      for (int i = 0; i < 4; ++i) {
+        Hq[qi][i] = H[i];
+        dHq[qi][i] = dH[i];
+        ddHq[qi][i] = ddH[i];
+      }
+      Mq[qi][0] = M[0];
+      Mq[qi][1] = M[1];
+    }
+
+    // #pragma omp parallel for
+    // #pragma unroll
     for (size_t e = 0; e < elements; ++e) {
-      std::vector<size_t> elem_nodes = { e, e + 1 };
-      std::vector<size_t> idx_x = { offset_x + 2 * elem_nodes[0] + 0,
-                                    offset_x + 2 * elem_nodes[0] + 1,
-                                    offset_x + 2 * elem_nodes[1] + 0,
-                                    offset_x + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_y = { offset_y + 2 * elem_nodes[0] + 0,
-                                    offset_y + 2 * elem_nodes[0] + 1,
-                                    offset_y + 2 * elem_nodes[1] + 0,
-                                    offset_y + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_z = { offset_z + 2 * elem_nodes[0] + 0,
-                                    offset_z + 2 * elem_nodes[0] + 1,
-                                    offset_z + 2 * elem_nodes[1] + 0,
-                                    offset_z + 2 * elem_nodes[1] + 1 };
-      std::vector<size_t> idx_l = { offset_l + 1 * elem_nodes[0] + 0,
-                                    offset_l + 1 * elem_nodes[1] + 0 };
+      const size_t elem_nodes[] = { e, e + 1 };
 
-      std::array<T, 4> ux = {
-        u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
-      };
-      std::array<T, 4> uy = {
-        u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
-      };
-      std::array<T, 4> uz = {
-        u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]]
-      };
-      std::array<T, 2> ul = { u[idx_l[0]], u[idx_l[1]] };
+      const size_t idx_x[] = { offset_x + 2 * elem_nodes[0] + 0,
+                               offset_x + 2 * elem_nodes[0] + 1,
+                               offset_x + 2 * elem_nodes[1] + 0,
+                               offset_x + 2 * elem_nodes[1] + 1 };
+      const size_t idx_y[] = { offset_y + 2 * elem_nodes[0] + 0,
+                               offset_y + 2 * elem_nodes[0] + 1,
+                               offset_y + 2 * elem_nodes[1] + 0,
+                               offset_y + 2 * elem_nodes[1] + 1 };
+      const size_t idx_z[] = { offset_z + 2 * elem_nodes[0] + 0,
+                               offset_z + 2 * elem_nodes[0] + 1,
+                               offset_z + 2 * elem_nodes[1] + 0,
+                               offset_z + 2 * elem_nodes[1] + 1 };
+      const size_t idx_l[] = { elem_nodes[0], elem_nodes[1] };
 
-      std::vector<T> R_loc_x(4, 0);
-      std::vector<T> R_loc_y(4, 0);
-      std::vector<T> R_loc_z(4, 0);
-      std::vector<T> R_loc_l(2, 0);
+      T ux[] = { u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]] };
+      T uy[] = { u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]] };
+      T uz[] = { u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]] };
+      T ul[] = { lambda[idx_l[0]], lambda[idx_l[1]] };
+
+      T R_loc_x[4] = { T(0), T(0), T(0), T(0) };
+      T R_loc_y[4] = { T(0), T(0), T(0), T(0) };
+      T R_loc_z[4] = { T(0), T(0), T(0), T(0) };
 
       for (size_t qi = 0; qi < 3; ++qi) {
-        real_t xi = xi_q[qi];
-        real_t w = w_q[qi];
+        T xp = 0, xpp = 0;
+        T yp = 0, ypp = 0;
+        T zp = 0, zpp = 0;
 
-        auto H = CubicHermite<real_t>::values(xi, h);
-        auto dH = CubicHermite<real_t>::derivs(xi, h);
-        auto ddH = CubicHermite<real_t>::second_derivs(xi, h);
-        auto M = LinearShape<real_t>::values(xi);
-
-        T x = 0, xp = 0, xpp = 0;
-        T y = 0, yp = 0, ypp = 0;
-        T z = 0, zp = 0, zpp = 0;
         for (size_t i = 0; i < 4; i++) {
-          x += H[i] * ux[i];
-          xp += dH[i] * ux[i];
-          xpp += ddH[i] * ux[i];
-          y += H[i] * uy[i];
-          yp += dH[i] * uy[i];
-          ypp += ddH[i] * uy[i];
-          z += H[i] * uz[i];
-          zp += dH[i] * uz[i];
-          zpp += ddH[i] * uz[i];
+          xp += dHq[qi][i] * ux[i];
+          yp += dHq[qi][i] * uy[i];
+          zp += dHq[qi][i] * uz[i];
+          xpp += ddHq[qi][i] * ux[i];
+          ypp += ddHq[qi][i] * uy[i];
+          zpp += ddHq[qi][i] * uz[i];
         }
 
-        // T l = beam::dot<T,2>(M, ul);
         T l = 0;
         for (size_t i = 0; i < 2; i++) {
-          l += M[i] * ul[i];
+          l += Mq[qi][i] * ul[i];
         }
 
         T S = xp * xp + yp * yp + zp * zp - 1.0;
 
         for (size_t a = 0; a < 4; ++a) {
           // Bending Energy Contributions
-          R_loc_x[a] += EI * xpp * ddH[a] * w * h;
-          R_loc_y[a] += EI * ypp * ddH[a] * w * h;
-          R_loc_z[a] += EI * zpp * ddH[a] * w * h;
+          const T coeff_bending = EI * ddHq[qi][a] * w_q[qi] * ds; 
+          R_loc_x[a] += xpp * coeff_bending;
+          R_loc_y[a] += ypp * coeff_bending;
+          R_loc_z[a] += zpp * coeff_bending;
           // External load contribution
-          R_loc_x[a] -= load[0] * H[a] * w * h;
-          R_loc_y[a] -= load[1] * H[a] * w * h;
-          R_loc_z[a] -= load[2] * H[a] * w * h;
+          R_loc_x[a] -= load[0] * Hq[qi][a] * w_q[qi] * ds;
+          R_loc_y[a] -= load[1] * Hq[qi][a] * w_q[qi] * ds;
+          R_loc_z[a] -= load[2] * Hq[qi][a] * w_q[qi] * ds;
           // Constraint contributions
-          R_loc_x[a] += 2 * (l + r_penalty * S) * xp * dH[a] * w * h;
-          R_loc_y[a] += 2 * (l + r_penalty * S) * yp * dH[a] * w * h;
-          R_loc_z[a] += 2 * (l + r_penalty * S) * zp * dH[a] * w * h;
-        }
-
-        for (size_t a = 0; a < 2; ++a) {
-          // Variation w.r.t. lambda
-          R_loc_l[a] += S * M[a] * w * h;
+          const T coeff_constraint = 2 * (l + r_penalty * S) * dHq[qi][a] * w_q[qi] * ds;
+          R_loc_x[a] += xp * coeff_constraint;
+          R_loc_y[a] += yp * coeff_constraint;
+          R_loc_z[a] += zp * coeff_constraint;
         }
       }
 
@@ -472,9 +636,144 @@ protected:
         residual[idx_y[i]] += R_loc_y[i];
         residual[idx_z[i]] += R_loc_z[i];
       }
+    }
+    return residual;
+  }
 
-      for (size_t i = 0; i < 2; ++i) {
-        residual[idx_l[i]] += R_loc_l[i];
+
+  /**
+   * @brief Assemble the residual vector for the nonlinear system
+   *
+   * @tparam T Scalar type (real_t or autodiff)
+   * @param u Current solution vector 
+   * @param load Current load on the beam
+   * @return Assembled residual vector containing:
+   *         - Bending energy terms
+   *         - External load contributions
+   *         - Inextensibility constraints
+   *
+   * Uses Gauss quadrature with 3 points for numerical integration.
+   */
+  template<typename T>
+  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_template(
+    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
+    const std::vector<std::array<real_t, 3>> load) const
+  {
+
+    BEAM_ASSERT(load.size() == nodes, "Nodes does not match load vector size.\n");
+
+    static constexpr real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+    static constexpr real_t w_q[] = { 0.2777777778,
+                                      0.4444444444,
+                                      0.2777777778 };
+
+    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
+      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(ndof);
+
+    real_t Hq[3][4], dHq[3][4], ddHq[3][4], Mq[3][2];
+    for (int qi = 0; qi < 3; ++qi) {
+      auto H = CubicHermite<real_t>::values(xi_q[qi], ds);
+      auto dH = CubicHermite<real_t>::derivs(xi_q[qi], ds);
+      auto ddH = CubicHermite<real_t>::second_derivs(xi_q[qi], ds);
+      auto M = LinearShape<real_t>::values(xi_q[qi]);
+      for (int i = 0; i < 4; ++i) {
+        Hq[qi][i] = H[i];
+        dHq[qi][i] = dH[i];
+        ddHq[qi][i] = ddH[i];
+      }
+      Mq[qi][0] = M[0];
+      Mq[qi][1] = M[1];
+    }
+
+    for (size_t e = 0; e < elements; ++e) {
+      const size_t elem_nodes[] = { e, e + 1 };
+
+      const size_t idx_x[] = { offset_x + 2 * elem_nodes[0] + 0,
+                               offset_x + 2 * elem_nodes[0] + 1,
+                               offset_x + 2 * elem_nodes[1] + 0,
+                               offset_x + 2 * elem_nodes[1] + 1 };
+      const size_t idx_y[] = { offset_y + 2 * elem_nodes[0] + 0,
+                               offset_y + 2 * elem_nodes[0] + 1,
+                               offset_y + 2 * elem_nodes[1] + 0,
+                               offset_y + 2 * elem_nodes[1] + 1 };
+      const size_t idx_z[] = { offset_z + 2 * elem_nodes[0] + 0,
+                               offset_z + 2 * elem_nodes[0] + 1,
+                               offset_z + 2 * elem_nodes[1] + 0,
+                               offset_z + 2 * elem_nodes[1] + 1 };
+      
+      const size_t idx_load[] = { elem_nodes[0], elem_nodes[1] };
+      
+      const size_t idx_lam[] = { elem_nodes[0], elem_nodes[1] };
+
+      T ux[] = { u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]] };
+      T uy[] = { u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]] };
+      T uz[] = { u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]] };
+
+      real_t fx [] = { load[idx_load[0]][0], load[idx_load[1]][0] }; 
+      real_t fy [] = { load[idx_load[0]][1], load[idx_load[1]][1] }; 
+      real_t fz [] = { load[idx_load[0]][2], load[idx_load[1]][2] }; 
+
+      T ul[] = { lambda[idx_lam[0]], lambda[idx_lam[1]] };
+
+      T R_loc_x[4] = { T(0), T(0), T(0), T(0) };
+      T R_loc_y[4] = { T(0), T(0), T(0), T(0) };
+      T R_loc_z[4] = { T(0), T(0), T(0), T(0) };
+
+      for (size_t qi = 0; qi < 3; ++qi) {
+        T xp = 0, xpp = 0;
+        T yp = 0, ypp = 0;
+        T zp = 0, zpp = 0;
+
+
+        for (size_t i = 0; i < 4; i++) {
+          xp += dHq[qi][i] * ux[i];
+          yp += dHq[qi][i] * uy[i];
+          zp += dHq[qi][i] * uz[i];
+          xpp += ddHq[qi][i] * ux[i];
+          ypp += ddHq[qi][i] * uy[i];
+          zpp += ddHq[qi][i] * uz[i];
+        }
+
+        T l = 0;
+        real_t fxp = 0;
+        real_t fyp = 0;
+        real_t fzp = 0;
+
+        for (size_t i = 0; i < 2; i++) {
+          l   += Mq[qi][i] * ul[i];
+          fxp += Mq[qi][i] * fx[i];
+          fyp += Mq[qi][i] * fy[i];
+          fzp += Mq[qi][i] * fz[i];
+        }
+
+        T S = xp * xp + yp * yp + zp * zp - 1.0;
+
+        for (size_t a = 0; a < 4; ++a) {
+          // Bending Energy Contributions
+          const T coeff_bending = EI * ddHq[qi][a] * w_q[qi] * ds; 
+          R_loc_x[a] += xpp * coeff_bending;
+          R_loc_y[a] += ypp * coeff_bending;
+          R_loc_z[a] += zpp * coeff_bending;
+ 
+          // External load contribution
+          const T coeff_load = Hq[qi][a] * w_q[qi] * ds;
+          R_loc_x[a] -= fxp * Hq[qi][a] * w_q[qi] * ds;
+          R_loc_y[a] -= fyp * Hq[qi][a] * w_q[qi] * ds;
+          R_loc_z[a] -= fzp * Hq[qi][a] * w_q[qi] * ds;
+ 
+          // Constraint contributions
+          const T coeff_constraint = 2 * (l + r_penalty * S) * dHq[qi][a] * w_q[qi] * ds;
+          R_loc_x[a] += xp * coeff_constraint;
+          R_loc_y[a] += yp * coeff_constraint;
+          R_loc_z[a] += zp * coeff_constraint;
+        }
+      }
+
+      // Scatter local residual contribution to global residual
+      for (size_t i = 0; i < 4; ++i) {
+        residual[idx_x[i]] += R_loc_x[i];
+        residual[idx_y[i]] += R_loc_y[i];
+        residual[idx_z[i]] += R_loc_z[i];
       }
     }
     return residual;

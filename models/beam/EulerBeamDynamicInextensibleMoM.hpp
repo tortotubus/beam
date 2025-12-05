@@ -13,87 +13,281 @@ public:
                                   beam::EulerBeamBCs bcs,
                                   real_t r_penalty)
     : EulerBeamStaticInextensibleMoM(length, EI, mu, nodes, bcs, r_penalty)
-    , u_prev(Eigen::VectorXd::Zero(dof))
-    , u_prev_prev(Eigen::VectorXd::Zero(dof))
-    , v_prev(Eigen::VectorXd::Zero(dof))
-    , a_prev(Eigen::VectorXd::Zero(dof)) {};
+    , u_prev(Eigen::VectorXd::Zero(ndof))
+    , u_prev_prev(Eigen::VectorXd::Zero(ndof))
+    , v_prev(Eigen::VectorXd::Zero(ndof))
+    , a_prev(Eigen::VectorXd::Zero(ndof))
+    , mass(Eigen::MatrixXd::Zero(ndof, ndof)) {};
 
   virtual void solve(real_t dt, std::array<real_t, 3> load) override
   {
-    solve_be(dt, load);
+    const real_t alpha = 0;
+    const real_t gamma = 0.5 - alpha;
+    const real_t beta = 0.25 * (1 - alpha) * (1 - alpha);
+    solve_newmark(dt, load, beta, gamma);
   }
 
-  void solve_newmark(real_t dt, std::array<real_t, 3> load)
+  virtual void solve(real_t dt, std::vector<std::array<real_t, 3>> load)
   {
-    real_t tol = 1e-6;
-    size_t max_iter = 100;
+    BEAM_ASSERT(load.size() == nodes,
+                "Size of load vector must equal number of nodes.");
+    const real_t alpha = 0;
+    const real_t gamma = 0.5 - alpha;
+    const real_t beta = 0.25 * (1 - alpha) * (1 - alpha);
+    solve_newmark(dt, load, beta, gamma);
+  }
 
-    for (size_t it = 0; it < max_iter; it++) {
-      assemble_be_system(dt, load);
+  void solve_newmark(real_t dt,
+                     std::vector<std::array<real_t, 3>> load,
+                     real_t beta,
+                     real_t gamma)
+  {
+
+    // Eigen::LDLT<Eigen::MatrixXd> solver;
+    // solver.setTolerance(tol_inner);
+    Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Upper | Eigen::Lower>
+      solver;
+
+    if (time_iter == 0) {
+      Eigen::VectorXd R0 =
+        EulerBeamStaticInextensibleMoM ::assemble_residual_template<real_t>(
+          u, load);
       apply_boundary_conditions();
-      real_t res_norm = residual.norm();
-      if (res_norm < tol) {
-        break;
+      for (size_t n = 0; n < nodes; ++n) {
+        size_t ix = offset_x + 2 * n;
+        size_t iy = offset_y + 2 * n;
+        size_t iz = offset_z + 2 * n;
+        a_prev(ix) = (-R0(ix)) / (mu * ds);
+        a_prev(iy) = (-R0(iy)) / (mu * ds);
+        a_prev(iz) = (-R0(iz)) / (mu * ds);
       }
-      Eigen::VectorXd delta_u = jacobian.colPivHouseholderQr().solve(-residual);
+    }
+
+    u_prev = u;
+
+    real_t S_norm = 0;
+
+    for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
+      assemble_system_newmark(dt, load, beta, gamma);
+      apply_boundary_conditions();
+
+      real_t res_norm = residual.norm();
+
+      if (res_norm < tol_outer) {
+        // std::cout << time_iter << " : " << iter_outer << " : ";
+        // std::cout << "||r|| = " << res_norm << "\t";
+        // std::cout << "||S|| = " << S_norm << std::endl;
+        break;
+      } else if (iter_outer == max_iter_outer - 1) {
+        BEAM_ABORT(
+          "EulerBeamDynamicInextensibleMoM::solve() did not converge.\n");
+      } else {
+        // std::cout << time_iter << " : " << iter_outer << " : ";
+        // std::cout << "||r|| = " << res_norm << "\t";
+        // std::cout << "||S|| = " << S_norm << std::endl;
+      }
+
+      solver.compute(jacobian);
+      Eigen::VectorXd delta_u = solver.solve(-residual);
       u += delta_u;
+
+      S_norm = update_lambda();
     }
 
     update_mesh();
+
+    size_t nodes = mesh.get_nodes();
+
+    for (size_t ni = 0; ni < nodes; ++ni) {
+      size_t ix = offset_x + 2 * ni;
+      size_t iy = offset_y + 2 * ni;
+      size_t iz = offset_z + 2 * ni;
+
+      auto upd = [&](size_t i) {
+        real_t a_new = (u(i) - u_prev(i) - dt * v_prev(i)) / (beta * dt * dt) -
+                       ((1.0 - 2.0 * beta) / (2.0 * beta)) * a_prev(i);
+        real_t v_new =
+          v_prev(i) + dt * ((1.0 - gamma) * a_prev(i) + gamma * a_new);
+        a_prev(i) = a_new;
+        v_prev(i) = v_new;
+      };
+
+      upd(ix);
+      upd(iy);
+      upd(iz);
+    }
+
     u_prev_prev = u_prev; // carry old n-1
     u_prev = u;           // store new n
+
+    time_iter++;
+    t += dt;
   }
 
-  void solve_be(real_t dt, std::array<real_t, 3> load)
+  void solve_newmark(real_t dt,
+                     std::array<real_t, 3> load,
+                     real_t beta,
+                     real_t gamma)
   {
-    real_t tol = 1e-6;
-    size_t max_iter = 100;
 
-    for (size_t it = 0; it < max_iter; it++) {
-      assemble_be_system(dt, load);
+    // Eigen::LDLT<Eigen::MatrixXd> solver;
+    // solver.setTolerance(tol_inner);
+    Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Upper | Eigen::Lower>
+      solver;
+
+    if (time_iter == 0) {
+      Eigen::VectorXd R0 =
+        EulerBeamStaticInextensibleMoM ::assemble_residual_template<real_t>(
+          u, load);
       apply_boundary_conditions();
-      real_t res_norm = residual.norm();
-      if (res_norm < tol) {
-        break;
+      for (size_t n = 0; n < nodes; ++n) {
+        size_t ix = offset_x + 2 * n;
+        size_t iy = offset_y + 2 * n;
+        size_t iz = offset_z + 2 * n;
+        a_prev(ix) = (-R0(ix)) / (mu * ds);
+        a_prev(iy) = (-R0(iy)) / (mu * ds);
+        a_prev(iz) = (-R0(iz)) / (mu * ds);
       }
-      Eigen::VectorXd delta_u = jacobian.colPivHouseholderQr().solve(-residual);
+    }
+
+    u_prev = u;
+
+    real_t S_norm = 0;
+
+    for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
+      assemble_system_newmark(dt, load, beta, gamma);
+      apply_boundary_conditions();
+
+      real_t res_norm = residual.norm();
+
+      if (res_norm < tol_outer) {
+        // std::cout << time_iter << " : " << iter_outer << " : ";
+        // std::cout << "||r|| = " << res_norm << "\t";
+        // std::cout << "||S|| = " << S_norm << std::endl;
+        break;
+      } else if (iter_outer == max_iter_outer - 1) {
+        BEAM_ABORT(
+          "EulerBeamDynamicInextensibleMoM::solve() did not converge.\n");
+      } else {
+        // std::cout << time_iter << " : " << iter_outer << " : ";
+        // std::cout << "||r|| = " << res_norm << "\t";
+        // std::cout << "||S|| = " << S_norm << std::endl;
+      }
+
+      solver.compute(jacobian);
+      Eigen::VectorXd delta_u = solver.solve(-residual);
       u += delta_u;
+
+      S_norm = update_lambda();
     }
 
     update_mesh();
+
+    size_t nodes = mesh.get_nodes();
+
+    for (size_t ni = 0; ni < nodes; ++ni) {
+      size_t ix = offset_x + 2 * ni;
+      size_t iy = offset_y + 2 * ni;
+      size_t iz = offset_z + 2 * ni;
+
+      auto upd = [&](size_t i) {
+        real_t a_new = (u(i) - u_prev(i) - dt * v_prev(i)) / (beta * dt * dt) -
+                       ((1.0 - 2.0 * beta) / (2.0 * beta)) * a_prev(i);
+        real_t v_new =
+          v_prev(i) + dt * ((1.0 - gamma) * a_prev(i) + gamma * a_new);
+        a_prev(i) = a_new;
+        v_prev(i) = v_new;
+      };
+
+      upd(ix);
+      upd(iy);
+      upd(iz);
+    }
+
     u_prev_prev = u_prev; // carry old n-1
     u_prev = u;           // store new n
+
+    time_iter++;
+    t += dt;
   }
 
   void apply_initial_condition() override
   {
     EulerBeamStaticInextensibleMoM::apply_initial_condition();
     u_prev = u;
-    u_prev_prev = u;
   }
 
   void apply_initial_condition(EulerBeamMesh& bmesh) override
   {
     EulerBeamStaticInextensibleMoM::apply_initial_condition(bmesh);
+    u_prev = u;
   }
 
 protected:
   Eigen::VectorXd v_prev;
   Eigen::VectorXd a_prev;
   Eigen::VectorXd u_prev, u_prev_prev;
+  Eigen::MatrixXd mass;
+  std::array<real_t, 3> load_prev;
 
   /**
-   * @brief Assemble the residual vector for the nonlinear system
    *
-   * @tparam T Scalar type (real_t or autodiff)
-   * @param u Current solution vector
-   * @return Assembled residual vector containing:
-   *         - Bending energy terms
-   *         - External load contributions
-   *         - Inextensibility constraints
-   *
-   * Uses Gauss quadrature with 3 points for numerical integration.
    */
+  void assemble_system_newmark(real_t dt,
+                               std::array<real_t, 3> load,
+                               real_t beta,
+                               real_t gamma)
+  {
+    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
+    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+
+    ADVec x_ad(ndof);
+
+    for (int i = 0; i < int(ndof); ++i) {
+      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      seed(i) = 1.0;
+      x_ad(i) = AD(u(i), seed);
+    }
+
+    ADVec R_ad = assemble_residual_newmark<AD>(x_ad, dt, load, beta, gamma);
+
+    residual.resize(ndof);
+    jacobian.resize(ndof, ndof);
+    for (int i = 0; i < int(ndof); ++i) {
+      residual(i) = R_ad(i).value();
+      jacobian.row(i) = R_ad(i).derivatives().transpose();
+    }
+  }
+
+  /**
+   *
+   */
+  void assemble_system_newmark(real_t dt,
+                               std::vector<std::array<real_t, 3>> load,
+                               real_t beta,
+                               real_t gamma)
+  {
+    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
+    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+
+    ADVec x_ad(ndof);
+
+    for (int i = 0; i < int(ndof); ++i) {
+      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      seed(i) = 1.0;
+      x_ad(i) = AD(u(i), seed);
+    }
+
+    ADVec R_ad = assemble_residual_newmark<AD>(x_ad, dt, load, beta, gamma);
+
+    residual.resize(ndof);
+    jacobian.resize(ndof, ndof);
+    for (int i = 0; i < int(ndof); ++i) {
+      residual(i) = R_ad(i).value();
+      jacobian.row(i) = R_ad(i).derivatives().transpose();
+    }
+  }
+
   template<typename T>
   Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_newmark(
     const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
@@ -102,120 +296,78 @@ protected:
     real_t beta,
     real_t gamma) const
   {
-    Eigen::Matrix<T, Eigen::Dynamic, 1> res =
-      EulerBeamStaticInextensibleMoM::assemble_residual_impl<T>(u, load);
+    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
+      EulerBeamStaticInextensibleMoM::assemble_residual_template<T>(u, load);
 
-    size_t nodes = mesh.get_nodes();
+    if (!(dt > 0.0))
+      throw std::runtime_error("Newmark: dt must be > 0");
+    if (!(beta > 0.0))
+      throw std::runtime_error("Newmark: beta must be > 0");
 
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_z = 2 * nodes;
-    size_t ndof_l = nodes;
+    const double inv = 1.0 / (beta * dt * dt);
+    const double inv_bt = 1.0 / (beta * dt);
+    const double kappa = (1.0 - 2.0 * beta) / (2.0 * beta);
 
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_z = ndof_x + ndof_y;
-    size_t offset_l = ndof_x + ndof_y + ndof_z;
-
-    const T inv = T(1.0) / (T(beta) * T(dt * dt));
-    const T kappa = (T(1.0) - T(2.0 * beta)) / (T(2.0 * beta));
-
-    auto newmark_a = [&](size_t i) -> T {
-      return inv * (u(i) - T(u_prev(i))) -
-             (T(dt) / T(beta * dt * dt)) * T(v_prev(i)) - kappa * T(a_prev(i));
+    auto newmark_a = [&](Eigen::Index i) -> T {
+      return inv * (u(i) - u_prev(i)) - inv_bt * v_prev(i) - kappa * a_prev(i);
     };
 
-    auto newmark_v = [&](const T& a_new, size_t i) -> T {
-      return T(v_prev(i)) +
-             T(dt) * ((T(1.0) - T(gamma)) * T(a_prev(i)) + T(gamma) + a_new);
-    };
+    for (size_t n = 0; n < nodes; ++n) {
+      const Eigen::Index ix = static_cast<Eigen::Index>(offset_x + 2 * n);
+      const Eigen::Index iy = static_cast<Eigen::Index>(offset_y + 2 * n);
+      const Eigen::Index iz = static_cast<Eigen::Index>(offset_z + 2 * n);
 
-    for (size_t ni = 0; ni < nodes; ++ni) {
-      size_t ix = offset_x + 2 * ni;
-      size_t iy = offset_y + 2 * ni;
-      size_t iz = offset_z + 2 * ni;
+      const T ax = newmark_a(ix);
+      const T ay = newmark_a(iy);
+      const T az = newmark_a(iz);
 
-      T ax = newmark_a(ix);
-      T ay = newmark_a(iy);
-      T az = newmark_a(iz);
-
-      res(ix) += T(mu) * ax;
-      res(iy) += T(mu) * ay;
-      res(iz) += T(mu) * az;
+      residual(ix) += mu * ds * ax;
+      residual(iy) += mu * ds * ay;
+      residual(iz) += mu * ds * az;
     }
 
-    return res;
+    return residual;
   }
 
-  void assemble_be_system(real_t dt, std::array<real_t, 3> load)
-  {
-    std::cout << "Dynamic::assemble_be_system()\n";
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
-
-    ADVec x_ad(dof);
-
-    for (int i = 0; i < int(dof); ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(dof);
-      seed(i) = 1.0;
-      x_ad(i) = AD(u(i), seed);
-    }
-
-    ADVec R_ad = assemble_residual_be<AD>(x_ad, dt, load);
-
-    residual.resize(dof);
-    jacobian.resize(dof, dof);
-    for (int i = 0; i < int(dof); ++i) {
-      residual(i) = R_ad(i).value();
-      jacobian.row(i) = R_ad(i).derivatives().transpose();
-    }
-  }
-  /**
-   * @brief Assemble the residual vector for the nonlinear system
-   *
-   * @tparam T Scalar type (real_t or autodiff)
-   * @param u Current solution vector
-   * @return Assembled residual vector containing:
-   *         - Bending energy terms
-   *         - External load contributions
-   *         - Inextensibility constraints
-   *
-   * Uses Gauss quadrature with 3 points for numerical integration.
-   */
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_be(
+  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_newmark(
     const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
     real_t dt,
-    std::array<real_t, 3> load) const
+    std::vector<std::array<real_t, 3>> load,
+    real_t beta,
+    real_t gamma) const
   {
-    Eigen::Matrix<T, Eigen::Dynamic, 1> res =
-      EulerBeamStaticInextensibleMoM::assemble_residual_impl<T>(u, load);
+    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
+      EulerBeamStaticInextensibleMoM::assemble_residual_template<T>(u, load);
 
-    size_t nodes = mesh.get_nodes();
+    if (!(dt > 0.0))
+      throw std::runtime_error("Newmark: dt must be > 0");
+    if (!(beta > 0.0))
+      throw std::runtime_error("Newmark: beta must be > 0");
 
-    size_t ndof_x = 2 * nodes;
-    size_t ndof_y = 2 * nodes;
-    size_t ndof_z = 2 * nodes;
-    size_t ndof_l = nodes;
+    const double inv = 1.0 / (beta * dt * dt);
+    const double inv_bt = 1.0 / (beta * dt);
+    const double kappa = (1.0 - 2.0 * beta) / (2.0 * beta);
 
-    size_t offset_x = 0;
-    size_t offset_y = ndof_x;
-    size_t offset_z = ndof_x + ndof_y;
-    size_t offset_l = ndof_x + ndof_y + ndof_z;
+    auto newmark_a = [&](Eigen::Index i) -> T {
+      return inv * (u(i) - u_prev(i)) - inv_bt * v_prev(i) - kappa * a_prev(i);
+    };
 
-    for (size_t n = 0; n < nodes; n++) {
-      res(offset_x + 2 * n) +=
-        (mu / (dt * dt)) * (u[offset_x + 2 * n] - 2 * u_prev[offset_x + 2 * n] +
-                            u_prev_prev[offset_x + 2 * n]);
-      res(offset_y + 2 * n) +=
-        (mu / (dt * dt)) * (u[offset_y + 2 * n] - 2 * u_prev[offset_y + 2 * n] +
-                            u_prev_prev[offset_y + 2 * n]);
-      res(offset_z + 2 * n) +=
-        (mu / (dt * dt)) * (u[offset_z + 2 * n] - 2 * u_prev[offset_z + 2 * n] +
-                            u_prev_prev[offset_z + 2 * n]);
+    for (size_t n = 0; n < nodes; ++n) {
+      const Eigen::Index ix = static_cast<Eigen::Index>(offset_x + 2 * n);
+      const Eigen::Index iy = static_cast<Eigen::Index>(offset_y + 2 * n);
+      const Eigen::Index iz = static_cast<Eigen::Index>(offset_z + 2 * n);
+
+      const T ax = newmark_a(ix);
+      const T ay = newmark_a(iy);
+      const T az = newmark_a(iz);
+
+      residual(ix) += mu * ds * ax;
+      residual(iy) += mu * ds * ay;
+      residual(iz) += mu * ds * az;
     }
 
-    return res;
+    return residual;
   }
 };
 }

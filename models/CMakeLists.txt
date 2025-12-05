@@ -1,20 +1,30 @@
 set(HDRS
-  immersedboundary.hpp
+  ibm/immersedboundary.hpp
   spring/Spring.hpp
+  beam/IBEulerBeam.hpp
   beam/EulerBeamDynamicInextensibleADDM.hpp
+  beam/EulerBeamDynamicInextensibleAugKKT.hpp
   beam/EulerBeamDynamicInextensibleMoM.hpp
+  beam/EulerBeamDynamicInextensibleMoMSparse.hpp
   beam/EulerBeamStatic.hpp
   beam/EulerBeamStaticInextensibleADDM.hpp
+  beam/EulerBeamStaticInextensibleAugKKT.hpp
   beam/EulerBeamStaticInextensibleMoM.hpp
   beam/EulerBeamStaticInextensibleMoMSparse.hpp
   beam/Shapes.hpp
 )
 
 set(SRCS
-  immersedboundary.cpp
+  ibm/immersedboundary.cpp
   spring/Spring.cpp
+  beam/IBEulerBeam.hpp
+  beam/EulerBeamDynamicInextensibleADDM.cpp
+  beam/EulerBeamDynamicInextensibleAugKKT.cpp
+  beam/EulerBeamDynamicInextensibleMoM.cpp
+  beam/EulerBeamDynamicInextensibleMoMSparse.cpp
   beam/EulerBeamStatic.cpp
   beam/EulerBeamStaticInextensibleADDM.cpp
+  beam/EulerBeamStaticInextensibleAugKKT.cpp
   beam/EulerBeamStaticInextensibleMoM.cpp
   beam/EulerBeamStaticInextensibleMoMSparse.cpp
 )

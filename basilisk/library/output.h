@@ -10,7 +10,7 @@
 #endif
 #endif
 
-#include "./vtk/IO/HDF/vtkHDFHyperTreeGrid.h"
+#include "./vtk/vtkHDFHyperTreeGrid.h"
 
 trace void
 output_hdf_htg(scalar* scalar_list,
@@ -22,30 +22,30 @@ output_hdf_htg(scalar* scalar_list,
 #if _MPI
 #if MPI_SINGLE_FILE
   char fname[64];
-  sprintf(fname, "%s_%d.hdf", basename, iter);
+  sprintf(fname, "%s_%d.vtkhdf", basename, iter);
   vtkHDFHyperTreeGrid vtk_hdf =
     vtk_HDF_hypertreegrid_init(scalar_list, vector_list, fname);
   vtk_HDF_hypertreegrid_close(&vtk_hdf);
 #else
   char fname[64];
-  sprintf(fname, "%s_pid_%d_%d.hdf", basename, pid(), iter);
+  sprintf(fname, "%s_pid_%d_%d.vtkhdf", basename, pid(), iter);
   vtkHDFHyperTreeGrid vtk_hdf =
     vtk_HDF_hypertreegrid_init(scalar_list, vector_list, fname);
   vtk_HDF_hypertreegrid_close(&vtk_hdf);
 #endif
 #else
   char fname[64];
-  sprintf(fname, "%s_%d.hdf", basename, iter);
+  sprintf(fname, "%s_%d.vtkhdf", basename, iter);
   vtkHDFHyperTreeGrid vtk_hdf =
     vtk_HDF_hypertreegrid_init(scalar_list, vector_list, fname);
   vtk_HDF_hypertreegrid_close(&vtk_hdf);
 
-  sprintf(fname, "%s_poly_%d.hdf", basename, iter);
+  sprintf(fname, "%s_poly_%d.vtkhdf", basename, iter);
 #endif
 }
 
 #include "library/vtk/IO/HDF/vtkHDFPolyData.h"
-#include "library/ibm.h"
+#include "library/ibm/immersedboundary.h"
 
 trace void
 output_hdf_polydata(char* basename, int iter = i, double time = t)
@@ -56,18 +56,18 @@ output_hdf_polydata(char* basename, int iter = i, double time = t)
 
   // Count total number of points
   int nn_all = 0;
-  for (int mi = 0; mi < ib_mesh_manager->nm; mi++) {
+  for (int mi = 0; mi < ib_mesh_manager.nm; mi++) {
     nn_all += IBMESH(mi).nn;
   }
   vtkPoints_init(&vtk_polydata.points, nn_all, pd_dim);
 
   // Build points dataset
   int ni_all = 0;
-  for (int mi = 0; mi < ib_mesh_manager->nm; mi++) {
+  for (int mi = 0; mi < ib_mesh_manager.nm; mi++) {
     for (int ni = 0; ni < IBMESH(mi).nn; ni++) {
-      vtk_polydata.points.data[ni_all + 0] = IBMESH(mi).nodes[ni].pos.x;
-      vtk_polydata.points.data[ni_all + 1] = IBMESH(mi).nodes[ni].pos.y;
-      vtk_polydata.points.data[ni_all + 2] = IBMESH(mi).nodes[ni].pos.z;
+      vtk_polydata.points.data[ni_all + 0] = IBMESH(mi).nodes[ni].lagpos.x;
+      vtk_polydata.points.data[ni_all + 1] = IBMESH(mi).nodes[ni].lagpos.y;
+      vtk_polydata.points.data[ni_all + 2] = IBMESH(mi).nodes[ni].lagpos.z;
       ni_all += pd_dim;
     }
   }

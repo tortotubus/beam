@@ -1,17 +1,13 @@
 list(APPEND SRCS
-  array.cpp
   error.cpp
-  dummy.cpp
   text.cpp
-  globals.cpp
+  globals.cpp 
 )
 
 list(APPEND HDRS
-  array.hpp
   error.hpp
-  dummy.hpp
   text.hpp
-  globals.hpp
+  globals.hpp 
 )
 
 convert_filenames_to_full_paths(SRCS)

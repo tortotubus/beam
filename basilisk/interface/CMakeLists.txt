@@ -1,15 +1,15 @@
-list(APPEND SRCS
-  dummy.cpp
-  immersedboundary.cpp
-  spring.cpp
-  #vertex.cpp
+list(APPEND SRCS 
+  ibm/immersedboundary.cpp
+  ibm/spring.cpp
+  ibm/beam.cpp
+  # df/directforcing.cpp
 )
 
-list(APPEND HDRS
-  dummy.h
-  immersedboundary.h
-  spring.h
-  #vertex.h
+list(APPEND HDRS 
+  ibm/immersedboundary.h
+  ibm/spring.h
+  ibm/beam.h
+  # df/directforcing.h
 )
 
 convert_filenames_to_full_paths(SRCS)

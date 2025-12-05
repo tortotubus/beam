@@ -1,15 +1,17 @@
 list(APPEND SRCS
-  VTKPolyData.cpp
-  HDF.cpp
-  VTKHDF.cpp
-  VTKHDFPolyData.cpp
+  C/vtkHDF.cpp
+  C/vtkHDFPolyData.cpp
+  C/vtkPolyData.cpp
+  CXX/vtkHDFPolyData.cpp
+  CXX/vtkPolyData.cpp
 )
 
 list(APPEND HDRS
-  VTKPolyData.hpp
-  HDF.hpp
-  VTKHDF.hpp
-  VTKHDFPolyData.hpp
+  C/vtkHDF.hpp
+  C/vtkHDFPolyData.hpp
+  C/vtkPolyData.hpp
+  CXX/vtkHDFPolyData.hpp
+  CXX/vtkPolyData.hpp
 )
 
 convert_filenames_to_full_paths(SRCS)

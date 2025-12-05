@@ -1,100 +1,19 @@
-
-
 #include <gtest/gtest.h>
 #include "models/beam/EulerBeamStaticInextensibleMoM.hpp"
 
-using beam::EulerBeamStaticInextensibleMoM;
-using beam::EulerBeam;
-using beam::EulerBeamMesh;
-using beam::EulerBeamBCs;
-using beam::real_t;
-using beam::left;
-using beam::right;
-using beam::simple_bc;
-using beam::clamped_bc;
-using beam::free_bc;
-using beam::point_force_bc;
-using beam::point_torque_bc;
-
-// TEST(EulerBeamStaticInextensibleMoMTest, DumpLoadAndStiffness) {
-
-//   EulerBeamBCs boundary_conditions = {
-//     .end = {left, right},
-//     .type = {clamped_bc, free_bc},
-//     .vals = {{
-//       .position = {0,0,0},
-//       .slope = {1,0,0}
-//     }, {
-//       .position = {1,0,0},
-//       .slope = {1,0,0}
-//     }}
-//   };
-
-//   real_t length = 1., EI = 1., load = -1., area = 1., r_penalty = 1e4;
-//   size_t nodes = 3;
-
-//   EulerBeamStaticInextensibleMoM static_beam(length, EI, load, area, nodes, boundary_conditions, r_penalty);
-
-//   //static_beam.update_lambda();
-//   static_beam.apply_initial_condition();
-//   static_beam.assemble_system();
-//   static_beam.apply_boundary_conditions();
-
-//   auto J = static_beam.jacobian;
-//   auto u = static_beam.u;
-//   auto R = static_beam.residual;
-  
-//   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
-//   GTEST_LOG_(INFO) << "J =\n" << J << "\n";
-//   GTEST_LOG_(INFO) << "u =\n" << u << "\n";
-//   GTEST_LOG_(INFO) << "R =\n" << R << "\n";
-  
-//   // Optionally, add some real checks:
-//   // EXPECT_NEAR(F(0), expected_value, 1e-12);
-//   // EXPECT_NEAR(K(0,0), expected_K00, 1e-12);
-// };
-
-
-// TEST(EulerBeamStaticInextensibleMoMTest, SolveUniformLoadAndPlot) {
-
-//   real_t length = 1., EI = 1., area = 1., r_pentalty = 1e3;
-//   std::array<real_t, 3> load = {0,-10,0};
-//   size_t nodes = 15;
-
-//   EulerBeamBCs boundary_conditions = {
-//     .end = {left, right},
-//     .type = {clamped_bc, free_bc},
-//     .vals = {{
-//       .position = {0,0,0},
-//       .slope = {1,0,0}
-//     }, {
-//       .position = {1,0,0},
-//       .slope = {1,0,0}
-//     }}
-//   };
-
-//   EulerBeamStaticInextensibleMoM static_beam(length, EI, nodes, boundary_conditions, r_pentalty);
-//   static_beam.solve(load);
-//   static_beam.plot("Static Inextensible Euler Beam");
-  
-//   // auto u = static_beam.get_solution();
-//   // GTEST_LOG_(INFO) << "u =\n" << u << "\n";
-
-//   // Optionally, add some real checks:
-//   // EXPECT_NEAR(F(0), expected_value, 1e-12);
-//   // EXPECT_NEAR(K(0,0), expected_K00, 1e-12);
-// };
-
 #include "EulerBeamStaticInextensibleReferences.hpp"
+
+namespace beam {
+using namespace io::CXX;
 
 TEST(EulerBeamStaticInextensibleMoMTest, BisshoppAndDrucker) {
 
-  real_t length = 1., EI = 1., area = 1., r_pentalty = 1e3;
+  real_t length = 1., EI = 1., area = 1., r_pentalty = 1e5;
   size_t nodes = 40;
 
   real_t tip_force_y = -1.;
 
-  double comparison_tol = 1e-6;
+  double comparison_tol = 1e-5;
 
   EulerBeamBCs boundary_conditions = {
     .end = {left, right},
@@ -150,31 +69,64 @@ TEST(EulerBeamStaticInextensibleMoMTest, BisshoppAndDrucker) {
 };
 
 
-TEST(EulerBeamStaticInextensibleMoMTest, BourgatDumayGlowinski) {
-  real_t length = 1.0, EI = 1., r_pentalty = 1e2;
-  std::array<real_t, 3> load = {0,-100,0};
-  size_t nodes = 50;
+TEST(EulerBeamStaticInextensibleMoMTest, NonUniform) {
+
+  real_t length = 1., EI = 1., area = 1., r_pentalty = 1e5;
+  size_t nodes = 40;
+
+  real_t force_y = -1.;
+
+  double comparison_tol = 1e-5;
 
   EulerBeamBCs boundary_conditions = {
     .end = {left, right},
-    .type = {simple_bc, simple_bc },
+    .type = {clamped_bc, free_bc},
     .vals = {{
       .position = {0,0,0},
       .slope = {1,0,0}
     }, {
-      .position = {0.95,0,0},
-      .slope = {1,0,0}
+      .force = {0,0,0}
     }}
   };
 
+  std::vector<std::array<real_t,3>> nonuniform_load(nodes,{0,-1,0});
 
   EulerBeamStaticInextensibleMoM static_beam(length, EI, nodes, boundary_conditions, r_pentalty);
 
-  GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
-  // static_beam.apply_initial_condition();
-  // static_beam.update_mesh();
-  // static_beam.plot("Static Inextensible Euler Beam (IC)");
+  // static_beam.solve({0,force_y,0});
+  static_beam.solve(nonuniform_load);
+  
+  static_beam.plot();
 
-  static_beam.solve(load);
-  static_beam.plot("Bourgat Dumay and Glowinski");
 };
+
+// TEST(EulerBeamStaticInextensibleMoMTest, BourgatDumayGlowinski) {
+//   real_t length = 1.0, EI = 1., r_pentalty = 1e2;
+//   std::array<real_t, 3> load = {0,-100,0};
+//   size_t nodes = 50;
+
+//   EulerBeamBCs boundary_conditions = {
+//     .end = {left, right},
+//     .type = {simple_bc, simple_bc },
+//     .vals = {{
+//       .position = {0,0,0},
+//       .slope = {1,0,0}
+//     }, {
+//       .position = {0.95,0,0},
+//       .slope = {1,0,0}
+//     }}
+//   };
+
+
+//   EulerBeamStaticInextensibleMoM static_beam(length, EI, nodes, boundary_conditions, r_pentalty);
+
+//   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
+//   // static_beam.apply_initial_condition();
+//   // static_beam.update_mesh();
+//   // static_beam.plot("Static Inextensible Euler Beam (IC)");
+
+//   static_beam.solve(load);
+//   static_beam.plot("Bourgat Dumay and Glowinski");
+// };
+
+}

@@ -42,7 +42,8 @@ set(QCC_EXECUTABLE "${install_dir}/bin/qcc" CACHE FILEPATH "Path to built qcc")
 
 option(BUILD_BASILISK_EXAMPLES "Build basilisk example programs" ON)
 if(BUILD_BASILISK_EXAMPLES)
-  add_subdirectory(examples)
+  add_subdirectory(examples/serial)
+  add_subdirectory(examples/mpi)
 endif()
 
 set(SOURCES ${SOURCES} ${SRCS} PARENT_SCOPE)

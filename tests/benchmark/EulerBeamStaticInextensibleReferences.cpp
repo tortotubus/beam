@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+namespace beam {
+
 TEST(EulerBeamStaticInextensibleReferences, BisshoppAndDrucker) {
   double EI = 1., length = 1.;
   double p_min = 0., p_max = 10., p_delta = 0.1;
@@ -59,3 +61,5 @@ TEST(EulerBeamStaticInextensibleReferences, BisshoppAndDrucker) {
   pclose(pipe);
   
 };
+
+}

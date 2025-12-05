@@ -2,7 +2,7 @@
 
 #include "config/config.hpp"
 #include "general/error.hpp"
-#include "io/VTKPolyData.hpp"
+#include "io/CXX/vtkPolyData.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -155,9 +155,9 @@ public:
 
   void plot_gnuplot() { plot_gnuplot("Beam Centerline"); }
 
-  VTKPolyData to_vtk_polydata()
+  io::CXX::vtkPolyData to_vtk_polydata()
   {
-    VTKPolyData pd;
+    io::CXX::vtkPolyData pd;
 
     pd.reserve_points(nodes);
     pd.reserve_lines(nodes - 1);

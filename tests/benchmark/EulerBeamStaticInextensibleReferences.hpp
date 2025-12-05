@@ -4,18 +4,23 @@
 #include <limits>
 #include <stdexcept>
 
-struct BisshoppAndDrucker1945Result {
+namespace beam {
+
+struct BisshoppAndDrucker1945Result
+{
   double k;     // elliptic modules in [1/sqrt(2), 1)
   double a;     // dimensionless load a = sqrt(PL^2/B)
   double delta; // vertical drop
   double A;     // horizontal retreat (L - x_tip)
 };
 
-/* 
+/*
   For reference see https://doi.org/10.1090/qam/13360
 */
-inline BisshoppAndDrucker1945Result BisshoppAndDrucker1945(double length, double EI, double tip_load) {
-  /* Note in the original paper, 
+inline BisshoppAndDrucker1945Result
+BisshoppAndDrucker1945(double length, double EI, double tip_load)
+{
+  /* Note in the original paper,
     L = beam length
     B = flexural rigidity
     P = vertical tip load
@@ -28,11 +33,11 @@ inline BisshoppAndDrucker1945Result BisshoppAndDrucker1945(double length, double
   double P = tip_load;
   double L = length;
   double B = EI;
- 
+
   BisshoppAndDrucker1945Result result{};
 
   // Compute the dimensionless load
-  result.a = std::sqrt((P*L*L)/B);
+  result.a = std::sqrt((P * L * L) / B);
 
   // Check if the load is zero
   if (result.a == 0.) {
@@ -42,12 +47,13 @@ inline BisshoppAndDrucker1945Result BisshoppAndDrucker1945(double length, double
     return result;
   }
 
-  // Helper function: a(k) = K(k) - F(theta1 | k), with theta1 = asin(1/sqrt(2)*k);
+  // Helper function: a(k) = K(k) - F(theta1 | k), with theta1 =
+  // asin(1/sqrt(2)*k);
   auto a_of_k = [](double k) -> double {
     const double kmin = M_SQRT1_2;   // 1/sqrt(2)
     const double kmax = 1.0 - 1e-15; // ~1
     k = k < kmin ? kmin : (k > kmax ? kmax : k);
-    const double theta1 = std::asin(1./(std::sqrt(2.)*k));
+    const double theta1 = std::asin(1. / (std::sqrt(2.) * k));
     const double K = std::comp_ellint_1(k);
     const double F1 = std::ellint_1(k, theta1);
     return K - F1;
@@ -74,19 +80,30 @@ inline BisshoppAndDrucker1945Result BisshoppAndDrucker1945(double length, double
     const double k_i = 0.5 * (k_lo + k_hi);
     const double a_i = a_of_k(k_i);
 
-    if (std::abs(a_i - result.a) < tol) { result.k = k_i; break; }
+    if (std::abs(a_i - result.a) < tol) {
+      result.k = k_i;
+      break;
+    }
 
-    if (a_i < result.a)                 { k_lo = k_i; } 
-    else                                { k_hi = k_i; }
+    if (a_i < result.a) {
+      k_lo = k_i;
+    } else {
+      k_hi = k_i;
+    }
 
-    if (std::abs(k_hi - k_lo) < tol)    { result.k = 0.5*(k_lo + k_hi); break; }
-    
-    if (it == max_it - 1)               { result.k = 0.5*(k_lo+k_hi); }
+    if (std::abs(k_hi - k_lo) < tol) {
+      result.k = 0.5 * (k_lo + k_hi);
+      break;
+    }
+
+    if (it == max_it - 1) {
+      result.k = 0.5 * (k_lo + k_hi);
+    }
   }
 
   // Now that k has been computed, compute delta/L and (L-A)/L
   const double k = result.k;
-  const double theta1 = std::asin(1./(std::sqrt(2.)*k));
+  const double theta1 = std::asin(1. / (std::sqrt(2.) * k));
   const double K = std::comp_ellint_1(k);
   const double E = std::comp_ellint_2(k);
   const double F1 = std::ellint_1(k, theta1);
@@ -95,10 +112,11 @@ inline BisshoppAndDrucker1945Result BisshoppAndDrucker1945(double length, double
   const double a_val = K - F1;
   // const double delta_over_L = (E-E1)/a_val;
   const double delta_over_L = 1.0 - 2.0 * (E - E1) / a_val;
-  const double x_over_L = (std::sqrt(2.)*std::sqrt(2.*k*k-1.))/a_val;
+  const double x_over_L = (std::sqrt(2.) * std::sqrt(2. * k * k - 1.)) / a_val;
 
   result.delta = delta_over_L * L;
   result.A = (1. - x_over_L) * L;
 
   return result;
+}
 }

@@ -35,3 +35,6 @@ Generate documentation using:
 make doc
 ```
 Then open `docs/html/index.html` in your browser.
+
+\subpage manual/main.md
+

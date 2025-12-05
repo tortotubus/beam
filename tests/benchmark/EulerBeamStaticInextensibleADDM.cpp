@@ -2,54 +2,17 @@
 
 #include <gtest/gtest.h>
 #include "models/beam/EulerBeamStaticInextensibleADDM.hpp"
-
-using beam::EulerBeamStaticInextensibleADDM;
-using beam::EulerBeam;
-using beam::EulerBeamMesh;
-using beam::EulerBeamBCs;
-using beam::real_t;
-using beam::left;
-using beam::right;
-using beam::simple_bc;
-using beam::clamped_bc;
-using beam::free_bc;
-using beam::point_force_bc;
-using beam::point_torque_bc;
-
-// TEST(EulerBeamStaticInextensibleADDMTest, SolveUniformLoadAndPlot) {
-
-//   real_t length = 10., EI = 1., r_pentalty = 1e3;
-//   std::array<real_t, 3> load = {0,-10,0};
-//   size_t nodes = 15;
-
-//   EulerBeamBCs boundary_conditions = {
-//     .end = {left, right},
-//     .type = {clamped_bc, free_bc},
-//     .vals = {{
-//       .position = {0,0,0},
-//       .slope = {1,0,0}
-//     }, {
-//       .position = {length,0,0},
-//       .slope = {0,0,0}
-//     }}
-//   };
-
-//   EulerBeamStaticInextensibleADDM static_beam(length, EI, nodes, boundary_conditions, r_pentalty);
-
-//   static_beam.solve(load);
-//   static_beam.plot("Static Inextensible Euler Beam");
-
-// };
-
-
 #include "EulerBeamStaticInextensibleReferences.hpp"
+
+namespace beam {
+using namespace io::CXX;
 
 TEST(EulerBeamStaticInextensibleADDMTest, BisshoppAndDrucker) {
 
-  real_t length = 1., EI = 1., mu = 1., r_pentalty = 1e3;
+  real_t length = 1., EI = 1., area = 1., r_pentalty = 1e3;
   size_t nodes = 40;
 
-  real_t tip_force_y = -1.;
+  real_t tip_force_y = -1;
 
   double comparison_tol = 1e-4;
 
@@ -130,3 +93,5 @@ TEST(EulerBeamStaticInextensibleADDMTest, BisshoppAndDrucker) {
 //   static_beam.solve(load);
 //   static_beam.plot("Bourgat Dumay and Glowinski");
 // };
+
+}

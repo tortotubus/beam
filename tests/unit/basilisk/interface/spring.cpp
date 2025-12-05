@@ -2,8 +2,8 @@
 
 extern "C" {
 
-#include "basilisk/interface/immersedboundary.h"
-#include "basilisk/interface/spring.h"
+#include "basilisk/interface/ibm/immersedboundary.h"
+#include "basilisk/interface/ibm/spring.h"
 }
 
 #include <vector>
@@ -17,7 +17,7 @@ TEST(IBSpringCircleCInterfaceTest, GetMidpointEllipseZeroVelocityProducesNonZero
     double K = 1.0;
     double rx = 2.0, ry = 1.0;
     double cx = 0.0, cy = 0.0;
-    ib_structure_model_t handle = ib_spring_circle_create_ellipse(N, K, rx, ry, cx, cy);
+    ib_velocity_structure_model_t handle = ib_spring_circle_create_ellipse(N, K, rx, ry, cx, cy);
     ASSERT_NE(handle, nullptr);
 
     // Zero velocity array
@@ -30,7 +30,7 @@ TEST(IBSpringCircleCInterfaceTest, GetMidpointEllipseZeroVelocityProducesNonZero
     double dt = 0.1;
 
     // Call the C interface for midpoint
-    ib_structure_mesh_t mesh = ib_structure_model_get_midpoint(handle, velocity.data(), N, dt);
+    ib_structure_mesh_t mesh = ib_velocity_structure_model_get_midpoint(handle, velocity.data(), N, dt);
 
     // Check that at least one force is nonzero
     bool any_nonzero = false;

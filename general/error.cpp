@@ -11,7 +11,7 @@
 
 #include "error.hpp"
 #include "globals.hpp"
-#include "array.hpp"
+// #include "array.hpp"
 #include <cstdlib>
 #include <iostream>
 
