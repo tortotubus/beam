@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../../config/config.hpp" 
-#include "../../general/error.hpp" 
+#include "../../config/config.hpp"
+#include "../../general/error.hpp"
 
-#include <vector>
 #include <iostream>
+#include <vector>
 
 namespace beam {
 
@@ -32,8 +32,7 @@ public:
     : NumberOfPoints(NumberOfPoints)
     , points(NumberOfPoints, { 0, 0, 0 })
     , forces(NumberOfPoints, { 0, 0, 0 })
-    , velocity(NumberOfPoints, { 0, 0, 0 })
-  {};
+    , velocity(NumberOfPoints, { 0, 0, 0 }) {};
 
   /**
    * @brief Copy constructor
@@ -47,9 +46,7 @@ public:
     , points(other.points)
     , forces(other.forces) {};
 
-  size_t GetNumberOfPoints() { 
-    return NumberOfPoints; 
-  }
+  size_t GetNumberOfPoints() { return NumberOfPoints; }
   std::vector<IBVertex>& GetPoints() { return points; }
   std::vector<IBVertex>& GetVelocity() { return velocity; }
   std::vector<IBVertex>& GetForces() { return forces; }
@@ -176,7 +173,11 @@ public:
   }
 };
 
-class IBForceCoupledStrucureModel
+/**
+ * @brief Immersed boundary coupling abstract base class for constitutive models
+ * that take forces as inputs and give position and velocity as outputs
+ */
+class IBForceCoupledStructureModel
 {
 protected:
   IBStructureMesh mesh, mesh_next;
@@ -187,13 +188,14 @@ protected:
                                  real_t dt) = 0;
 
 public:
-  IBForceCoupledStrucureModel(size_t NumberOfPoints)
+  IBForceCoupledStructureModel(size_t NumberOfPoints)
     : mesh(NumberOfPoints)
     , mesh_next(NumberOfPoints) {};
 
-  size_t GetNumberOfPoints() { 
-    std::cout << "IBForceCoupledStructureModel::GetNumberOfPoint()\n";
-    return mesh.GetNumberOfPoints(); 
+  size_t GetNumberOfPoints()
+  {
+    // std::cout << "IBForceCoupledStructureModel::GetNumberOfPoint()\n";
+    return mesh.GetNumberOfPoints();
   }
 
   virtual IBStructureMesh& GetCurrent() { return mesh; }

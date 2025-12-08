@@ -15,9 +15,9 @@ TEST(EulerBeamStaticInextensibleMoMTest, BisshoppAndDrucker) {
 
   double comparison_tol = 1e-5;
 
-  EulerBeamBCs boundary_conditions = {
-    .end = {left, right},
-    .type = {clamped_bc, point_force_bc},
+  EulerBeam::EulerBeamBCs boundary_conditions = {
+    .end = {EulerBeam::left, EulerBeam::right},
+    .type = {EulerBeam::clamped_bc, EulerBeam::point_force_bc},
     .vals = {{
       .position = {0,0,0},
       .slope = {1,0,0}
@@ -78,9 +78,9 @@ TEST(EulerBeamStaticInextensibleMoMTest, NonUniform) {
 
   double comparison_tol = 1e-5;
 
-  EulerBeamBCs boundary_conditions = {
-    .end = {left, right},
-    .type = {clamped_bc, free_bc},
+  EulerBeam::EulerBeamBCs boundary_conditions = {
+    .end = {EulerBeam::left, EulerBeam::right},
+    .type = {EulerBeam::clamped_bc, EulerBeam::free_bc},
     .vals = {{
       .position = {0,0,0},
       .slope = {1,0,0}

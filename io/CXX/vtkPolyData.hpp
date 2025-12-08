@@ -13,6 +13,12 @@ namespace CXX {
 
 class vtkHDFPolyData;
 
+/**
+ * @brief Wrapper for the @ref C::vtkPolyData class
+ *
+ * This class actually implements its own logic to ensure correct vtkPolyData
+ * fields, but is easily convertible to the C class.
+ */
 class vtkPolyData
 {
 protected:

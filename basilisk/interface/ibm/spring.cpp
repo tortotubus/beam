@@ -1,8 +1,8 @@
 #include "spring.h"
 
-#include "../../models/spring/Spring.hpp"
+#include "models/spring/Spring.hpp"
 
-using beam::IBSpringCircle;
+using namespace beam;
 
 extern "C"
 {

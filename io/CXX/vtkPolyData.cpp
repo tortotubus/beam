@@ -410,6 +410,7 @@ vtkPolyData::add_polygon(std::vector<int64_t> polygon_points)
 
   return number_of_polygons() - 1;
 }
+
 }
 }
 }

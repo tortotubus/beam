@@ -25,7 +25,7 @@ public:
   EulerBeamStaticInextensibleMoMSparse(real_t length,
                                        real_t EI,
                                        size_t nodes,
-                                       beam::EulerBeamBCs bcs,
+                                       EulerBeam::EulerBeamBCs bcs,
                                        real_t r_penalty)
     : EulerBeam(length, EI, nodes, bcs)
     , elements(nodes - 1)
@@ -158,7 +158,7 @@ protected:
                                        real_t EI,
                                        real_t mu,
                                        size_t nodes,
-                                       beam::EulerBeamBCs bcs,
+                                       EulerBeam::EulerBeamBCs bcs,
                                        real_t r_penalty)
     : EulerBeam(length, EI, mu, nodes, bcs)
     , elements(nodes - 1)

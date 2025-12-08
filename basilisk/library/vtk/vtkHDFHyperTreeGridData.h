@@ -1,4 +1,9 @@
-#include "foreach_cell_bfs.h"
+/** @defgroup basilisk Basilisk library
+ * 
+ *  @{
+ */
+
+ #include "foreach_cell_bfs.h"
 #include "vtkType.h"
 
 /**
@@ -259,3 +264,6 @@ vtkHDFHyperTreeGridData *vtk_hdf_hypertreegrid_data_init(void) {
 
     return vtk_hdf_hypertreegrid_data;
 }
+
+
+/** @} */

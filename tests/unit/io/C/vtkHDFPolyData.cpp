@@ -66,7 +66,7 @@ TEST(VtkHDFPolyDataTransientTest, WriteLine)
   }
 
   // Write the initial file
-  vtkHDFPolyData hdf_pd = vtk_HDF_polydata_init_transient(fname, &pd);
+  vtkHDFPolyData hdf_pd = vtk_HDF_polydata_init_transient(fname, true, &pd, 0.0);
   vtk_HDF_polydata_close(&hdf_pd);
 
   for (size_t ti = 1; ti < 100; ti++) {

@@ -20,7 +20,7 @@ typedef enum
 } vtkPolyDataState;
 
 /**
- * @brief
+ * @brief Data object for consumption by @ref vtkHDFPolyData class
  */
 typedef struct
 {

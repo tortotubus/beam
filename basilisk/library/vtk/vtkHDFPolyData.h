@@ -1,3 +1,8 @@
+/** @defgroup basilisk Basilisk library
+ * 
+ *  @{
+ */
+
 #include "../../Core/vtkPolyDataSet.h"
 #include "vtkHDF.h"
 
@@ -1119,3 +1124,6 @@ vtk_HDF_polydata_init(vtkPolyData_t* data, const char* fname)
 
   return vtk_hdf_polydata;
 }
+
+
+/** @} */

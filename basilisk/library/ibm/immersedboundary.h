@@ -6,13 +6,13 @@
 #include "interface/ibm/immersedboundary.h"
 #include "library/navier-stokes/centered.h"
 
-/**
+/*!
  * Distance functions
  */
 
 #include "library/ibm/kernels.h"
 
-/**
+/*!
  * IBNode
  */
 #if dimension == 1
@@ -23,7 +23,7 @@
 #define STENCIL_SIZE 125
 #endif
 
-/**
+/*!
  * @brief Initialize an IBNode struct
  */
 typedef struct
@@ -66,10 +66,15 @@ ibnode_free(IBNode* n)
   ibnode_free_stencil(n);
 }
 
-/**
+/*
  * IBMesh
  */
 
+/*!
+ * @brief 
+ * 
+ * @memberof IBMesh
+ */
 typedef enum
 {
   INVALID = -1,
@@ -78,12 +83,21 @@ typedef enum
   FORCE_COUPLED_IBM = 2
 } IBMeshModelType;
 
+/*!
+ * @brief 
+ * 
+ * @memberof IBMesh
+ */
 typedef union
 {
   ib_velocity_structure_model_t velocity_coupled;
   ib_force_structure_model_t force_coupled;
 } IBMeshModel;
 
+/*!
+ * @brief 
+ * 
+ */
 typedef struct
 {
   IBMeshModelType model_type;
@@ -93,6 +107,9 @@ typedef struct
   bool isactive;
 } IBMesh;
 
+/*!
+ * @memberof IBMesh
+ */
 void
 ib_mesh_free(IBMesh* mesh)
 {
@@ -104,10 +121,12 @@ ib_mesh_free(IBMesh* mesh)
   }
 }
 
-/**
+/*!
  * @brief Initialize a mesh without nodes.
  *
  * @param mesh Mesh to initialize
+ * 
+ * @memberof IBMesh
  */
 void
 ib_mesh_init(IBMesh* mesh)
@@ -118,11 +137,13 @@ ib_mesh_init(IBMesh* mesh)
   mesh->isactive = false;
 }
 
-/**
+/*!
  * @brief Initialize the IBMesh with a number of IBNodes
  *
  * @param mesh The IBMesh to initialize
  * @param nn The number of nodes to initialize
+ * 
+ * @memberof IBMesh
  */
 void
 ib_mesh_init_nn(IBMesh* mesh, int nn)
@@ -137,12 +158,14 @@ ib_mesh_init_nn(IBMesh* mesh, int nn)
   }
 }
 
-/**
+/*!
  * @brief Set the (velocity-coupled) constitutive model for a given IBMesh
  *
  * @param mesh Pointer (reference) to the IBMesh we want to set the Lagrangian
  * model for
  * @param model The C++ velocity-coupled to use for this mesh
+ * 
+ * @memberof IBMesh
  */
 void
 ib_mesh_set_velocity_model(IBMesh* mesh, ib_velocity_structure_model_t model)
@@ -174,6 +197,9 @@ ib_mesh_set_velocity_model(IBMesh* mesh, ib_velocity_structure_model_t model)
   ib_structure_mesh_free(&cpp_mesh);
 }
 
+/*! 
+ * @memberof IBMesh
+ */
 void
 ib_mesh_set_force_model(IBMesh* mesh, ib_force_structure_model_t model)
 {
@@ -206,10 +232,12 @@ ib_mesh_set_force_model(IBMesh* mesh, ib_force_structure_model_t model)
   ib_structure_mesh_free(&cpp_mesh);
 }
 
-/**
+/*!
  * @brief Helper function to compute the centroid of a given IBMesh
  *
  * @param mesh IBMesh to compute the centroid of
+ * 
+ * @memberof IBMesh
  */
 vertex_t
 ib_mesh_get_centroid(IBMesh* mesh)
@@ -236,8 +264,10 @@ ib_mesh_get_centroid(IBMesh* mesh)
   return centroid;
 }
 
-/**
+/*!
  * @brief
+ * 
+ * @memberof IBMesh
  */
 void
 ib_mesh_print_pos(IBMesh* mesh)
@@ -267,7 +297,7 @@ ib_mesh_print_pos(IBMesh* mesh)
   printf("}\n");
 }
 
-/**
+/*!
  * @brief Management struct to hold all IBMeshes in the simulation
  */
 typedef struct
@@ -280,10 +310,12 @@ typedef struct
 
 IBMeshManager ib_mesh_manager;
 
-/**
+/*!
  * @brief Initialize the immersed boundary mesh manager
  *
  * @param nm The number of meshes you plan to have
+ * 
+ * @memberof IBMeshManager
  */
 void
 ib_mesh_manager_init(int nm)
@@ -302,9 +334,11 @@ ib_mesh_manager_init(int nm)
   }
 }
 
-/**
+/*!
  * @brief Free all members in the immersed boundary mesh manager, including the
  * array of meshes, their nodes, and stencil nodes.
+ * 
+ * @memberof IBMeshManager
  */
 void
 ib_mesh_manager_free()
@@ -316,10 +350,12 @@ ib_mesh_manager_free()
   ib_mesh_manager.nm = 0;
 }
 
-/**
+/*!
  * @brief Generate the stencils for each node of a given mesh.
  *
  * @param mesh
+ * 
+ * @memberof IBMesh
  */
 void
 generate_stencil_cache(IBMesh* mesh)
@@ -358,8 +394,10 @@ generate_stencil_cache(IBMesh* mesh)
   }
 }
 
-/**
+/*!
  * @brief Generate stencils for every node of every mesh
+ * 
+ * @memberof IBMeshManager
  */
 trace void
 generate_stencil_caches()
@@ -371,12 +409,14 @@ generate_stencil_caches()
 
 vector forcing[];
 
-/**
+/*!
  * @brief Spread the IBM force at the Lagrangian nodes back
  * onto the Eulerian vector field
  *
  * @param forcing Eulerian vector field to hold the result in
  * @param mesh The mesh for to gather forcing from
+ * 
+ * @memberof IBMesh
  */
 trace void
 spread_eulerian_forcing(vector forcing, IBMesh* mesh)
@@ -419,11 +459,13 @@ spread_eulerian_forcing(vector forcing, IBMesh* mesh)
     }
   }
 }
-/**
+/*!
  * @brief Interpolate Eulerian velocities from the Eulerian mesh to the
  * Lagrangian nodes
  *
  * @param mesh The mesh for to gather forcing from
+ * 
+ * @memberof IBMesh
  */
 trace void
 interpolate_eulerian_velocities(IBMesh* mesh)
@@ -472,10 +514,12 @@ interpolate_eulerian_velocities(IBMesh* mesh)
 
 scalar stencils[];
 
-/**
+/*!
  * @brief
  *
  * @param mesh The immersed boundary mesh
+ * 
+ * @memberof IBMesh
  */
 trace void
 tag_stencil(IBMesh* mesh)
@@ -506,9 +550,11 @@ tag_stencil(IBMesh* mesh)
   }
 }
 
-/**
+/*!
  * @brief
  *
+ * 
+ * @memberof IBMeshManager
  */
 trace void
 tag_stencils()
@@ -524,11 +570,13 @@ tag_stencils()
   }
 }
 
-/**
+/*!
  * @brief Update the position and velocity of the lagrangian points according to
  * their kinematic law(s)
  *
  * @param mesh
+ * 
+ * @memberof IBMesh
  */
 trace void
 advect_lagrangian_mesh(IBMesh* mesh)
@@ -564,11 +612,13 @@ advect_lagrangian_mesh(IBMesh* mesh)
 #endif
 }
 
-/**
+/*!
  * @brief Update the position and velocity of the lagrangian points according to
  * their kinematic law(s)
  *
  * @param mesh
+ * 
+ * @memberof IBMesh
  */
 void
 advance_lagrangian_mesh(IBMesh* mesh)
@@ -619,11 +669,13 @@ advance_lagrangian_mesh(IBMesh* mesh)
 //   }
 }
 
-/**
+/*!
  * @brief Update the force between the interpolated Eulerian velocity and
  * the Lagrangian velocity at the nodes
  *
  * @param mesh
+ * 
+ * @memberof IBMesh
  */
 void
 compute_kinematic_constraint_force(IBMesh* mesh)
@@ -649,7 +701,7 @@ compute_kinematic_constraint_force(IBMesh* mesh)
   // printf("||f_ib|| = %f\n", force_norm_val);
 }
 
-/**
+/*!
  * @brief
  *
  * See
@@ -664,7 +716,7 @@ defaults(i = 0)
   }
 }
 
-/**
+/*!
  * @brief
  *
  * See
@@ -712,7 +764,7 @@ tracer_advection(i++)
   }
 }
 
-/**
+/*!
  * @brief In the acceleration event, we transfer the Lagrangian forces to the
  * fluid using a regularized Dirac function. The acceleration is stored on the
  * cell faces, and will be fed as a source term to the Navier-Stokes solver.
@@ -786,7 +838,7 @@ acceleration(i++)
   }
 }
 
-/** At the end of the simulation, we free the allocated memory.*/
+/*! At the end of the simulation, we free the allocated memory.*/
 event
 cleanup(t = end)
 {

@@ -1,3 +1,8 @@
+/** @defgroup basilisk Basilisk library
+ * 
+ *  @{
+ */
+
 #include <hdf5.h>
 
 /**
@@ -100,3 +105,6 @@ vtk_HDF_init(const char* fname)
 
   return vtk_hdf;
 }
+
+
+/** @} */

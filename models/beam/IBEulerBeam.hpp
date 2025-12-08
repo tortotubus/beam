@@ -5,19 +5,23 @@
 
 namespace beam {
 
+/**
+ * @brief The immersed boundary force-coupling class for @ref EulerBeam
+ */
 class IBEulerBeam
-  : public IBForceCoupledStrucureModel
+  : public IBForceCoupledStructureModel
   , public EulerBeamDynamicInextensibleMoM
 
 {
 private:
-  void EBMeshToIBMeshNext() {
+  void EBMeshToIBMeshNext()
+  {
     // Update the E-B Mesh
     EulerBeamDynamicInextensibleMoM::update_mesh();
 
     // Get refernce to IB Mesh
-    auto& ib_points = IBForceCoupledStrucureModel::mesh_next.GetPoints();
-    auto& ib_velocity = IBForceCoupledStrucureModel::mesh_next.GetVelocity();
+    auto& ib_points = IBForceCoupledStructureModel::mesh_next.GetPoints();
+    auto& ib_velocity = IBForceCoupledStructureModel::mesh_next.GetVelocity();
 
     // Get reference to E-B Mesh
     auto& eb_points = EulerBeam::mesh.get_centerline();
@@ -35,13 +39,14 @@ private:
     }
   }
 
-  void EBMeshToIBMeshCurrent() {
+  void EBMeshToIBMeshCurrent()
+  {
     // Update the E-B Mesh
     EulerBeamDynamicInextensibleMoM::update_mesh();
 
     // Get refernce to IB Mesh
-    auto& ib_points = IBForceCoupledStrucureModel::mesh.GetPoints();
-    auto& ib_velocity = IBForceCoupledStrucureModel::mesh.GetVelocity();
+    auto& ib_points = IBForceCoupledStructureModel::mesh.GetPoints();
+    auto& ib_velocity = IBForceCoupledStructureModel::mesh.GetVelocity();
 
     // Get reference to E-B Mesh
     auto& eb_points = EulerBeam::mesh.get_centerline();
@@ -67,10 +72,11 @@ public:
               EulerBeamBCs bcs,
               real_t r_penalty)
     : EulerBeamDynamicInextensibleMoM(length, EI, mu, nodes, bcs, r_penalty)
-    , IBForceCoupledStrucureModel(nodes) {
-      EBMeshToIBMeshCurrent();   
-      EBMeshToIBMeshNext();   
-    };
+    , IBForceCoupledStructureModel(nodes)
+  {
+    EBMeshToIBMeshCurrent();
+    EBMeshToIBMeshNext();
+  };
 
   void ComputeNextPoints(std::vector<IBStructureMesh::IBVertex> force,
                          real_t dt) override
@@ -86,8 +92,8 @@ public:
 
     EulerBeamDynamicInextensibleMoM::solve(dt, load);
 
-    auto& ib_points = IBForceCoupledStrucureModel::mesh_next.GetPoints();
-    auto& ib_velocity = IBForceCoupledStrucureModel::mesh_next.GetVelocity();
+    auto& ib_points = IBForceCoupledStructureModel::mesh_next.GetPoints();
+    auto& ib_velocity = IBForceCoupledStructureModel::mesh_next.GetVelocity();
 
     auto& eb_points = EulerBeamDynamicInextensibleMoM::mesh.get_centerline();
     auto& eb_velocity =

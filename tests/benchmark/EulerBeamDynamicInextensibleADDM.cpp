@@ -3,19 +3,6 @@
 #include "models/beam/EulerBeamDynamicInextensibleADDM.hpp"
 #include <gtest/gtest.h>
 
-using beam::clamped_bc;
-using beam::EulerBeam;
-using beam::EulerBeamBCs;
-using beam::EulerBeamDynamicInextensibleADDM;
-using beam::EulerBeamMesh;
-using beam::free_bc;
-using beam::left;
-using beam::point_force_bc;
-using beam::point_torque_bc;
-using beam::real_t;
-using beam::right;
-using beam::simple_bc;
-
 // TEST(EulerBeamDynamicInextensibleADDMTest, StaticSolveAndPlot)
 // {
 

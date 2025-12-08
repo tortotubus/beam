@@ -13,6 +13,11 @@ namespace beam {
 namespace io {
 namespace C {
 
+/**
+ * @brief vtkHDF file type
+ * 
+ * @memberof vtkHDF
+ */
 typedef enum
 {
   IMAGEDATA,
@@ -24,12 +29,20 @@ typedef enum
   MULTIBLOCKDATASET
 } vtkHDFType;
 
+/**
+ * @brief Major and minor version of the vtkHDF file format
+ * 
+ * @memberof vtkHDF
+ */
 typedef struct
 {
   int major;
   int minor;
 } vtkHDFVersion;
 
+/**
+ * @brief Parent class with many helper functions for writing VTKHDF files
+ */
 typedef struct
 {
   hid_t file_id;       /**< File id */
@@ -52,6 +65,10 @@ typedef struct
 } vtkHDF;
 
 /**
+ * @brief Close a vtkHDF file
+ * 
+ * @param vtk_hdf Pointer or reference to vtkHDF object/struct
+ * 
  * @memberof vtkHDF
  */
 void
@@ -61,16 +78,18 @@ vtk_HDF_close(vtkHDF* vtk_hdf);
  * @brief Function called on any error which immediately closes the file to
  * avoid corruptions
  *
+ * @param vtk_hdf Pointer or reference to vtkHDF object/struct
+ * 
  * @memberof vtkHDF
  */
 void
 vtk_HDF_error(vtkHDF* vtk_hdf);
 
 /**
- * @brief Check for error
+ * @brief Check for error of some operation that returns herr_t type
  *
- * @param vtk_hdf
- * @param result
+ * @param vtk_hdf Pointer or reference to vtkHDF object/struct
+ * @param result Result of a HDF5 operation to check
  *
  * @memberof vtkHDF
  */
@@ -78,10 +97,10 @@ void
 vtk_HDF_check_result(vtkHDF* vtk_hdf, herr_t result);
 
 /**
- * @brief Check for error
+ * @brief Check for error of some operation that returns an object id
  *
- * @param vtk_hdf
- * @param object_id
+ * @param vtk_hdf Pointer or reference to vtkHDF object/struct
+ * @param object_id Object id to check
  *
  * @memberof vtkHDF
  */
@@ -89,7 +108,7 @@ void
 vtk_HDF_check_object(vtkHDF* vtk_hdf, hid_t object_id);
 
 /**
- * @brief Initialize the vtkHDF struct
+ * @brief Initialize the vtkHDF struct by writing a new file
  *
  * @memberof vtkHDF
  */
@@ -97,7 +116,7 @@ vtkHDF
 vtk_HDF_init(const char* fname, bool overwrite);
 
 /**
- * @brief Initialize the vtkHDF struct
+ * @brief Initialize the vtkHDF struct by opening an existing file
  *
  * @memberof vtkHDF
  */
@@ -116,7 +135,6 @@ vtk_HDF_open(const char* fname);
  *
  * @memberof vtkHDF
  */
-
 void
 vtk_HDF_write_attribute(const char* attribute_name,
                         const void* data,
@@ -199,7 +217,7 @@ vtk_HDF_write_type_attribute(const char* type_name,
  * @param data Pointer to the array of data
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
- * @param rank
+ * @param rank The rank of the dataset (e.g. the size of the dims array)
  * @param dims Pointer to an array of hsize_t which will afterwards contain the
  * dims of the dataset
  * @param max_dims Pointer to an array of hsize_t which will afterwards contain
@@ -225,7 +243,7 @@ vtk_HDF_read_dataset(const char* dataset_name,
  * @param data Pointer to the array of data
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
- * @param rank
+ * @param rank The rank of the dataset (e.g. the size of the dims array)
  * @param dims The dimensions of the dataset
  * @param vtk_hdf Pointer or reference to vtkHDF object/struct
  *
@@ -247,7 +265,7 @@ vtk_HDF_write_dataset(const char* dataset_name,
  * @param data Pointer to the array of data
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
- * @param rank
+ * @param rank The rank of the dataset (e.g. the size of the dims array)
  * @param dims The dimensions of the dataset
  * @param max_dims The maximum dimensions of the dataset
  * @param chunk_dims The chunk dimensions
@@ -271,7 +289,7 @@ vtk_HDF_write_chunked_dataset(const char* dataset_name,
  * @param data Pointer to the array of data
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
- * @param rank
+ * @param rank The rank of the dataset (e.g. the size of the dims array)
  * @param dims The dimensions of the dataset to append
  * @param vtk_hdf Pointer or reference to vtkHDF object/struct
  */
@@ -292,7 +310,7 @@ vtk_HDF_append_chunked_dataset(const char* dataset_name,
  * @param data Pointer to the array of data
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
- * @param rank
+ * @param rank The rank of the dataset (e.g. the size of the dims array)
  * @param dims The dimensions of the dataset
  * @param max_dims The maximum dimensions of the dataset
  * @param chunk_dims The chunk dimensions
@@ -320,7 +338,7 @@ vtk_HDF_write_compressed_dataset(const char* dataset_name,
  * @param data Pointer to the array of data
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
- * @param rank
+ * @param rank The rank of the dataset (e.g. the size of the dims array)
  * @param dims The dimensions of the dataset
  * @param local_size The size of the sub-array this process writes into
  * @param local_offset The position of the sub-array this process writes into
@@ -346,7 +364,7 @@ vtk_HDF_collective_write_dataset(const char* dataset_name,
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
  * @param dims The dimensions of the dataset
- * @param rank
+ * @param rank The rank of the dataset (e.g. the size of the dims array)
  * @param max_dims The maximum dimensions of the dataset
  * @param chunk_dims The chunk dimensions
  * @param local_size The size of the sub-array this process writes into
@@ -374,7 +392,7 @@ vtk_HDF_collective_write_chunked_dataset(const char* dataset_name,
  * @param data Pointer to the array of data
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
- * @param rank
+ * @param rank The rank of the dataset (e.g. the size of the dims array)
  * @param dims The dimensions of the dataset
  * @param max_dims The maximum dimensions of the dataset
  * @param chunk_dims The chunk dimensions

@@ -4,7 +4,7 @@ OUTPUT_DIRECTORY = docs
 CREATE_SUBDIRS = YES
 EXTRACT_ALL = YES
 EXTRACT_PRIVATE = YES
-INPUT = basilisk/interface config general mesh models manual io 
+INPUT = config general models manual io basilisk/interface
 RECURSIVE = YES
 USE_MDFILE_AS_MAINPAGE = manual/index.md
 GENERATE_LATEX = YES
@@ -22,6 +22,9 @@ HTML_COLORSTYLE_GAMMA = 113
 SEARCHENGINE = YES
 SERVER_BASED_SEARCH = NO
 EXTERNAL_SEARCH = NO
+WARN_IF_UNDOCUMENTED = YES
+WARN_IF_DOC_ERROR = YES
+WARN_NO_PARAMDOC = YES
 
 # LaTeX Configurations
 USE_MATHJAX = YES

@@ -9,90 +9,6 @@
 namespace beam {
 
 /**
- * @brief Boundary-condition types for Euler–Bernoulli / elastica beams.
- *
- * Use these to specify end constraints or lumped end loads.
- *  - free_bc:         shear \f(V(s) = 0\f) and bending moment \f(M(s) = 0\f)
- *  - simple_bc:       deflection \f(r(s) = 0\f) and moment \f(M(s) = 0\f)
- *  - clamped_bc:      deflection \f(r(s) = 0\f) and rotation \f(θ(s) = 0\f)
- *  - point_force_bc:  jump in shear (\f(V\f) has an impulse)
- *  - point_torque_bc: jump in moment (\f(M\f) has an impulse)
- *
- * @see EulerBeamBC for how these are carried with magnitudes/locations.
- */
-typedef enum
-{
-  free_bc,
-  simple_bc,
-  clamped_bc,
-  point_force_bc,
-  point_torque_bc,
-} EulerBeamBCType;
-
-/**
- * @brief Beam end to denote where to apply a given boundary condition.
- *
- * Note that "left" should be applied to the \f(s = 0\f), \f(x = 0\f), or
- * otherwise whatever is first coordinate in the particular E-B beam model's
- * netural axis coordinate system. Correspondingly the "right" should be applied
- * to the final coordinate \f(s = L\f) or \f(x = Lf\).
- */
-typedef enum
-{
-  left,
-  right,
-} EulerBeamBCEnd;
-
-/**
- * @brief Values to apply for a given boundary condition.
- *
- * Note that each is a vector in \f(\mathbb{R}^3\f), extraneous coordinats in
- * particular models will be ignored if they are not used. Similarly, extraneous
- * values for a given boundary condition to be applied will also be ignored.
- *
- */
-typedef struct
-{
-  double position[3];
-  double slope[3];
-  double force[3];
-  double torque[3];
-} EulerBeamBCVals;
-
-/**
- * @brief The boundary condition struct contains user-supplied boundary
- * conditions to be applied to the problem solved.
- *
- *
- * @see EulerBeamBCType for the type of boundary conditions supported.
- */
-typedef struct
-{
-  EulerBeamBCEnd end[2];
-  EulerBeamBCType type[2];
-  EulerBeamBCVals vals[2];
-} EulerBeamBCs;
-
-/**
- * @brief Denotes the type of loading applied to the beam at nodes. In
- * particular, we support uniform (spatially invariant) loads represented as
- * constants as well as nonuniform (spatially depdendent) loads at the nodes.
- *
- * For more details, see the solve() methods in EulerBeam base class.
- */
-typedef enum
-{
-  INVALID = -1,
-  NONE,
-  UNIFORM,
-  NONUNIFORM,
-  // UNIFORM_TIME_INDEPENDENT,
-  // NONUNIFORM_TIME_INDEPENDENT,
-  // UNIFORM_TIME_DEPENDENT,
-  // NONUNIFORM_TIME_DEPENDENT,
-} EulerBeamLoadType;
-
-/**
  * @brief Base class for Euler-Bernoulli beam implementations.
  *
  * This abstract class provides the interface for solving Euler-Bernoulli beam
@@ -110,6 +26,96 @@ typedef enum
 class EulerBeam
 {
 public:
+  /**
+   * @brief Boundary-condition types for Euler–Bernoulli / elastica beams.
+   *
+   * Use these to specify end constraints or lumped end loads.
+   *  - free_bc:         shear \f(V(s) = 0\f) and bending moment \f(M(s) = 0\f)
+   *  - simple_bc:       deflection \f(r(s) = 0\f) and moment \f(M(s) = 0\f)
+   *  - clamped_bc:      deflection \f(r(s) = 0\f) and rotation \f(θ(s) = 0\f)
+   *  - point_force_bc:  jump in shear (\f(V\f) has an impulse)
+   *  - point_torque_bc: jump in moment (\f(M\f) has an impulse)
+   *
+   * @see EulerBeamBC for how these are carried with magnitudes/locations.
+   * @memberof EulerBeamBCs
+   */
+  typedef enum
+  {
+    free_bc,
+    simple_bc,
+    clamped_bc,
+    point_force_bc,
+    point_torque_bc,
+  } EulerBeamBCType;
+
+  /**
+   * @brief Beam end to denote where to apply a given boundary condition.
+   *
+   * Note that "left" should be applied to the \f(s = 0\f), \f(x = 0\f), or
+   * otherwise whatever is first coordinate in the particular E-B beam model's
+   * netural axis coordinate system. Correspondingly the "right" should be
+   * applied to the final coordinate \f(s = L\f) or \f(x = Lf\).
+   *
+   * @memberof EulerBeamBCs
+   */
+  typedef enum
+  {
+    left,
+    right,
+  } EulerBeamBCEnd;
+
+  /**
+   * @brief Values to apply for a given boundary condition.
+   *
+   * Note that each is a vector in \f(\mathbb{R}^3\f), extraneous coordinats in
+   * particular models will be ignored if they are not used. Similarly,
+   * extraneous values for a given boundary condition to be applied will also be
+   * ignored.
+   *
+   * @memberof EulerBeamBCs
+   */
+  typedef struct
+  {
+    double position[3];
+    double slope[3];
+    double force[3];
+    double torque[3];
+  } EulerBeamBCVals;
+
+  /**
+   * @brief The boundary condition struct contains user-supplied boundary
+   * conditions to be applied to the problem solved.
+   *
+   *
+   * @see EulerBeamBCType for the type of boundary conditions supported.
+   * @memberof EulerBeam
+   */
+  typedef struct
+  {
+    EulerBeamBCEnd end[2];
+    EulerBeamBCType type[2];
+    EulerBeamBCVals vals[2];
+  } EulerBeamBCs;
+
+  /**
+   * @brief Denotes the type of loading applied to the beam at nodes. In
+   * particular, we support uniform (spatially invariant) loads represented as
+   * constants as well as nonuniform (spatially depdendent) loads at the nodes.
+   *
+   * For more details, see the solve() methods in EulerBeam base class.
+   */
+  typedef enum
+  {
+    INVALID = -1,
+    NONE,
+    UNIFORM,
+    NONUNIFORM,
+    // UNIFORM_TIME_INDEPENDENT,
+    // NONUNIFORM_TIME_INDEPENDENT,
+    // UNIFORM_TIME_DEPENDENT,
+    // NONUNIFORM_TIME_DEPENDENT,
+  } EulerBeamLoadType;
+
   /**
    * @brief Solves the beam problem with no external loading.
    *

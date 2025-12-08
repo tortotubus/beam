@@ -1,3 +1,8 @@
+/** @defgroup basilisk Basilisk library
+ * 
+ *  @{
+ */
+
 /**
  * @brief This macro performs a [breadth-first search](https://en.wikipedia.org/wiki/Breadth-first_search) of the
  * basilisk tree, and is largely rewritten and based on the builtin basilisk macro
@@ -118,3 +123,6 @@ macro2 foreach_cell_BFS() {
         foreach_cell_root_BFS(root) {...}
     }
 }
+
+
+/** @} */

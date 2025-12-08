@@ -10,7 +10,7 @@ public:
                                   real_t EI,
                                   real_t mu,
                                   size_t nodes,
-                                  beam::EulerBeamBCs bcs,
+                                  EulerBeam::EulerBeamBCs bcs,
                                   real_t r_penalty)
     : EulerBeamStaticInextensibleMoMSparse(length, EI, mu, nodes, bcs, r_penalty)
     , u_prev(Eigen::VectorXd::Zero(ndof))

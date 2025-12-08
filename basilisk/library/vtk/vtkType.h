@@ -1,3 +1,8 @@
+/** @defgroup basilisk Basilisk library 
+ * 
+ *  @{
+ */
+
 typedef uint8_t UInt8_t;
 typedef uint16_t UInt16_t;
 typedef uint32_t UInt32_t;

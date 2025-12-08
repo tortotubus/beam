@@ -1,10 +1,12 @@
 #include "immersedboundary.h"
-#include "../../models/ibm/immersedboundary.hpp"
+#include "models/ibm/immersedboundary.hpp"
 #include <stdlib.h>
 
-using beam::IBForceCoupledStrucureModel;
-using beam::IBStructureMesh;
-using beam::IBVelocityCoupledStructureModel;
+// using beam::IBForceCoupledStructureModel;
+// using beam::IBStructureMesh;
+// using beam::IBVelocityCoupledStructureModel;
+
+using namespace beam;
 
 extern "C"
 {
@@ -184,8 +186,8 @@ extern "C"
   int ib_force_structure_model_get_number_of_nodes(
     ib_force_structure_model_t handle)
   {
-    IBForceCoupledStrucureModel* model =
-      reinterpret_cast<IBForceCoupledStrucureModel*>(handle);
+    IBForceCoupledStructureModel* model =
+      reinterpret_cast<IBForceCoupledStructureModel*>(handle);
 
       int n = model->GetNumberOfPoints();
 
@@ -198,8 +200,8 @@ extern "C"
   ib_structure_mesh_t ib_force_structure_model_get_current(
     ib_force_structure_model_t handle)
   {
-    IBForceCoupledStrucureModel* model =
-      reinterpret_cast<IBForceCoupledStrucureModel*>(handle);
+    IBForceCoupledStructureModel* model =
+      reinterpret_cast<IBForceCoupledStructureModel*>(handle);
     IBStructureMesh& mesh = model->GetCurrent();
 
     std::vector<IBStructureMesh::IBVertex>& position = mesh.GetPoints();
@@ -237,8 +239,8 @@ extern "C"
     double dt)
   {
     // Get the pointer from the handle
-    IBForceCoupledStrucureModel* model =
-      reinterpret_cast<IBForceCoupledStrucureModel*>(handle);
+    IBForceCoupledStructureModel* model =
+      reinterpret_cast<IBForceCoupledStructureModel*>(handle);
 
     // Pack the raw C array into beam::Array<beam::fem:Vertex>
     std::vector<IBStructureMesh::IBVertex> force_arr(nv);

@@ -1,3 +1,8 @@
+/** @defgroup basilisk Basilisk library
+ * 
+ *  @{
+ */
+
 #include "vtkHDF.h"
 #include "vtkHDFHyperTreeGridData.h"
 
@@ -2034,3 +2039,5 @@ vtk_HDF_hypertreegrid_init(scalar* scalar_list,
 
   return vtk_hdf_htg;
 }
+
+/** @} */

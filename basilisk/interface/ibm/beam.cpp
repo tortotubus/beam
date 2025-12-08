@@ -1,6 +1,6 @@
 #include "beam.h"
 
-#include "../../models/beam/IBEulerBeam.hpp"
+#include "models/beam/IBEulerBeam.hpp"
 #include "config/config.hpp"
 
 using namespace beam;
@@ -15,8 +15,8 @@ extern "C"
                         double r_penalty)
   {
 
-    EulerBeamBCs bcs = { .end = { left, right },
-                         .type = { simple_bc, free_bc } };
+    EulerBeam::EulerBeamBCs bcs = { .end = { EulerBeam::left, EulerBeam::right },
+                         .type = { EulerBeam::simple_bc, EulerBeam::free_bc } };
 
     return new IBEulerBeam(static_cast<real_t>(length),
                            static_cast<real_t>(EI),
@@ -62,8 +62,8 @@ extern "C"
       ic_velocity[ni][2] = 0.;
     }
 
-    EulerBeamBCs boundary_conditions = { .end = { left, right },
-                                         .type = { free_bc, simple_bc },
+    EulerBeam::EulerBeamBCs boundary_conditions = { .end = { EulerBeam::left, EulerBeam::right },
+                                         .type = { EulerBeam::free_bc, EulerBeam::simple_bc },
                                          .vals = { {
                                                      .position = { 0, 0, 0 },
                                                    },

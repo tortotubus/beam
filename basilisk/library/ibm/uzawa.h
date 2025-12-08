@@ -36,24 +36,26 @@
  */
 typedef struct
 {
-  vertex_t lagpos; /* lagrangian nodal position */
-  vertex_t force;  /* lagrange multiplier as a force */
-  vertex_t lagvel; /* lagrangian nodal velocity */
+  vertex_t lagpos; /**<  lagrangian nodal position */
+  vertex_t force;  /**< lagrange multiplier as a force */
+  vertex_t lagvel; /**< lagrangian nodal velocity */
   vertex_t
-    eulvel; /* eulerian fluid velocity interpolated at the lagrangian node */
+    eulvel; /**< eulerian fluid velocity interpolated at the lagrangian node */
 
-  vertex_t rhs; /* b_i = lagvel_i - (Ju*)_i (constraint mismatch)*/
-  vertex_t res; /* r_i (residual) */
-  vertex_t w;   /* w_i (search direction) */
-  vertex_t Ay;  /* y_i = (A w)_i */
+  vertex_t rhs; /**< b_i = lagvel_i - (Ju*)_i (constraint mismatch)*/
+  vertex_t res; /**< r_i (residual) */
+  vertex_t w;   /**< w_i (search direction) */
+  vertex_t Ay;  /**< y_i = (A w)_i */
 
-  double weight; /* quadtrature weight */
-  vertex_t gravity;
+  double weight;    /**< quadtrature weight */
+  vertex_t gravity; /**< gravity */
 
-  Cache stencil;
+  Cache stencil; /**< stencil cache */
 } IBNode;
 
 /**
+ * @brief Constructor for the stencil member
+ *
  * @memberof IBNode
  */
 void
@@ -65,6 +67,7 @@ ibnode_init_stencil(IBNode* node)
 }
 
 /**
+ * @brief Desctructor for the stencil member
  * @memberof IBNode
  */
 void
@@ -74,6 +77,7 @@ ibnode_free_stencil(IBNode* node)
 }
 
 /**
+ * @brief Constructor for the IBNode struct
  * @memberof IBNode
  */
 void
@@ -98,6 +102,7 @@ ibnode_init(IBNode* node)
 }
 
 /**
+ * @brief Destructor for the IBNode struct
  * @memberof IBNode
  */
 void
@@ -120,6 +125,7 @@ typedef struct
 } IBMesh;
 
 /**
+ * @brief Destructor for the IBMesh struct
  * @memberof IBMesh
  */
 void
@@ -137,7 +143,7 @@ ib_mesh_free(IBMesh* mesh)
 }
 
 /**
- * @brief Initialize a mesh without nodes.
+ * @brief Default constructor for an IBMesh
  *
  * @param mesh Mesh to initialize
  *
@@ -153,7 +159,7 @@ ib_mesh_init(IBMesh* mesh)
 }
 
 /**
- * @brief Initialize the IBMesh with a number of IBNodes
+ * @brief Construct the IBMesh with a number of IBNodes
  *
  * @param mesh The IBMesh to initialize
  * @param nn The number of nodes to initialize
@@ -174,6 +180,11 @@ ib_mesh_init_nn(IBMesh* mesh, int nn)
 }
 
 /**
+ * @brief Set the model for an IBMesh
+ *
+ * @param mesh The IBMesh
+ * @param model The pointer to the force-coupled structural model
+ *
  * @memberof IBMesh
  */
 void
@@ -243,7 +254,9 @@ ib_mesh_get_centroid(IBMesh* mesh)
 }
 
 /**
- * @brief
+ * @brief Prints the centroid of an IBMesh
+ *
+ * @param mesh The IBMesh
  *
  * @memberof IBMesh
  */
@@ -479,7 +492,8 @@ ib_mesh_interpolate_eulerian_velocities(IBMesh* mesh)
 scalar stencils[];
 
 /**
- * @brief
+ * @brief Injects the stencils field with noise so that we may call adapt_wavlet
+ * to ensure sufficient cells on the same level near our IBNodes
  *
  * @param mesh The immersed boundary mesh
  *
@@ -563,6 +577,8 @@ ib_mesh_advance_lagrangian_mesh(IBMesh* mesh)
 }
 
 /**
+ * @brief Compute the kinematic no-slip residual
+ * 
  * @memberof IBMesh
  */
 trace void

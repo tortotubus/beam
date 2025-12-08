@@ -1,4 +1,4 @@
-#include "library/df/kernels.h"
+#include "library/ibm/kernels.h"
 #include "navier-stokes/centered.h"
 
 #if dimension == 2

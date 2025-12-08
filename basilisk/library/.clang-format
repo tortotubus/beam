@@ -1,0 +1,59 @@
+### Indentation / line width ###################################################
+
+IndentWidth: 2          # "standard indentation is two spaces"
+TabWidth: 2
+UseTab: Never           # spaces only
+ColumnLimit: 80         # "Lines are not longer than 80 characters."
+
+ContinuationIndentWidth: 2
+
+# OneLineFormatOffRegex: '^\s*\{\.\.\.\}\s*$'
+
+### Braces & control statements ################################################
+
+BreakBeforeBraces: Attach
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+
+### Spaces / punctuation #######################################################
+
+# Basilisk-style "natural punctuation":
+#   - `if (` / `while (` / `for (`
+#   - `foo (x, y)` with a space before '(' on function calls
+SpaceBeforeParens: Always
+
+SpacesInParentheses: false               # no `if ( x )`
+SpacesInCStyleCastParentheses: false
+SpaceAfterCStyleCast: true
+
+SpaceBeforeAssignmentOperators: true     # `a = b`, not `a=b`
+
+# We *cannot* tell clang-format to treat `+`/`-` differently from `*`/`/`.
+# It will normally put spaces around all binary operators. You’ll still need
+# to tweak the occasional `a + b*c` by hand if you want exactly the Basilisk
+# convention.
+
+PointerAlignment: Left                   # `int *p` → `int *p`, not `int* p`
+DerivePointerAlignment: false
+
+BinPackArguments: false                  # one arg per line when wrapped
+BinPackParameters: false
+AlignAfterOpenBracket: Align
+
+SpacesInSquareBrackets: false            # `a[i]`, not `a[ i ]`
+
+### Comments / Doxygen-style blocks ###########################################
+
+ReflowComments: true          # re-wrap comments to ColumnLimit
+AlignTrailingComments: true
+
+# We still allow clang-format to touch /** ... */ comments; you keep them in
+# "wiki markdown" and grammatically correct, clang-format just wraps to 80 cols.
+
+### Includes / misc ###########################################################
+
+SortIncludes: false           # Basilisk often has hand-ordered includes
+
+# Don’t try to be clever with namespaces etc. (mostly C code here anyway)
+NamespaceIndentation: None

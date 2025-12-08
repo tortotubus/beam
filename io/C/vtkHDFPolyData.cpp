@@ -502,7 +502,7 @@ vtk_HDF_polydata_init_static(const char* fname,
 }
 
 vtkHDFPolyData
-vtk_HDF_polydata_init_transient(const char* fname, vtkPolyData* vtk_pd)
+vtk_HDF_polydata_init_transient(const char* fname, bool overwrite, vtkPolyData* vtk_pd, float time)
 {
   vtkHDFPolyData vtk_hdf_pd = {
     .grp_vertices_id = H5I_INVALID_HID,         /**< Vertices group */
@@ -516,7 +516,6 @@ vtk_HDF_polydata_init_transient(const char* fname, vtkPolyData* vtk_pd)
     .grp_pointdata_offsets_id = H5I_INVALID_HID /**< PointData Offsets group */
   };
 
-  bool overwrite = true;
   vtk_hdf_pd.vtk_hdf = vtk_HDF_init(fname, overwrite);
 
   vtk_hdf_pd.grp_celldata_id = H5Gcreate2(vtk_hdf_pd.vtk_hdf.file_id,
@@ -1202,7 +1201,7 @@ vtk_HDF_polydata_init_transient(const char* fname, vtkPolyData* vtk_pd)
      */
     {
       const char* dataset_name = "Values";
-      float dataset_data[] = { 0 };
+      float dataset_data[] = { time };
       hid_t dataset_datatype = H5T_IEEE_F32LE;
       hid_t dataset_group = vtk_hdf_pd.grp_steps_id;
       hsize_t dataset_dims[] = { 1 };

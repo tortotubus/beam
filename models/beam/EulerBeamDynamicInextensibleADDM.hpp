@@ -26,7 +26,7 @@ public:
     real_t EI,
     real_t mu,
     size_t nodes,
-    beam::EulerBeamBCs bcs,
+    EulerBeam::EulerBeamBCs bcs,
     real_t r_penalty
   ) : EulerBeamStaticInextensibleADDM(
     length,
