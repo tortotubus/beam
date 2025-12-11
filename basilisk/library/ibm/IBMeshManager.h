@@ -438,8 +438,8 @@ trace void ib_mesh_manager_solve_lambda_CG (double dt) {
   printf ("tag_stencils\n");
 #endif
 
-  const int maxiter = 5000;
-  const double tol = 1e-6;
+  const int maxiter = 50000;
+  const double tol = 1e-9;
 
   // Initial guess
   foreach_ibmesh () {
@@ -456,7 +456,7 @@ trace void ib_mesh_manager_solve_lambda_CG (double dt) {
   foreach_ibmesh () {
     foreach_ibnode (mesh) {
       foreach_dimension () {
-        rr_old += sq (node->res.x) * node->weight;
+        rr_old += sq (node->res.x)* node->weight;
       }
     }
   }
@@ -503,7 +503,7 @@ trace void ib_mesh_manager_solve_lambda_CG (double dt) {
         foreach_dimension () {
           node->force.x += alpha * node->w.x; // lambda udate
           node->res.x -= alpha * node->Ay.x;  // residual update
-          rr_new += sq (node->res.x) * node->weight;
+          rr_new += sq (node->res.x)* node->weight;
         }
       }
     }
@@ -525,7 +525,7 @@ trace void ib_mesh_manager_solve_lambda_CG (double dt) {
     foreach_ibmesh () {
       foreach_ibnode (mesh) {
         foreach_dimension () {
-          node->w.x = node->res.x + beta * node->w.x;
+          node->w.x = node->res.x + beta * node->w.x  ;
         }
       }
     }

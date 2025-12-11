@@ -177,27 +177,27 @@ trace void ib_mesh_generate_stencil_cache (IBMesh* mesh) {
 
       cache_append (&node->stencil, point, 0);
 
-// #if _MPI
-// #if dimension == 1
-//       if (point.level >= 0 && _k == 0) {
-//         node->pid = cell.pid;
-//       } else {
-//         node->pid = -1;
-//       }
-// #elif dimension == 2
-//       if (point.level >= 0 && _k == 0 && _l == 0) {
-//         node->pid = cell.pid;
-//       } else {
-//         node->pid = -1;
-//       }
-// #else // dimension == 3
-//       if (point.level >= 0 && _l == 0 && _m == 0 && _n == 0) {
-//         node->pid = cell.pid;
-//       } else {
-//         node->pid = -1;
-//       }
-// #endif
-// #endif
+      // #if _MPI
+      // #if dimension == 1
+      //       if (point.level >= 0 && _k == 0) {
+      //         node->pid = cell.pid;
+      //       } else {
+      //         node->pid = -1;
+      //       }
+      // #elif dimension == 2
+      //       if (point.level >= 0 && _k == 0 && _l == 0) {
+      //         node->pid = cell.pid;
+      //       } else {
+      //         node->pid = -1;
+      //       }
+      // #else // dimension == 3
+      //       if (point.level >= 0 && _l == 0 && _m == 0 && _n == 0) {
+      //         node->pid = cell.pid;
+      //       } else {
+      //         node->pid = -1;
+      //       }
+      // #endif
+      // #endif
     }
   }
 }
@@ -219,9 +219,9 @@ trace void ib_mesh_spread_eulerian_forcing (IBMesh* mesh, vector forcing) {
 #if DEBUG
   printf ("ib_mesh_spread_eulerian_forcing\n");
 #endif
-  #if _MPI
-    synchronize ((scalar*) {forcing });
-  #endif
+#if _MPI
+  synchronize ((scalar*) {forcing});
+#endif
   foreach_ibnode (mesh) {
     foreach_cache (node->stencil) {
       coord lagpos = {
@@ -229,14 +229,21 @@ trace void ib_mesh_spread_eulerian_forcing (IBMesh* mesh, vector forcing) {
       peskin_kernel (lagpos) {
         foreach_dimension () {
           forcing.x[] += peskin_weight * node->force.x * node->weight;
+#if dimension == 1
+          forcing.x[] += (peskin_weight /      (Delta)) * node->force.x * node->weight;
+#elif dimension == 2
+          forcing.x[] += 1 * (peskin_weight /   sq (Delta)) * node->force.x * node->weight;
+#else
+          forcing.x[] += (peskin_weight / cube (Delta)) * node->force.x * node->weight;
+#endif
         }
       }
     }
   }
 
-  #if _MPI
-    synchronize ((scalar*) {forcing });
-  #endif
+#if _MPI
+  synchronize ((scalar*) {forcing});
+#endif
 }
 
 /*!
@@ -252,9 +259,9 @@ trace void ib_mesh_interpolate_eulerian_velocities (IBMesh* mesh) {
   printf ("ib_mesh_interpolate_eulerian_velocities\n");
 #endif
 
-  #if _MPI
-    synchronize ((scalar*) {u });
-  #endif
+#if _MPI
+  synchronize ((scalar*) {u});
+#endif
   foreach_ibnode (mesh) {
     foreach_dimension () {
       node->eulvel.x = 0.;
@@ -270,9 +277,9 @@ trace void ib_mesh_interpolate_eulerian_velocities (IBMesh* mesh) {
     }
   }
 
-  #if _MPI
-    synchronize ((scalar*) {forcing });
-  #endif
+#if _MPI
+  synchronize ((scalar*) {forcing});
+#endif
 }
 
 scalar stencils[];
@@ -375,7 +382,6 @@ trace void ib_mesh_matvec_Aw (IBMesh* mesh, double dt) {
     }
   }
 
-  
   // 1. g = J^T w on grid
   foreach_ibnode (mesh) {
     foreach_cache (node->stencil) {
@@ -383,7 +389,15 @@ trace void ib_mesh_matvec_Aw (IBMesh* mesh, double dt) {
         .x = node->lagpos.x, .y = node->lagpos.y, .z = node->lagpos.z};
       peskin_kernel (lagpos) {
         foreach_dimension () {
-          tmp_force.x[] += peskin_weight * node->w.x * node->weight;
+#if dimension == 1
+          tmp_force.x[] += (peskin_weight / (Delta)) * node->w.x * node->weight;
+#elif dimension == 2
+          tmp_force.x[] +=
+            (peskin_weight / sq (Delta)) * node->w.x * node->weight;
+#else
+          tmp_force.x[] +=
+            (peskin_weight / cube (Delta)) * node->w.x * node->weight;
+#endif
         }
       }
     }
@@ -393,14 +407,20 @@ trace void ib_mesh_matvec_Aw (IBMesh* mesh, double dt) {
   synchronize ((scalar*) {tmp_force});
 #endif
 
-  //2. c = M_f^{-1} g ~ g / (rho_f)
+  // 2. c = M_f^{-1} g ~ g / (rho_f)
   foreach () {
     foreach_dimension () {
-      tmp_vel.x[] = tmp_force.x[] / RHO_F;
+#if dimension == 1
+      tmp_vel.x[] = tmp_force.x[] / (1 * RHO_F);
+#elif dimension == 2
+      tmp_vel.x[] = tmp_force.x[] / (1 * RHO_F);
+#else
+      tmp_vel.x[] = tmp_force.x[] / (1 * RHO_F);
+#endif
     }
   }
 
-  // 3. d = J c, store in node->Ay temporarily, then scale by dt
+  // 3. d = J c, then scale by dt
   foreach_ibnode (mesh) {
     foreach_dimension () {
       node->Ay.x = 0.;
@@ -424,8 +444,8 @@ trace void ib_mesh_matvec_Aw (IBMesh* mesh, double dt) {
  * @memberof IBMesh
  */
 trace void ib_mesh_solve_lambda_CG (IBMesh* mesh, double dt) {
-  const int maxiter = 5000;
-  const double tol = 1e-6;
+  const int maxiter = 50000;
+  const double tol = 1e-9;
 
   // Initial guess
   foreach_ibnode (mesh) {

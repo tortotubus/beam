@@ -23,7 +23,24 @@ trace void synchronize (scalar* list) {
 
 #define PESKIN_SUPPORT_RADIUS 2
 
-macro peskin_kernel (coord delta_centre, Point point = point) {
+// macro peskin_kernel (coord delta_centre, Point point = point) {
+//   coord dist; 
+// #if dimension == 1
+// #elif dimension == 2 
+//   dist.x = x - delta_centre.x;
+//   dist.y = y - delta_centre.y;
+//   bool cutoff = fabs(dist.x) <= Delta * 2 && fabs(dist.y) <= Delta * 2;
+//   double peskin_weight = 0.;
+//   if (cutoff) {
+//     peskin_weight = (1. + cos(0.5 * pi * dist.x / Delta)) * (1. + cos(0.5 * pi * dist.x / Delta)) / 16.;
+//   } else {
+//     peskin_weight = 0.;
+//   }
+// #else 
+// #endif 
+// }
+
+macro peskin_kernel  (coord delta_centre, Point point = point) {
   if (point.level >= 0) {
     coord dist;
 #if dimension == 1
@@ -45,7 +62,7 @@ macro peskin_kernel (coord delta_centre, Point point = point) {
       double peskin_weight =
         (1. + cos (pi * dist.x / (Delta * PESKIN_SUPPORT_RADIUS))) *
         (1. + cos (pi * dist.y / (Delta * PESKIN_SUPPORT_RADIUS))) /
-        sq (2. * Delta * PESKIN_SUPPORT_RADIUS);
+        sq (2. * PESKIN_SUPPORT_RADIUS);
       NOT_UNUSED (peskin_weight);
       // clang-format off
       {...}
