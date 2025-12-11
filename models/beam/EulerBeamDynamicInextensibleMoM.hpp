@@ -94,7 +94,6 @@ public:
       S_norm = update_lambda();
     }
 
-    update_mesh();
 
     size_t nodes = mesh.get_nodes();
 
@@ -119,6 +118,9 @@ public:
 
     u_prev_prev = u_prev; // carry old n-1
     u_prev = u;           // store new n
+
+
+    update_mesh();
 
     time_iter++;
     t += dt;
@@ -369,5 +371,27 @@ protected:
 
     return residual;
   }
+
+  void update_mesh()
+  {
+
+    std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
+    std::vector<std::array<real_t, 3>>& velocity = mesh.get_centerline_velocity();
+    std::vector<std::array<real_t, 3>>& slope = mesh.get_slope();
+    std::vector<real_t>& s = mesh.get_curvilinear_axis();
+
+    for (size_t i = 0; i < nodes; ++i) {
+      centerline[i][0] = u(offset_x + 2 * i + 0);
+      centerline[i][1] = u(offset_y + 2 * i + 0);
+      centerline[i][2] = u(offset_z + 2 * i + 0);
+      slope[i][0] = u(offset_x + 2 * i + 1);
+      slope[i][1] = u(offset_y + 2 * i + 1);
+      slope[i][2] = u(offset_z + 2 * i + 1);
+      velocity[i][0] = v_prev(offset_x + 2 * i + 0);
+      velocity[i][1] = v_prev(offset_y + 2 * i + 0);
+      velocity[i][2] = v_prev(offset_z + 2 * i + 0);
+    }
+  }
+
 };
 }

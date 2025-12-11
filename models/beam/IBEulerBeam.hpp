@@ -78,6 +78,11 @@ public:
     EBMeshToIBMeshNext();
   };
 
+  void apply_initial_condition(EulerBeamMesh &mesh) override {
+    EulerBeamDynamicInextensibleMoM::apply_initial_condition(mesh);
+    EBMeshToIBMeshCurrent();
+  }
+
   void ComputeNextPoints(std::vector<IBStructureMesh::IBVertex> force,
                          real_t dt) override
   {
