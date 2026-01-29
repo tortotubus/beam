@@ -9,7 +9,7 @@
 #include "models/beam/EulerBeamDynamicInextensibleMoMSparse.hpp"
 #include "io/CXX/vtkHDFPolyData.hpp"
 
-namespace beam {
+namespace ELFF {
 using namespace io::CXX;
 
 // TEST(EulerBeamDynamicInextensibleMoMSparseTest, Glowinski) {

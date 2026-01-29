@@ -2,7 +2,7 @@
 
 #include "EulerBeamStaticInextensibleAugKKT.hpp"
 
-namespace beam {
+namespace ELFF {
 class EulerBeamDynamicInextensibleAugKKT
   : public EulerBeamStaticInextensibleAugKKT
 {

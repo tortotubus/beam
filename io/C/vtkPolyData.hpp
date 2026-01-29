@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstdlib>
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace C {
 
@@ -222,4 +222,4 @@ vtk_polydata_add_line(vtkPolyData* pd,
                       int64_t line_point_2);
 } // namespace C
 } // namespace io
-} // namespace beam
+} // namespace ELFF

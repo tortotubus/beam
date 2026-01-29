@@ -10,7 +10,7 @@ endfunction()
 
 
 # Wrapper for add_library
-# macro(beam_add_library NAME)
+# macro(elff_add_library NAME)
 #   add_library(${NAME} ${ARGN})
 # endmacro()
 

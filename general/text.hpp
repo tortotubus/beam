@@ -3,7 +3,7 @@
 #include <iostream>
 #include <limits>
 
-namespace beam {
+namespace ELFF {
 inline void skip_comment_lines(std::istream &is, const char comment_char) 
 {
   while (1) {
@@ -14,4 +14,4 @@ inline void skip_comment_lines(std::istream &is, const char comment_char)
     is.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   }
 }
-} // namespace beam
+} // namespace ELFF

@@ -10,38 +10,38 @@
 // CONTRIBUTING.md for details.
 
 
-// Support out-of-source builds: if BEAM_CONFIG_FILE is defined, include it.
+// Support out-of-source builds: if ELFF_CONFIG_FILE is defined, include it.
 //
 // Otherwise, use the local file: _config.hpp.
 
-#ifndef BEAM_CONFIG_HPP
-#define BEAM_CONFIG_HPP
+#ifndef ELFF_CONFIG_HPP
+#define ELFF_CONFIG_HPP
 
-#ifdef BEAM_CONFIG_FILE
-#include BEAM_CONFIG_FILE
+#ifdef ELFF_CONFIG_FILE
+#include ELFF_CONFIG_FILE
 #else
 #include "_config.hpp"
 #endif
 
-namespace beam
+namespace ELFF
 {
 
-#if (defined(BEAM_USE_CUDA) && defined(__CUDACC__)) || \
-    (defined(BEAM_USE_HIP) && defined(__HIPCC__))
-#define BEAM_HOST_DEVICE __host__ __device__
+#if (defined(ELFF_USE_CUDA) && defined(__CUDACC__)) || \
+    (defined(ELFF_USE_HIP) && defined(__HIPCC__))
+#define ELFF_HOST_DEVICE __host__ __device__
 #else
-#define BEAM_HOST_DEVICE
+#define ELFF_HOST_DEVICE
 #endif
 
 // BEAM precision configuration
 
-#if defined BEAM_USE_SINGLE && defined BEAM_USE_DOUBLE
+#if defined ELFF_USE_SINGLE && defined ELFF_USE_DOUBLE
 #error "DOUBLE and SINGLE precision cannot both be specified"
 #endif
 
-#ifdef BEAM_USE_SINGLE
+#ifdef ELFF_USE_SINGLE
 typedef float real_t;
-#elif defined BEAM_USE_DOUBLE
+#elif defined ELFF_USE_DOUBLE
 typedef double real_t;
 #else
 #error "Either DOUBLE or SINGLE precision must be specified"
@@ -52,45 +52,45 @@ typedef double real_t;
 
 // Return value for main function in examples that should be skipped by testing
 // in some case. This return value prevents failures in testing.
-#define BEAM_SKIP_RETURN_VALUE 242
+#define ELFF_SKIP_RETURN_VALUE 242
 
 // Request a global object to be instantiated for each thread in its TLS.
-#define BEAM_THREAD_LOCAL thread_local
+#define ELFF_THREAD_LOCAL thread_local
 
-// BEAM_DEPRECATED macro to mark obsolete functions and methods
+// ELFF_DEPRECATED macro to mark obsolete functions and methods
 // see https://stackoverflow.com/questions/295120/c-mark-as-deprecated
 #if defined(__GNUC__) || defined(__clang__)
-#define BEAM_DEPRECATED __attribute__((deprecated))
+#define ELFF_DEPRECATED __attribute__((deprecated))
 #elif defined(_MSC_VER)
-#define BEAM_DEPRECATED __declspec(deprecated)
+#define ELFF_DEPRECATED __declspec(deprecated)
 #else
-#pragma message("WARNING: You need to implement BEAM_DEPRECATED for this compiler")
-#define BEAM_DEPRECATED
+#pragma message("WARNING: You need to implement ELFF_DEPRECATED for this compiler")
+#define ELFF_DEPRECATED
 #endif
 
 // Common configuration macros
 
 
-// Macro BEAM_EXPORT: this macro is used when declaring exported global
+// Macro ELFF_EXPORT: this macro is used when declaring exported global
 // variables and static class variables in public header files, e.g.:
-//    extern BEAM_EXPORT Geometry Geometries;
-//    static BEAM_EXPORT Device device_singleton;
+//    extern ELFF_EXPORT Geometry Geometries;
+//    static ELFF_EXPORT Device device_singleton;
 // In cases where a class contains multiple static variables, instead of marking
-// all such variables with BEAM_EXPORT, one can mark the class with BEAM_EXPORT,
+// all such variables with ELFF_EXPORT, one can mark the class with ELFF_EXPORT,
 // e.g.:
-//    class BEAM_EXPORT MemoryManager ...
-// Note: BEAM's GitHub CI includes a shared MSVC build that will fail if a
-// variable that needs BEAM_EXPORT does not have it. However, builds with
+//    class ELFF_EXPORT MemoryManager ...
+// Note: ELFF's GitHub CI includes a shared MSVC build that will fail if a
+// variable that needs ELFF_EXPORT does not have it. However, builds with
 // optional external libraries are not tested and may require separate checks to
-// determine the necessity of BEAM_EXPORT.
-#if defined(_MSC_VER) && defined(BEAM_SHARED_BUILD)
+// determine the necessity of ELFF_EXPORT.
+#if defined(_MSC_VER) && defined(ELFF_SHARED_BUILD)
 #ifdef beam_EXPORTS
-#define BEAM_EXPORT __declspec(dllexport)
+#define ELFF_EXPORT __declspec(dllexport)
 #else
-#define BEAM_EXPORT __declspec(dllimport)
+#define ELFF_EXPORT __declspec(dllimport)
 #endif
 #else
-#define BEAM_EXPORT
+#define ELFF_EXPORT
 #endif
 // On Cygwin the option -std=c++11 prevents the definition of M_PI. Defining
 // the following macro allows us to get M_PI and some needed functions, e.g.
@@ -99,4 +99,4 @@ typedef double real_t;
 #define _XOPEN_SOURCE 600
 #endif
 
-#endif // BEAM_CONFIG_HPP
+#endif // ELFF_CONFIG_HPP

@@ -3,7 +3,7 @@
 
 #include "io/C/vtkHDFPolyData.hpp"
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace CXX {
 

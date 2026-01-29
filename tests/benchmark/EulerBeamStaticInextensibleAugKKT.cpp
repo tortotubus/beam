@@ -3,7 +3,7 @@
 #include "EulerBeamStaticInextensibleReferences.hpp"
 
 
-namespace beam {
+namespace ELFF {
 
 TEST(EulerBeamStaticInextensibleAugKKTTest, BisshoppAndDrucker) {
 
@@ -39,7 +39,7 @@ TEST(EulerBeamStaticInextensibleAugKKTTest, BisshoppAndDrucker) {
 
   FILE *pipe = popen("gnuplot -persist", "w");
   if (!pipe) {
-    BEAM_ABORT("Failed to open pipe to gnuplot");
+    ELFF_ABORT("Failed to open pipe to gnuplot");
   }
 
   // Configure the plot

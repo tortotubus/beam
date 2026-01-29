@@ -2,7 +2,7 @@
 
 #include "models/spring/Spring.hpp"
 
-using namespace beam;
+using namespace ELFF;
 
 // TEST(IBSpringCircleTest, ConstructionAndPoints)
 // {

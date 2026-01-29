@@ -4,7 +4,7 @@
 #include "models/beam/EulerBeamStaticInextensibleADDM.hpp"
 #include "EulerBeamStaticInextensibleReferences.hpp"
 
-namespace beam {
+namespace ELFF {
 using namespace io::CXX;
 
 TEST(EulerBeamStaticInextensibleADDMTest, BisshoppAndDrucker) {
@@ -41,7 +41,7 @@ TEST(EulerBeamStaticInextensibleADDMTest, BisshoppAndDrucker) {
 
   FILE *pipe = popen("gnuplot -persist", "w");
   if (!pipe) {
-    BEAM_ABORT("Failed to open pipe to gnuplot");
+    ELFF_ABORT("Failed to open pipe to gnuplot");
   }
 
   // Configure the plot

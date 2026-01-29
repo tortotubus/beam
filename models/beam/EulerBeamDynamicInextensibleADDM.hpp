@@ -2,7 +2,7 @@
 
 #include "EulerBeamStaticInextensibleADDM.hpp"
 
-namespace beam {
+namespace ELFF {
 class EulerBeamDynamicInextensibleADDM : public EulerBeamStaticInextensibleADDM 
 {
 public:

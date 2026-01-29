@@ -3,7 +3,7 @@
 #include "../ibm/immersedboundary.hpp"
 #include "EulerBeamDynamicInextensibleMoM.hpp"
 
-namespace beam {
+namespace ELFF {
 
 /**
  * @brief The immersed boundary force-coupling class for @ref EulerBeam
@@ -81,7 +81,7 @@ public:
   void ComputeNextPoints(std::vector<IBStructureMesh::IBVertex> force,
                          real_t dt) override
   {
-    BEAM_ASSERT(force.size() == nodes, "Force array must match node count.\n");
+    ELFF_ASSERT(force.size() == nodes, "Force array must match node count.\n");
 
     std::vector<std::array<real_t, 3>> load(nodes);
     for (size_t ni = 0; ni < nodes; ni++) {

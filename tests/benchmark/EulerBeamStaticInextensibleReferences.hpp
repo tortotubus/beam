@@ -4,7 +4,7 @@
 #include <limits>
 #include <stdexcept>
 
-namespace beam {
+namespace ELFF {
 
 struct BisshoppAndDrucker1945Result
 {

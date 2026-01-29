@@ -17,7 +17,7 @@
 #include <Eigen/SparseCholesky> // for SimplicialLLT
 #include <unsupported/Eigen/AutoDiff>
 
-namespace beam {
+namespace ELFF {
 
 class EulerBeamStaticInextensibleMoMSparse : public EulerBeam
 {
@@ -84,7 +84,7 @@ public:
       if (res_norm < tol_outer) {
         break;
       } else if (iter_outer == max_iter_outer - 1) {
-        BEAM_ABORT(
+        ELFF_ABORT(
           "EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
       }
 
@@ -93,7 +93,7 @@ public:
       solver.compute(jacobian);
 
       if (solver.info() != Eigen::Success) {
-        BEAM_ABORT("EulerBeamStaticInextensibleMoMSparse::solve(): "
+        ELFF_ABORT("EulerBeamStaticInextensibleMoMSparse::solve(): "
                    "Preconditioner failed.\n");
       }
 
@@ -108,7 +108,7 @@ public:
 
   virtual void apply_initial_condition(EulerBeamMesh& bmesh) override
   {
-    BEAM_ASSERT(
+    ELFF_ASSERT(
       nodes == bmesh.get_nodes(),
       "Provided mesh must have same node count as the previous mesh.\n");
 
@@ -600,4 +600,4 @@ protected:
   }
 };
 
-} // namespace beam
+} // namespace ELFF

@@ -7,10 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE BOOL
   "Force the use of the chosen C++ standard.")
 set(CMAKE_CXX_EXTENSIONS OFF CACHE BOOL "Enable C++ standard extensions.")
 
-project(beam NONE)
-# Current version of BEAM, see also `makefile`.
+project(elff NONE)
+# Current version of ELFF, see also `makefile`.
 #   mfem_VERSION = (string)
-#   BEAM_VERSION = (int)   [automatically derived from mfem_VERSION]
+#   ELFF_VERSION = (int)   [automatically derived from mfem_VERSION]
 set(${PROJECT_NAME}_VERSION 0.0.1)
 
 # Load project defaults
@@ -19,15 +19,15 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/config/defaults.cmake")
 # Prohibit in-source build
 if (${PROJECT_SOURCE_DIR} STREQUAL ${PROJECT_BINARY_DIR})
   message(FATAL_ERROR
-    "BEAM does not support in-source CMake builds at this time.")
+    "ELFF does not support in-source CMake builds at this time.")
 endif (${PROJECT_SOURCE_DIR} STREQUAL ${PROJECT_BINARY_DIR})
 
 # Path to CMake modules and utilities.
-set(BEAM_CMAKE_PATH ${PROJECT_SOURCE_DIR}/config)
-set(CMAKE_MODULE_PATH ${BEAM_CMAKE_PATH}/cmake/modules)
+set(ELFF_CMAKE_PATH ${PROJECT_SOURCE_DIR}/config)
+set(CMAKE_MODULE_PATH ${ELFF_CMAKE_PATH}/cmake/modules)
 
-# Load BEAM CMake utilities.
-include(BeamCmakeUtilities)
+# Load ELFF CMake utilities.
+include(ElffCmakeUtilities)
 
 # Enable languages.
 enable_language(CXX)
@@ -35,33 +35,33 @@ enable_language(CXX)
 # Suppress warnings about MACOSX_RPATH
 set(CMAKE_MACOSX_RPATH OFF CACHE BOOL "")
 if (CMAKE_BUILD_TYPE MATCHES "Debug|debug|DEBUG")
-  set(BEAM_DEBUG ON)
+  set(ELFF_DEBUG ON)
 else()
-  set(BEAM_DEBUG OFF)
+  set(ELFF_DEBUG OFF)
 endif()
 
 # Set 
-if (BEAM_PRECISION MATCHES "^(double|Double|DOUBLE)$")
-  set(BEAM_USE_SINGLE OFF)
-  set(BEAM_USE_DOUBLE ON)
-elseif (BEAM_PRECISION MATCHES "^(single|Single|SINGLE)$")
-  set(BEAM_USE_SINGLE ON)
-  set(BEAM_USE_DOUBLE OFF)
+if (ELFF_PRECISION MATCHES "^(double|Double|DOUBLE)$")
+  set(ELFF_USE_SINGLE OFF)
+  set(ELFF_USE_DOUBLE ON)
+elseif (ELFF_PRECISION MATCHES "^(single|Single|SINGLE)$")
+  set(ELFF_USE_SINGLE ON)
+  set(ELFF_USE_DOUBLE OFF)
 else()
   message(FATAL_ERROR " *** Invalid floating-point precision: "
-    "BEAM_PRECISION = ${BEAM_PRECISION}")
+    "ELFF_PRECISION = ${ELFF_PRECISION}")
 endif()
 
-# BEAM_DEBUG
+# ELFF_DEBUG
 if (CMAKE_BUILD_TYPE MATCHES "Debug|debug|DEBUG")
-  set(BEAM_DEBUG ON)
+  set(ELFF_DEBUG ON)
 else()
-  set(BEAM_DEBUG OFF)
+  set(ELFF_DEBUG OFF)
 endif()
 
 
 # BLAS, LAPACK
-if (BEAM_USE_LAPACK)
+if (ELFF_USE_LAPACK)
   find_package(BLAS REQUIRED)
   find_package(LAPACK REQUIRED)
 endif()
@@ -72,7 +72,7 @@ if (MFEM_USE_CODIPACK)
   # find_package updates CODIPACK_FOUND, CODIPACK_INCLUDE_DIRS, CODIPACK_LIBRARIES
 endif()
 
-option (BEAM_USE_MPI "Build beam with MPI" ON)
+option (ELFF_USE_MPI "Build elff with MPI" ON)
 find_package(MPI REQUIRED)
 
 # Find Eigen3 package
@@ -88,18 +88,18 @@ find_package(HDF5 COMPONENTS C HL REQUIRED)
 # Headers and sources
 set(SOURCES "")
 set(HEADERS "")
-set(BEAM_SOURCE_DIRS general models basilisk io)
+set(ELFF_SOURCE_DIRS general models basilisk io)
 
 # Collect from the specified subdirectories
-foreach(DIR IN LISTS BEAM_SOURCE_DIRS)
+foreach(DIR IN LISTS ELFF_SOURCE_DIRS)
   add_subdirectory(${DIR})
 endforeach()
 
 add_subdirectory(config)
 
 # Variables used when generating _config.hpp, and config.mk
-set(BEAM_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(BEAM_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
+set(ELFF_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(ELFF_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
 
 # Configure the config header
 configure_file(
@@ -107,25 +107,25 @@ configure_file(
   "${PROJECT_BINARY_DIR}/config/_config.hpp")
 
 # Declaring the library
-add_library(beam SHARED ${SOURCES} ${HEADERS})
+add_library(elff SHARED ${SOURCES} ${HEADERS})
 
 # --- OpenMP (optional) ---
-option(BEAM_USE_OPENMP "Build BEAM with OpenMP" ON)
-if (BEAM_USE_OPENMP)
+option(ELFF_USE_OPENMP "Build ELFF with OpenMP" ON)
+if (ELFF_USE_OPENMP)
   find_package(OpenMP COMPONENTS CXX REQUIRED)
-  target_link_libraries(beam PRIVATE OpenMP::OpenMP_CXX)
-  target_compile_definitions(beam PUBLIC BEAM_WITH_OPENMP=1)
+  target_link_libraries(elff PRIVATE OpenMP::OpenMP_CXX)
+  target_compile_definitions(elff PUBLIC ELFF_WITH_OPENMP=1)
 endif()
 
 # Add binary dir to include paths to find generated config.hpp
-target_include_directories(beam 
+target_include_directories(elff 
   PUBLIC 
     ${CMAKE_CURRENT_BINARY_DIR}/config
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 # Link in numeric libs
-target_link_libraries(beam 
+target_link_libraries(elff 
   PUBLIC
     hdf5::hdf5
     hdf5::hdf5_hl
@@ -135,7 +135,7 @@ target_link_libraries(beam
     # hdf5::hdf5_cpp       # C++ API
 )
 
-option(BUILD_TESTS "Build unit & integration tests" OFF)
+option(BUILD_TESTS "Build unit & integration tests" ON)
 if(BUILD_TESTS)
   # Find GTest
   find_package(GTest REQUIRED)

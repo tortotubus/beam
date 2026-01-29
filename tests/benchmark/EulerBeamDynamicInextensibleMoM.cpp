@@ -9,7 +9,7 @@
 #include "io/CXX/vtkHDFPolyData.hpp"
 #include "models/beam/EulerBeamDynamicInextensibleMoM.hpp"
 
-namespace beam {
+namespace ELFF {
 
 using namespace io::CXX;
 

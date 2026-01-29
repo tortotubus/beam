@@ -11,7 +11,7 @@
 // #include <cmath>
 #include <vector>
 
-namespace beam {
+namespace ELFF {
 
 /**
  * @brief This class helps provide a standard mesh for the various methods to
@@ -168,7 +168,7 @@ public:
   {
     FILE* pipe = popen("gnuplot -persist", "w");
     if (!pipe) {
-      BEAM_ABORT("Failed to open pipe to gnuplot");
+      ELFF_ABORT("Failed to open pipe to gnuplot");
     }
 
     // Configure the plot

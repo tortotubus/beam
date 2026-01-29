@@ -2,17 +2,17 @@
 #include "models/ibm/immersedboundary.hpp"
 #include <stdlib.h>
 
-// using beam::IBForceCoupledStructureModel;
-// using beam::IBStructureMesh;
-// using beam::IBVelocityCoupledStructureModel;
+// using ELFF::IBForceCoupledStructureModel;
+// using ELFF::IBStructureMesh;
+// using ELFF::IBVelocityCoupledStructureModel;
 
-using namespace beam;
+using namespace ELFF;
 
 extern "C"
 {
 
   /* ==================================================================================================================
-   * Wrappers for beam::IBStructureMesh
+   * Wrappers for ELFF::IBStructureMesh
    * ==================================================================================================================
    */
 
@@ -27,7 +27,7 @@ extern "C"
   }
 
   /* ==================================================================================================================
-   * Wrappers for beam::IBVelocityCoupledStructureModel
+   * Wrappers for ELFF::IBVelocityCoupledStructureModel
    * ==================================================================================================================
    */
 
@@ -89,7 +89,7 @@ extern "C"
     IBVelocityCoupledStructureModel* model =
       reinterpret_cast<IBVelocityCoupledStructureModel*>(handle);
 
-    // Pack the raw C array into beam::Array<beam::fem:Vertex>
+    // Pack the raw C array into ELFF::Array<ELFF::fem:Vertex>
     // Array<Vertex> velocity_arr(nv);
     std::vector<IBStructureMesh::IBVertex> velocity_arr(nv);
 
@@ -176,7 +176,7 @@ extern "C"
   }
 
   /* ================================================================================================================== 
-   * Wrappers for beam::IBForceCoupledStructureModel
+   * Wrappers for ELFF::IBForceCoupledStructureModel
    * ==================================================================================================================
    */
 
@@ -242,7 +242,7 @@ extern "C"
     IBForceCoupledStructureModel* model =
       reinterpret_cast<IBForceCoupledStructureModel*>(handle);
 
-    // Pack the raw C array into beam::Array<beam::fem:Vertex>
+    // Pack the raw C array into ELFF::Array<ELFF::fem:Vertex>
     std::vector<IBStructureMesh::IBVertex> force_arr(nv);
 
     for (int i = 0; i < nv; ++i) {

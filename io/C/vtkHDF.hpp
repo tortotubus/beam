@@ -9,7 +9,7 @@
 #include <hdf5.h>
 #include <mpi.h>
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace C {
 
@@ -419,4 +419,4 @@ vtk_HDF_collective_write_compressed_dataset(const char* dataset_name,
                                             vtkHDF* vtk_hdf);
 } // namespace C
 } // namespace io
-} // namespace beam
+} // namespace ELFF

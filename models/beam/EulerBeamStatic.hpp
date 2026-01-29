@@ -9,7 +9,7 @@
 #include "Shapes.hpp"
 #include "config/config.hpp"
 
-namespace beam {
+namespace ELFF {
 
 /**
  * @brief A class to solve the static Euler–Bernoulli beam equation; this
@@ -93,7 +93,7 @@ public:
   void apply_initial_condition(EulerBeamMesh& bmesh)
   {
     size_t nodes = mesh.get_nodes();
-    BEAM_ASSERT(
+    ELFF_ASSERT(
       nodes == bmesh.get_nodes(),
       "Provided mesh must have same node count as the previous mesh.\n");
     auto centerline = bmesh.get_centerline();
@@ -120,11 +120,11 @@ public:
 
     cg.compute(K_global);
     if (cg.info() != Eigen::Success)
-      BEAM_ABORT("CG decomposition failed");
+      ELFF_ABORT("CG decomposition failed");
 
     u = cg.solve(F_global);
     if (cg.info() != Eigen::Success)
-      BEAM_ABORT("CG did not converge");
+      ELFF_ABORT("CG did not converge");
 
     std::cout << "CG iters: " << cg.iterations()
               << ", final error est.: " << cg.error() << "\n";
@@ -148,11 +148,11 @@ public:
 
     cg.compute(K_global);
     if (cg.info() != Eigen::Success)
-      BEAM_ABORT("CG decomposition failed");
+      ELFF_ABORT("CG decomposition failed");
 
     u = cg.solve(F_global);
     if (cg.info() != Eigen::Success)
-      BEAM_ABORT("CG did not converge");
+      ELFF_ABORT("CG did not converge");
 
     std::cout << "CG iters: " << cg.iterations()
               << ", final error est.: " << cg.error() << "\n";

@@ -2,7 +2,7 @@
 
 #include "EulerBeamStaticInextensibleMoMSparse.hpp"
 
-namespace beam {
+namespace ELFF {
 class EulerBeamDynamicInextensibleMoMSparse : public EulerBeamStaticInextensibleMoMSparse
 {
 public:
@@ -68,7 +68,7 @@ public:
         // std::cout << "\t ||S|| = " << S_norm << std::endl;
         break;
       } else if (iter_outer == max_iter_outer - 1) {
-        // BEAM_ABORT( "EulerBeamDynamicInextensibleMoMSparse::solve() did not converge.\n");
+        // ELFF_ABORT( "EulerBeamDynamicInextensibleMoMSparse::solve() did not converge.\n");
       } else {
         // std::cout << iter_outer << ": ||r|| = " << res_norm;
         // std::cout << "\t ||S|| = " << S_norm << std::endl;

@@ -3,7 +3,7 @@
 #include "vtkHDF.hpp"
 #include "vtkPolyData.hpp"
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace C {
 
@@ -71,4 +71,4 @@ vtk_HDF_polydata_append_transient(const char* fname,
 
 } // namespace C
 } // namespace io
-} // namespace beam
+} // namespace ELFF

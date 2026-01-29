@@ -21,7 +21,7 @@
 #include <iomanip>
 #include <cstdlib>  // getenv
 
-namespace beam
+namespace ELFF
 {
 
 OutStream out(std::cout);
@@ -29,19 +29,19 @@ OutStream err(std::cerr);
 
 namespace internal
 {
-bool beam_out_initialized = false;
-bool beam_err_initialized = false;
+bool elff_out_initialized = false;
+bool elff_err_initialized = false;
 }
 
 void OutStream::Init()
 {
-   if (this == &beam::out)
+   if (this == &ELFF::out)
    {
-      internal::beam_out_initialized = true;
+      internal::elff_out_initialized = true;
    }
-   else if (this == &beam::err)
+   else if (this == &ELFF::err)
    {
-      internal::beam_err_initialized = true;
+      internal::elff_err_initialized = true;
    }
 }
 
@@ -54,18 +54,18 @@ std::string MakeParFilename(const std::string &prefix, const int myid,
 }
 
 
-#ifdef BEAM_USE_MPI
+#ifdef ELFF_USE_MPI
 
-MPI_Comm BEAM_COMM_WORLD = MPI_COMM_WORLD;
+MPI_Comm ELFF_COMM_WORLD = MPI_COMM_WORLD;
 
 MPI_Comm GetGlobalMPI_Comm()
 {
-   return BEAM_COMM_WORLD;
+   return ELFF_COMM_WORLD;
 }
 
 void SetGlobalMPI_Comm(MPI_Comm comm)
 {
-   BEAM_COMM_WORLD = comm;
+   ELFF_COMM_WORLD = comm;
 }
 
 #endif

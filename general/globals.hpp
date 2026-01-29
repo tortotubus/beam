@@ -14,7 +14,7 @@
 #include "../config/config.hpp"
 #include <iostream>
 
-namespace beam
+namespace ELFF
 {
 
 /// Simple extension of std::ostream.
@@ -58,23 +58,23 @@ public:
 /** @brief Global stream used by the library for standard output. Initially it
     uses the same std::streambuf as std::cout, however that can be changed.
     @sa OutStream. */
-extern BEAM_EXPORT OutStream out;
+extern ELFF_EXPORT OutStream out;
 
 /** @brief Global stream used by the library for standard error output.
     Initially it uses the same std::streambuf as std::cerr, however that can be
     changed.
     @sa OutStream. */
-extern BEAM_EXPORT OutStream err;
+extern ELFF_EXPORT OutStream err;
 
 
 /** @brief Construct a string of the form "<prefix><myid><suffix>" where the
     integer @a myid is padded with leading zeros to be at least @a width digits
     long. */
-/** This is a convenience function, e.g. to redirect beam::out to individual
+/** This is a convenience function, e.g. to redirect ELFF::out to individual
     files for each rank, one can use:
     \code
        std::ofstream out_file(MakeParFilename("app_out.", myid).c_str());
-       beam::out.SetStream(out_file);
+       ELFF::out.SetStream(out_file);
     \endcode
 */
 std::string MakeParFilename(const std::string &prefix, const int myid,
@@ -87,4 +87,4 @@ std::string MakeParFilename(const std::string &prefix, const int myid,
 /// to suppress the warning.
 const char* GetEnv(const char* name);
 
-} // namespace beam
+} // namespace ELFF

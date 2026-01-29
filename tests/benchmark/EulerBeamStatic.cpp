@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "models/beam/EulerBeamStatic.hpp"
 
-namespace beam {
+namespace ELFF {
 using namespace io::CXX;
 }

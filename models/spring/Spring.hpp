@@ -4,7 +4,7 @@
 
 #include <cmath>
 
-namespace beam {
+namespace ELFF {
 
 /**
  * @class IBSpringCircle
@@ -196,4 +196,4 @@ private:
     return points;
   }
 };
-} // namespace beam
+} // namespace ELFF

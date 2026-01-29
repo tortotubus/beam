@@ -17,7 +17,7 @@
 #include <Eigen/SparseCholesky> // for SimplicialLLT
 #include <unsupported/Eigen/AutoDiff>
 
-namespace beam {
+namespace ELFF {
 
 class EulerBeamStaticInextensibleAugKKT : public EulerBeam
 {
@@ -76,7 +76,7 @@ public:
         std::cout << "Converged in " << it << " iters.\n";
         break;
       } else if (it == max_iter) {
-        BEAM_ABORT("EulerBeamStaticInextensibleAugKKT::solve() did not converge.\n");
+        ELFF_ABORT("EulerBeamStaticInextensibleAugKKT::solve() did not converge.\n");
       }
 
       Eigen::VectorXd delta_u;
@@ -121,7 +121,7 @@ public:
   virtual void apply_initial_condition(EulerBeamMesh& bmesh) override
   {
     if (bmesh.get_nodes() != mesh.get_nodes()) {
-      BEAM_ABORT("");
+      ELFF_ABORT("");
     }
 
     auto centerline = bmesh.get_centerline();
@@ -413,7 +413,7 @@ protected:
           zpp += ddH[i] * uz[i];
         }
 
-        // T l = beam::dot<T,2>(M, ul);
+        // T l = ELFF::dot<T,2>(M, ul);
         T l = 0;
         for (size_t i = 0; i < 2; i++) {
           l += M[i] * ul[i];
@@ -457,4 +457,4 @@ protected:
   }
 };
 
-} // namespace beam
+} // namespace ELFF

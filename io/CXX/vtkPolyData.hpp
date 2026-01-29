@@ -7,7 +7,7 @@
 
 #include <vector>
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace CXX {
 

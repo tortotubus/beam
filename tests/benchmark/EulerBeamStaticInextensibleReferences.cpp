@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-namespace beam {
+namespace ELFF {
 
 TEST(EulerBeamStaticInextensibleReferences, BisshoppAndDrucker) {
   double EI = 1., length = 1.;

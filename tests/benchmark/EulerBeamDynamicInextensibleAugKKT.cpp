@@ -10,10 +10,10 @@
 #include "models/beam/EulerBeamStaticInextensibleAugKKT.hpp"
 #include "io/CXX/vtkHDFPolyData.hpp"
 
-namespace beam {
+namespace ELFF {
 
 using namespace io::CXX;
-// using beam::vtkHDFPolyData;
+// using ELFF::vtkHDFPolyData;
 
 // TEST(EulerBeamDynamicInextensibleAugKKTTest, StaticSolveAndPlot) {
 

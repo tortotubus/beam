@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace C {
 
@@ -341,4 +341,4 @@ vtk_polydata_free(vtkPolyData* pd)
 
 } // namespace C
 } // namespace io
-} // namespace beam
+} // namespace ELFF

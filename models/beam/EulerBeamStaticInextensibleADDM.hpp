@@ -16,7 +16,7 @@
 #include <Eigen/IterativeLinearSolvers>
 #include <unsupported/Eigen/AutoDiff>
 
-namespace beam {
+namespace ELFF {
 
 /**
  * @brief A class to solve the static inextensible Euler–Bernoulli beam
@@ -230,7 +230,7 @@ protected:
   void apply_initial_condition_xy(EulerBeamMesh& bmesh)
   {
     size_t nodes = bmesh.get_nodes();
-    BEAM_ASSERT(nodes == mesh.get_nodes(),
+    ELFF_ASSERT(nodes == mesh.get_nodes(),
                 "Node count of the mesh must match current mesh.\n");
     auto centerline = bmesh.get_centerline();
     auto slopes = bmesh.get_slope();
@@ -692,4 +692,4 @@ protected:
   }
 };
 
-} // namespace beam
+} // namespace ELFF

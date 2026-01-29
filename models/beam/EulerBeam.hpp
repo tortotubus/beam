@@ -6,7 +6,7 @@
 #include <array>
 #include <vector>
 
-namespace beam {
+namespace ELFF {
 
 /**
  * @brief Base class for Euler-Bernoulli beam implementations.
@@ -125,7 +125,7 @@ public:
    */
   virtual void solve()
   {
-    BEAM_ABORT("EulerBeam base class does not implement a solution method.\n");
+    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
   };
 
   /**
@@ -137,7 +137,7 @@ public:
    */
   virtual void solve(std::array<real_t, 3> uniform_load)
   {
-    BEAM_ABORT("EulerBeam base class does not implement a solution method.\n");
+    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
   };
 
   /**
@@ -148,7 +148,7 @@ public:
    */
   virtual void solve(std::vector<std::array<real_t, 3>> nonuniform_load)
   {
-    BEAM_ABORT("EulerBeam base class does not implement a solution method.\n");
+    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
   };
 
   /**
@@ -158,7 +158,7 @@ public:
    */
   virtual void solve(real_t dt)
   {
-    BEAM_ABORT("EulerBeam base class does not implement a solution method.\n");
+    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
   }
 
   /**
@@ -171,7 +171,7 @@ public:
    */
   virtual void solve(real_t dt, std::array<real_t, 3> uniform_load)
   {
-    BEAM_ABORT("EulerBeam base class does not implement a solution method.\n");
+    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
   }
 
   /**
@@ -184,7 +184,7 @@ public:
   virtual void solve(real_t dt,
                      std::vector<std::array<real_t, 3>> nonuniform_load)
   {
-    BEAM_ABORT("EulerBeam base class does not implement a solution method.\n");
+    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
   }
 
   /**
@@ -303,4 +303,4 @@ protected:
     , boundary_conditions(bcs) {};
 };
 
-} // namespace beam
+} // namespace ELFF

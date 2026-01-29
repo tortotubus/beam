@@ -2,7 +2,7 @@
 
 #include "EulerBeamStaticInextensibleMoM.hpp"
 
-namespace beam {
+namespace ELFF {
 class EulerBeamDynamicInextensibleMoM : public EulerBeamStaticInextensibleMoM
 {
 public:
@@ -29,7 +29,7 @@ public:
 
   virtual void solve(real_t dt, std::vector<std::array<real_t, 3>> load)
   {
-    BEAM_ASSERT(load.size() == nodes,
+    ELFF_ASSERT(load.size() == nodes,
                 "Size of load vector must equal number of nodes.");
     const real_t alpha = 0;
     const real_t gamma = 0.5 - alpha;
@@ -79,7 +79,7 @@ public:
         // std::cout << "||S|| = " << S_norm << std::endl;
         break;
       } else if (iter_outer == max_iter_outer - 1) {
-        BEAM_ABORT(
+        ELFF_ABORT(
           "EulerBeamDynamicInextensibleMoM::solve() did not converge.\n");
       } else {
         // std::cout << time_iter << " : " << iter_outer << " : ";
@@ -166,7 +166,7 @@ public:
         // std::cout << "||S|| = " << S_norm << std::endl;
         break;
       } else if (iter_outer == max_iter_outer - 1) {
-        BEAM_ABORT(
+        ELFF_ABORT(
           "EulerBeamDynamicInextensibleMoM::solve() did not converge.\n");
       } else {
         // std::cout << time_iter << " : " << iter_outer << " : ";

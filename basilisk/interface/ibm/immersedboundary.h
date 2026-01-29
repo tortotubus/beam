@@ -14,7 +14,7 @@ extern "C"
   } vertex_t;
 
   /**
-   * @brief Struct for representing the @ref beam::IBStructureMesh
+   * @brief Struct for representing the @ref ELFF::IBStructureMesh
    */
   typedef struct
   {
@@ -33,7 +33,7 @@ extern "C"
    * @class ib_velocity_structure_model_t
    *
    * @brief Pointer handle to any object of the @ref
-   * beam::IBVelocityCoupledStructureModel.
+   * ELFF::IBVelocityCoupledStructureModel.
    */
   typedef void* ib_velocity_structure_model_t;
 
@@ -46,7 +46,7 @@ extern "C"
     ib_velocity_structure_model_t handle);
 
   /**
-   * @brief Get the "current" timestep mesh. @sa beam::IBVelocityStructureModel
+   * @brief Get the "current" timestep mesh. @sa ELFF::IBVelocityStructureModel
    *
    * @memberof ib_velocity_structure_model_t
    */
@@ -75,7 +75,7 @@ extern "C"
    * @class ib_force_structure_model_t
    *
    * @brief Pointer handle to any object of the @ref
-   * beam::IBForceCoupledStructureModel.
+   * ELFF::IBForceCoupledStructureModel.
    */
   typedef void* ib_force_structure_model_t;
 

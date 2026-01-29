@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-namespace beam {
+namespace ELFF {
 
 /**
  * @brief This class provides a Lagrangian mesh for use with the immersed
@@ -94,7 +94,7 @@ protected:
     real_t dt)
   {
     std::vector<IBStructureMesh::IBVertex>& midpoints = mesh_next.GetPoints();
-    BEAM_ASSERT(velocity.size() == midpoints.size(),
+    ELFF_ASSERT(velocity.size() == midpoints.size(),
                 "Velocity vector must have same size as mesh.\n");
 
     for (size_t pi = 0; pi < midpoints.size(); pi++) {
@@ -109,7 +109,7 @@ protected:
     real_t dt)
   {
     std::vector<IBStructureMesh::IBVertex>& midpoints = mesh.GetPoints();
-    BEAM_ASSERT(velocity.size() == midpoints.size(),
+    ELFF_ASSERT(velocity.size() == midpoints.size(),
                 "Velocity vector must have same size as mesh.\n");
 
     for (size_t pi = 0; pi < midpoints.size(); pi++) {
@@ -132,7 +132,7 @@ public:
     std::vector<IBStructureMesh::IBVertex>& velocity,
     real_t dt)
   {
-    BEAM_ASSERT(velocity.size() == mesh.GetPoints().size(),
+    ELFF_ASSERT(velocity.size() == mesh.GetPoints().size(),
                 "Velocity must match dimension and number of points");
 
     CopyCurrentToNext();
@@ -155,7 +155,7 @@ public:
     std::vector<IBStructureMesh::IBVertex>& velocity,
     real_t dt)
   {
-    BEAM_ASSERT(velocity.size() == mesh.GetPoints().size(),
+    ELFF_ASSERT(velocity.size() == mesh.GetPoints().size(),
                 "Velocity must match dimension and number of points");
 
     ComputeNextPoints(velocity, dt);
@@ -211,7 +211,7 @@ public:
   virtual IBStructureMesh& GetNext(std::vector<IBStructureMesh::IBVertex> force,
                                    real_t dt)
   {
-    BEAM_ASSERT(force.size() == mesh.GetPoints().size(),
+    ELFF_ASSERT(force.size() == mesh.GetPoints().size(),
                 "Force length must match number of points.\n");
 
     ComputeNextPoints(force, dt);
@@ -220,4 +220,4 @@ public:
   }
 };
 
-} // namespace beam
+} // namespace ELFF

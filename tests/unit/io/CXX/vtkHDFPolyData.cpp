@@ -7,7 +7,7 @@
 #include "io/CXX/vtkPolyData.hpp"
 #include "io/CXX/vtkHDFPolyData.hpp"
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace CXX {
 

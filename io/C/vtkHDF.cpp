@@ -1,6 +1,6 @@
 #include "vtkHDF.hpp"
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace C {
 
@@ -193,7 +193,7 @@ vtk_HDF_modify_scalar_attribute(const char* attribute_name,
   int ndims = H5Sget_simple_extent_ndims(vtk_hdf->attr_space_id);
   vtk_HDF_check_result(vtk_hdf, ndims);
   if (ndims != 0) {
-    BEAM_ABORT("vtk_HDF_modify_scalar_attribute: attribute is not scalar.\n");
+    ELFF_ABORT("vtk_HDF_modify_scalar_attribute: attribute is not scalar.\n");
   }
 
   // 3. (Optional) get file datatype if you want to sanity-check or inspect it
@@ -314,7 +314,7 @@ vtk_HDF_read_dataset(const char* dataset_name,
   int file_rank = H5Sget_simple_extent_ndims(vtk_hdf->dset_space_id);
 
   if (file_rank != rank) {
-    BEAM_ABORT("Rank mismatch.\n");
+    ELFF_ABORT("Rank mismatch.\n");
   }
 
   // Dims / max_dims
@@ -333,7 +333,7 @@ vtk_HDF_read_dataset(const char* dataset_name,
   *data = malloc(n_elems * type_size);
 
   if (!*data) {
-    BEAM_ABORT("malloc failed\n");
+    ELFF_ABORT("malloc failed\n");
   }
 
   result =
@@ -477,7 +477,7 @@ vtk_HDF_append_chunked_dataset(const char* dataset_name,
 
   // Check that the rank should match
   if (file_rank != rank) {
-    BEAM_ABORT("Rank mismatch when appending chunked dataset.\n");
+    ELFF_ABORT("Rank mismatch when appending chunked dataset.\n");
   }
 
   // We assume we append along dimension 0, and that all other dimensions stay
@@ -491,7 +491,7 @@ vtk_HDF_append_chunked_dataset(const char* dataset_name,
   // Ensure other dims are unchanged
   for (int i = 1; i < rank; ++i) {
     if (dims[i] != cur_dims[i]) {
-      BEAM_ABORT(
+      ELFF_ABORT(
         "Append dims must match existing dims in non-unlimited axes.\n");
     }
   }
@@ -866,4 +866,4 @@ vtk_HDF_collective_write_compressed_dataset(const char* dataset_name,
 
 } // namespace C
 } // namespace io
-} // namespace beam
+} // namespace ELFF

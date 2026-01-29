@@ -1,0 +1,101 @@
+{
+  "version": 4,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 12,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "Default",
+      "displayName": "Default (Release)",
+      "description": "Release build with system default generator.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release"
+      }
+    },
+    {
+      "name": "Debug",
+      "displayName": "Debug",
+      "description": "Build with debug info and no optimization.",
+      "inherits": "Default",
+      "binaryDir": "${sourceDir}/build/debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug"
+      }
+    },
+    {
+      "name": "SockeyeRelease",
+      "displayName": "HPC Release for Sockeye",
+      "description": "Release build for Sockeye with specific compiler and flags.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/sockeye_release",
+      "environment": {
+        "CC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
+        "CXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
+        "GCC_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef",
+        "MPICC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin/mpicc",
+        "MPICXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin/mpic++",
+        "OPENMPI_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn",
+        "HDF5_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf",
+        "ZLIB_NG_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo",
+        "PATH": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/cmake-3.30.2-rqzh7vkeki4vg7ttajpsnx67dtwzsrkf/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/ncurses-6.2-oaf7gg7ya6ykzhqzdhknr5wdfmrip5qi/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/curl-8.4.0-geha52sl3kihrhwsyrjijuuxlmxxz2an/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/libxml2-2.9.10-n7vzxzludlt5n22fne77gaw3naiyuzgn/bin:/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin:/home/colive1/.local/bin:/home/colive1/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/arc/software/bin:/arc/system/opt/slurm/bin:/arc/software/cuda/el9/latest/bin",
+        "LD_LIBRARY_PATH": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf/lib"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/sockeye_release",
+        "USE_SUBMODULES": "ON",
+        "OCTREE_BASILISK_PROVIDER": "VENDORED",
+        "BUILD_THIRD_PARTY_HDF5": "OFF",
+        "BUILD_THIRD_PARTY_XERCESC": "ON",
+        "BUILD_THIRD_PARTY_ZLIB": "OFF",
+        "CMAKE_C_COMPILER": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
+        "CMAKE_CXX_COMPILER": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
+        "CMAKE_PREFIX_PATH" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo/.",
+        "MPI_HOME": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn",
+        "ZLIB_ROOT": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "Default",
+      "configurePreset": "Default",
+      "description": "Build the release configuration",
+      "jobs": 16
+    },
+    {
+      "name": "Debug",
+      "configurePreset": "Debug",
+      "description": "Build the debug configuration",
+      "jobs": 16
+    },
+    {
+      "name": "SockeyeRelease",
+      "configurePreset": "SockeyeRelease",
+      "description": "Build on Sockeye",
+      "jobs": 8
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "Default",
+      "configurePreset": "Default",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "Debug",
+      "configurePreset": "Debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

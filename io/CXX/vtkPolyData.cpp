@@ -3,7 +3,7 @@
 #include <cstdlib>   // malloc, free
 #include <cstring>   // std::memcpy
 
-namespace beam {
+namespace ELFF {
 namespace io {
 namespace CXX {
 
@@ -18,7 +18,7 @@ vtkPolyData::to_c_struct()
   float* points = static_cast<float*>(std::malloc(sizeof(float) * points_size));
 
   if (!points) {
-    BEAM_ABORT("malloc failure for points\n");
+    ELFF_ABORT("malloc failure for points\n");
   }
 
   if (points_size > 0) {
@@ -32,7 +32,7 @@ vtkPolyData::to_c_struct()
     std::malloc(sizeof(int64_t) * n_vertices_connectivity));
 
   if (!vertices_connectivity) {
-    BEAM_ABORT("malloc failure for vertices_connectivity\n");
+    ELFF_ABORT("malloc failure for vertices_connectivity\n");
   }
 
   if (n_vertices_connectivity > 0) {
@@ -48,7 +48,7 @@ vtkPolyData::to_c_struct()
     static_cast<int64_t*>(std::malloc(sizeof(int64_t) * n_vertices_offsets));
 
   if (!vertices_offsets) {
-    BEAM_ABORT("malloc failure for vertices_offsets\n");
+    ELFF_ABORT("malloc failure for vertices_offsets\n");
   }
 
   if (n_vertices_offsets > 0) {
@@ -64,7 +64,7 @@ vtkPolyData::to_c_struct()
     static_cast<int64_t*>(std::malloc(sizeof(int64_t) * n_lines_connectivity));
 
   if (!lines_connectivity) {
-    BEAM_ABORT("malloc failure for lines_connectivity\n");
+    ELFF_ABORT("malloc failure for lines_connectivity\n");
   }
 
   if (n_lines_connectivity > 0) {
@@ -80,7 +80,7 @@ vtkPolyData::to_c_struct()
     static_cast<int64_t*>(std::malloc(sizeof(int64_t) * n_lines_offsets));
 
   if (!lines_offsets) {
-    BEAM_ABORT("malloc failure for lines_offsets\n");
+    ELFF_ABORT("malloc failure for lines_offsets\n");
   }
 
   if (n_lines_offsets > 0) {
@@ -96,7 +96,7 @@ vtkPolyData::to_c_struct()
     static_cast<int64_t*>(std::malloc(sizeof(int64_t) * n_strips_connectivity));
 
   if (!strips_connectivity) {
-    BEAM_ABORT("malloc failure for strips_connectivity\n");
+    ELFF_ABORT("malloc failure for strips_connectivity\n");
   }
 
   if (n_strips_connectivity > 0) {
@@ -112,7 +112,7 @@ vtkPolyData::to_c_struct()
     static_cast<int64_t*>(std::malloc(sizeof(int64_t) * n_strips_offsets));
 
   if (!strips_offsets) {
-    BEAM_ABORT("malloc failure for strips_offsets\n");
+    ELFF_ABORT("malloc failure for strips_offsets\n");
   }
 
   if (n_strips_offsets > 0) {
@@ -128,7 +128,7 @@ vtkPolyData::to_c_struct()
     std::malloc(sizeof(int64_t) * n_polygons_connectivity));
 
   if (!polygons_connectivity) {
-    BEAM_ABORT("malloc failure for polygons_connectivity\n");
+    ELFF_ABORT("malloc failure for polygons_connectivity\n");
   }
 
   if (n_polygons_connectivity > 0) {
@@ -144,7 +144,7 @@ vtkPolyData::to_c_struct()
     static_cast<int64_t*>(std::malloc(sizeof(int64_t) * n_polygons_offsets));
 
   if (!polygons_offsets) {
-    BEAM_ABORT("malloc failure for polygons_offsets\n");
+    ELFF_ABORT("malloc failure for polygons_offsets\n");
   }
 
   if (n_polygons_offsets > 0) {
@@ -216,7 +216,7 @@ void
 vtkPolyData::on_add_points()
 {
   if (points_is_sealed())
-    BEAM_ABORT("New points may not be added after adding connectivity.\n");
+    ELFF_ABORT("New points may not be added after adding connectivity.\n");
 }
 
 void
@@ -224,7 +224,7 @@ vtkPolyData::on_add_connectivity()
 {
   points_state = State::SEALED;
   if (connectivity_is_sealed())
-    BEAM_ABORT(
+    ELFF_ABORT(
       "New connectivity may not be added after adding point or cell data.\n");
 }
 
@@ -234,7 +234,7 @@ vtkPolyData::on_add_field_data()
   points_state = State::SEALED;
   connectivity_state = State::SEALED;
   if (fields_is_sealed())
-    BEAM_ABORT("New fields may not be added.\n");
+    ELFF_ABORT("New fields may not be added.\n");
 }
 
 const size_t
@@ -319,7 +319,7 @@ vtkPolyData::add_vertex(int64_t vertex_point)
   on_add_connectivity();
 
   if (!point_exists(vertex_point)) {
-    BEAM_ABORT("Point does not exist.\n");
+    ELFF_ABORT("Point does not exist.\n");
   }
 
   vertices_connectivity.push_back(vertex_point);
@@ -334,12 +334,12 @@ vtkPolyData::add_poly_vertex(std::vector<int64_t> poly_vertex_points)
   on_add_connectivity();
 
   if (poly_vertex_points.size() < 2) {
-    BEAM_ABORT("Poly vertex must contain at least 2 points.\n");
+    ELFF_ABORT("Poly vertex must contain at least 2 points.\n");
   }
 
   for (auto point : poly_vertex_points) {
     if (!point_exists(point)) {
-      BEAM_ABORT("One of the points does not exist.\n");
+      ELFF_ABORT("One of the points does not exist.\n");
     }
   }
 
@@ -357,7 +357,7 @@ vtkPolyData::add_line(int64_t point_1, int64_t point_2)
   on_add_connectivity();
 
   if (!point_exists(point_1) || !point_exists(point_2)) {
-    BEAM_ABORT("One of the points does not exist.\n");
+    ELFF_ABORT("One of the points does not exist.\n");
   }
 
   lines_connectivity.push_back(point_1);
@@ -373,12 +373,12 @@ vtkPolyData::add_polyline(std::vector<int64_t> polyline_points)
   on_add_connectivity();
 
   if (polyline_points.size() < 2) {
-    BEAM_ABORT("Line must contain at least 2 points.\n");
+    ELFF_ABORT("Line must contain at least 2 points.\n");
   }
 
   for (auto point : polyline_points) {
     if (!point_exists(point)) {
-      BEAM_ABORT("One of the points does not exist.\n");
+      ELFF_ABORT("One of the points does not exist.\n");
     }
   }
 
@@ -395,12 +395,12 @@ vtkPolyData::add_polygon(std::vector<int64_t> polygon_points)
   on_add_connectivity();
 
   if (polygon_points.size() < 3) {
-    BEAM_ABORT("Polygon must contain at least 3 points.\n");
+    ELFF_ABORT("Polygon must contain at least 3 points.\n");
   }
 
   for (auto point : polygon_points) {
     if (!point_exists(point)) {
-      BEAM_ABORT("One of the points does not exist.\n");
+      ELFF_ABORT("One of the points does not exist.\n");
     }
   }
 

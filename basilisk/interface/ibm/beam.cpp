@@ -3,7 +3,7 @@
 #include "models/beam/IBEulerBeam.hpp"
 #include "config/config.hpp"
 
-using namespace beam;
+using namespace ELFF;
 
 extern "C"
 {

@@ -5,7 +5,7 @@
 // // Adjust include path / name as needed:
 // #include "io/C/vtkPolyData.hpp"
 
-// namespace beam {
+// namespace ELFF {
 
 // // Helper to get a clean, zero-initialized polydata
 // static vtkPolyData make_empty_polydata()
@@ -229,4 +229,4 @@
 //       ".*");
 // }
 
-// } // namespace beam
+// } // namespace ELFF

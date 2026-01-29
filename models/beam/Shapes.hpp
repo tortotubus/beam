@@ -17,7 +17,7 @@
 #include <array>
 #include <cstddef>
 
-namespace beam {
+namespace ELFF {
 
 /**
  * @class CubicHermite

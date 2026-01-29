@@ -18,7 +18,7 @@
 #include <Eigen/SparseCholesky> // for SimplicialLLT
 #include <unsupported/Eigen/AutoDiff>
 
-namespace beam {
+namespace ELFF {
 
 class EulerBeamStaticInextensibleMoM : public EulerBeam
 {
@@ -86,7 +86,7 @@ public:
         std::cout << "\t ||S|| = " << S_norm << std::endl;
         break;
       } else if (iter_outer == max_iter_outer - 1) {
-        BEAM_ABORT(
+        ELFF_ABORT(
           "EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
       } else {
         std::cout << iter_outer << ": ||r|| = " << res_norm;
@@ -96,7 +96,7 @@ public:
       solver.compute(jacobian);
 
       if (solver.info() != Eigen::Success) {
-        BEAM_ABORT("EulerBeamStaticInextensibleMoM::solve(): "
+        ELFF_ABORT("EulerBeamStaticInextensibleMoM::solve(): "
                    "Preconditioner failed.\n");
       }
 
@@ -130,7 +130,7 @@ public:
         std::cout << "\t ||S|| = " << S_norm << std::endl;
         break;
       } else if (iter_outer == max_iter_outer - 1) {
-        BEAM_ABORT(
+        ELFF_ABORT(
           "EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
       } else {
         std::cout << iter_outer << ": ||r|| = " << res_norm;
@@ -140,7 +140,7 @@ public:
       solver.compute(jacobian);
 
       if (solver.info() != Eigen::Success) {
-        BEAM_ABORT("EulerBeamStaticInextensibleMoM::solve(): "
+        ELFF_ABORT("EulerBeamStaticInextensibleMoM::solve(): "
                    "Preconditioner failed.\n");
       }
 
@@ -170,7 +170,7 @@ public:
   virtual void apply_initial_condition(EulerBeamMesh& bmesh) override
   {
     if (bmesh.get_nodes() != mesh.get_nodes()) {
-      BEAM_ABORT("");
+      ELFF_ABORT("");
     }
 
     auto centerline = bmesh.get_centerline();
@@ -660,7 +660,7 @@ protected:
     const std::vector<std::array<real_t, 3>> load) const
   {
 
-    BEAM_ASSERT(load.size() == nodes, "Nodes does not match load vector size.\n");
+    ELFF_ASSERT(load.size() == nodes, "Nodes does not match load vector size.\n");
 
     static constexpr real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
     static constexpr real_t w_q[] = { 0.2777777778,
@@ -780,4 +780,4 @@ protected:
   }
 };
 
-} // namespace beam
+} // namespace ELFF
