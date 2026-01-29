@@ -21,6 +21,9 @@ event defaults (i = 0) {
   }
 }
 
+// vector forcing[];
+// scalar stencils[];
+
 event acceleration (i++) {
   face vector ae = a;
 
@@ -34,22 +37,25 @@ event acceleration (i++) {
   }
 
   // 1. Advance lagrangian mesh
-  ib_mesh_manager_advance_lagrangian_mesh ();
+  // ib_mesh_manager_advance_lagrangian_mesh ();
+
+  // 1a. Update node ownership
+  ibnode_list_set_pid ();
 
   // 2. Generate the stencil cache
-  ib_mesh_manager_generate_stencil_cache ();
+  ibnode_list_generate_stencil_cache ();
 
   // 3. Interpolate \f(u*\f) with \f(J u*\f)
-  ib_mesh_manager_interpolate_eulerian_velocities ();
+  ibnode_list_interpolate_eulerian_velocities ();
 
   // 4. Build the right-hand side vector \f(b = v_{\rm lag} - J u^* \f)
-  ib_mesh_manager_compute_constraint_rhs ();
+  ibnode_list_compute_constraint_rhs ();
 
   // 5. Solve A \lambda = b via CG/Uzawa on nodes
-  ib_mesh_manager_solve_lambda_CG (dt);
+  ibnode_list_solve_lambda_CG (dt);
 
   // 6. Spread lambda to grid forcing \f(J^T \lambda\f)
-  ib_mesh_manager_spread_eulerian_forcing (forcing);
+  ibnode_list_spread_eulerian_forcing ();
 
   // 7. Add forcing to the acceleration field
   foreach_face () {
@@ -57,14 +63,13 @@ event acceleration (i++) {
       ae.x[] += .5 * alpha.x[] * (forcing.x[] + forcing.x[-1]);
     }
   }
-}
 
-event acceleration(i++) {
-  ib_mesh_manager_sort_triplets ();
+  ibnode_list_tag_stencil (stencils);
 }
 
 /** At the end of the simulation, we free the allocated memory.*/
 event cleanup (t = end) {
   ib_mesh_manager_free ();
+  ibnode_list_free ();
 }
  
