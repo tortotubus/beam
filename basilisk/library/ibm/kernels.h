@@ -24,6 +24,23 @@ trace void synchronize (scalar* list) {
 #define PESKIN_SUPPORT_RADIUS 2
 
 macro peskin_kernel (coord delta_centre, Point point = point) {
+  coord dist; 
+#if dimension == 1
+#elif dimension == 2 
+  dist.x = x - delta_centre.x;
+  dist.y = y - delta_centre.y;
+  bool cutoff = fabs(dist.x) <= Delta * 2 && fabs(dist.y) <= Delta * 2;
+  double peskin_weight = 0.;
+  if (cutoff) {
+    peskin_weight = (1. + cos(0.5 * pi * dist.x / Delta)) * (1. + cos(0.5 * pi * dist.x / Delta)) / 16.;
+  } else {
+    peskin_weight = 0.;
+  }
+#else 
+#endif 
+}
+
+macro peskin_kernel2 (coord delta_centre, Point point = point) {
   if (point.level >= 0) {
     coord dist;
 #if dimension == 1
@@ -74,7 +91,7 @@ macro peskin_kernel (coord delta_centre, Point point = point) {
 
 // Old locate-based peskin stencil
 
-macro foreach_neighbor_of_coord3 (coord c, unsigned int size) {
+macro foreach_neighbor_of_coord (coord c, unsigned int size) {
   {
     // int ig = 0;
     // NOT_UNUSED(ig);
@@ -204,7 +221,7 @@ macro2 foreach_neighbor_of_coord2 (coord c, unsigned int size) {
   }
 }
 
-macro2 foreach_neighbor_of_coord  (coord c, unsigned int size) {
+macro2 foreach_neighbor_of_coord3 (coord c, unsigned int size) {
   {
     int ig = 0;
     NOT_UNUSED (ig);

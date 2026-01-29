@@ -1,6 +1,13 @@
 {
-  "cmake.configureSettings": {
-    "BUILD_TESTS": "ON",
-    "BUILD_DOC": "ON"
+  "direnv.path": "/nix/store/z71kxbvbcc9zrdpbnrzljmq66rkclmhb-direnv-2.37.1/bin/direnv",
+  "direnv.restart.automatic": true,
+  "direnv.watchForChanges": true,
+  "editor.tabSize": 4,
+  "github.copilot.nextEditSuggestions.enabled": false,
+  "[c]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
   },
+  "[cpp]": {
+    "editor.defaultFormatter": "ms-vscode.cpptools"
+  }
 }
