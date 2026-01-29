@@ -258,7 +258,7 @@ vtkHDFHyperTreeGridData *vtk_hdf_hypertreegrid_data_init(void) {
     vtk_hdf_get_number_of_vertices_per_depth(vtk_hdf_hypertreegrid_data);
     vtk_hdf_get_descriptors(vtk_hdf_hypertreegrid_data);
 
-    #if MPI_SINGLE_FILE
+    #if _MPI
         vtk_hdf_get_local_mask(vtk_hdf_hypertreegrid_data);
     #endif
 
