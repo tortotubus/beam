@@ -2,19 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug beam_benchmark_tests",
+      "name": "Debug (CMake Tools)",
       "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/build/tests/beam_benchmark_tests",
-      "args": [],
+      "program": "${command:cmake.launchTargetPath}",
+      "cwd": "${workspaceFolder}",
       "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/build/tests",
-      "environment": [],
       "externalConsole": false,
       "MIMode": "gdb",
-      "setupCommands": [
-        { "description": "Enable pretty-printing for gdb", "text": "-enable-pretty-printing", "ignoreFailures": true }
-      ]
+      "miDebuggerPath": "/nix/store/n0cf9vad3va0js6606gcra8xhsnr0js7-gdb-16.3/bin/gdb"
     }
   ]
 }

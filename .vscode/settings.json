@@ -4,10 +4,19 @@
   "direnv.watchForChanges": true,
   "editor.tabSize": 4,
   "github.copilot.nextEditSuggestions.enabled": false,
+  "github.copilot.enable": {
+    "*": false,
+    "plaintext": false,
+    "markdown": false,
+    "scminput": false
+  }, 
   "[c]": {
     "editor.defaultFormatter": "ms-vscode.cpptools"
   },
   "[cpp]": {
     "editor.defaultFormatter": "ms-vscode.cpptools"
+  },
+  "cmake.debugConfig": {
+    "miDebuggerPath": "/nix/store/n0cf9vad3va0js6606gcra8xhsnr0js7-gdb-16.3/bin/gdb"
   }
 }

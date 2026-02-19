@@ -25,9 +25,13 @@ function(elff_basilisk_add_executable SOURCE_FILE)
   
   add_executable(${source_name} "_${source_name}.c")
 
+  find_package(MPI REQUIRED)
+  find_package(HDF5 REQUIRED)
+
   target_link_libraries(${source_name}
     PRIVATE
       HDF5::HDF5
+      MPI::MPI_C
       m
   )
 

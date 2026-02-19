@@ -1,38 +1,36 @@
-#pragma once
+#include "library/ibm/IBConfig.h"
+#include "library/ibm/IBMacros.h"
 
-#include <stdlib.h>
-#include <string.h> /* memcpy */
-#include <stddef.h> /* size_t */
-
-/*!
- * \brief Immersed-boundary node state.
+/**
+ * @struct IBNode
  *
- * Ownership:
- * - \c stencil.p is owned by the \c IBNode and must be freed with \ref
- * ibnode_free (or \ref ibnode_free_stencil).
+ * @brief Immersed-boundary node state.
  */
 typedef struct {
-  coord lagpos; /*!< Lagrangian nodal position */
-  coord force;  /*!< Lagrange multiplier as a force */
-  coord lagvel; /*!< Lagrangian nodal velocity */
-  coord eulvel; /*!< Eulerian fluid velocity interpolated at the Lagrangian node */
+  coord lagpos; /**< Lagrangian nodal position */
+  coord force;  /**< Lagrange multiplier as a force */
+  coord lagvel; /**< Lagrangian nodal velocity */
+  coord eulvel; /**< Eulerian fluid velocity interpolated at the Lagrangian node */
 
-  coord rhs; /*!< b_i = lagvel_i - (J u*)_i (constraint mismatch) */
-  coord res; /*!< r_i (residual) */
-  coord w;   /*!< w_i (search direction) */
-  coord Ay;  /*!< y_i = (A w)_i */
+  // coord rhs; /**< b_i = lagvel_i - (J u*)_i (constraint mismatch) */
+  // coord res; /**< r_i (residual) */
+  // coord w;   /**< w_i (search direction) */
+  // coord Ay;  /**< y_i = (A w)_i */
 
-  double weight; /*!< Quadrature weight */
-  coord gravity; /*!< Gravity */
+  // double dV; /**< Quadrature weight */
+  double weight;
+  // coord gravity; /**< Gravity */
 
-  int pid; /*!< MPI rank that owns this node */
+  int pid; /**< MPI rank that owns this node */
 
-  Cache stencil; /*!< Stencil cache (owns stencil.p) */
+  Cache stencil; /**< Stencil cache (owns stencil.p) */
 } IBNode;
 
-/*!
- * \brief Compute the stencil storage length for the current Basilisk dimension.
- * \return Number of \c Index entries required for the stencil buffer.
+/**
+ * @brief Compute the stencil storage length for the current Basilisk dimension.
+ * @return Number of @c Index entries required for the stencil buffer.
+ *
+ * @relates IBNode
  */
 size_t ibnode_stencil_capacity_ (void) {
 #if dimension == 1
@@ -44,15 +42,17 @@ size_t ibnode_stencil_capacity_ (void) {
 #endif
 }
 
-/*!
- * \brief Initialize the \c stencil member of an \c IBNode.
+/**
+ * @brief Initialize the stencil member of an @ref IBNode.
  *
- * \param node Node to initialize.
- * \return 0 on success, -1 on allocation failure or invalid input.
+ * @param node Node to initialize.
+ * @return 0 on success, -1 on allocation failure or invalid input.
  *
  * Allocates \c node->stencil.p and sets:
  * - \c stencil.n = 0
  * - \c stencil.nm = required capacity for the stencil buffer
+ *
+ * @relates IBNode
  */
 int ibnode_init_stencil (IBNode* node) {
   if (!node)
@@ -74,15 +74,12 @@ int ibnode_init_stencil (IBNode* node) {
   return 0;
 }
 
-/*!
- * \brief Free the \c stencil member of an \c IBNode.
+/**
+ * @brief Free the \c stencil member of an \c IBNode.
  *
- * \param node Node whose stencil should be freed.
+ * @param node Node whose stencil should be freed.
  *
- * After this call:
- * - \c stencil.p == NULL
- * - \c stencil.n == 0
- * - \c stencil.nm == 0
+ * @relates IBNode
  */
 void ibnode_free_stencil (IBNode* node) {
   if (!node)
@@ -93,14 +90,13 @@ void ibnode_free_stencil (IBNode* node) {
   node->stencil.nm = 0;
 }
 
-/*!
- * \brief Initialize an \c IBNode.
+/**
+ * @brief Initialize an \c IBNode.
  *
- * \param node Node to initialize.
- * \return 0 on success, -1 on allocation failure or invalid input.
+ * @param node Node to initialize.
+ * @return 0 on success, -1 on allocation failure or invalid input.
  *
- * Sets all vector-like members to zero, sets default scalars, and initializes
- * the stencil buffer.
+ * @relates IBNode
  */
 int ibnode_init (IBNode* node) {
   if (!node)
@@ -110,44 +106,44 @@ int ibnode_init (IBNode* node) {
   node->force.x = 0.;
   node->lagvel.x = 0.;
   node->eulvel.x = 0.;
-  node->rhs.x = 0.;
-  node->res.x = 0.;
-  node->w.x = 0.;
-  node->Ay.x = 0.;
-  node->gravity.x = 0.;
+  // node->rhs.x = 0.;
+  // node->res.x = 0.;
+  // node->w.x = 0.;
+  // node->Ay.x = 0.;
+  // node->gravity.x = 0.;
 
   node->lagpos.y = 0.;
   node->force.y = 0.;
   node->lagvel.y = 0.;
   node->eulvel.y = 0.;
-  node->rhs.y = 0.;
-  node->res.y = 0.;
-  node->w.y = 0.;
-  node->Ay.y = 0.;
-  node->gravity.y = 0.;
+  // node->rhs.y = 0.;
+  // node->res.y = 0.;
+  // node->w.y = 0.;
+  // node->Ay.y = 0.;
+  // node->gravity.y = 0.;
 
   node->lagpos.z = 0.;
   node->force.z = 0.;
   node->lagvel.z = 0.;
   node->eulvel.z = 0.;
-  node->rhs.z = 0.;
-  node->res.z = 0.;
-  node->w.z = 0.;
-  node->Ay.z = 0.;
-  node->gravity.z = 0.;
+  // node->rhs.z = 0.;
+  // node->res.z = 0.;
+  // node->w.z = 0.;
+  // node->Ay.z = 0.;
+  // node->gravity.z = 0.;
 
-  node->weight = 1.;
+  // node->weight = 1.;
   node->pid = -1;
 
   return ibnode_init_stencil (node);
 }
 
-/*!
- * \brief Free resources owned by an \c IBNode.
+/**
+ * @brief Free resources owned by an \c IBNode.
  *
- * \param node Node to free.
+ * @param node Node to free.
  *
- * Currently this frees only owned dynamic resources (the stencil buffer).
+ * @relates IBNode
  */
 void ibnode_free (IBNode* node) {
   if (!node)
@@ -155,16 +151,15 @@ void ibnode_free (IBNode* node) {
   ibnode_free_stencil (node);
 }
 
-/*!
- * \brief Deep-copy an \c IBNode.
+/**
+ * @brief Deep-copy an @ref IBNode.
  *
- * \param dst Destination node (will be overwritten; any owned resources are
+ * @param dst Destination node (will be overwritten; any owned resources are
  * freed first).
- * \param src Source node.
- * \return 0 on success, -1 on allocation failure or invalid input.
+ * @param src Source node.
+ * @return 0 on success, -1 on allocation failure or invalid input.
  *
- * This performs a deep copy of \c stencil.p, so \c dst and \c src can be freed
- * independently.
+ * @relates IBNode
  */
 int ibnode_copy (IBNode* dst, const IBNode* src) {
   if (!dst || !src)
@@ -193,14 +188,14 @@ int ibnode_copy (IBNode* dst, const IBNode* src) {
   return 0;
 }
 
-/*!
- * \brief Move an \c IBNode (transfer ownership).
+/**
+ * @brief Move an @ref IBNode (transfer ownership).
  *
- * \param dst Destination node (will be overwritten; any owned resources are
+ * @param dst Destination node (will be overwritten; any owned resources are
  * freed first).
- * \param src Source node (left in a valid, empty state).
+ * @param src Source node (left in a valid, empty state).
  *
- * After the move, \c src does not own any stencil memory.
+ * @relates IBNode
  */
 void ibnode_move (IBNode* dst, IBNode* src) {
   if (!dst || !src)
@@ -215,13 +210,13 @@ void ibnode_move (IBNode* dst, IBNode* src) {
   src->stencil.nm = 0;
 }
 
-/*!
- * \brief Swap two \c IBNode values.
+/**
+ * @brief Swap two @ref IBNode values.
  *
- * \param a First node.
- * \param b Second node.
+ * @param a First node.
+ * @param b Second node.
  *
- * This is safe under the ownership model above (it swaps the owned pointer).
+ * @relates IBNode
  */
 void ibnode_swap (IBNode* a, IBNode* b) {
   if (!a || !b)
@@ -229,4 +224,14 @@ void ibnode_swap (IBNode* a, IBNode* b) {
   IBNode tmp = *a;
   *a = *b;
   *b = tmp;
+}
+
+/**
+ * @brief Populates the @c stencil member of @ref IBNode with adjacent cells for
+ * its stencil.
+ */
+void ibnode_fill_stencil_cache (IBNode* node) {
+  foreach_neighborhood_coord(node->lagpos, PESKIN_SUPPORT_RADIUS) {
+    cache_append(&node->stencil, point, 0);
+  }
 }

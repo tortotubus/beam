@@ -3,27 +3,27 @@
 #include <cstddef>
 #include <cstring>
 
-extern "C" {
+// extern "C" {
 
-    typedef struct {
-      double x, y, z;
-    } coord;
+//     typedef struct {
+//       double x, y, z;
+//     } coord;
 
-    typedef int Index;
+//     typedef int Index;
 
-    typedef struct {
-      size_t n;    /*!< Current number of entries in the stencil */
-      size_t nm;   /*!< Allocated capacity of the stencil */
-      Index  *p;   /*!< Pointer to stencil entries (owned) */
-    } Cache;
+//     typedef struct {
+//       size_t n;    /*!< Current number of entries in the stencil */
+//       size_t nm;   /*!< Allocated capacity of the stencil */
+//       Index  *p;   /*!< Pointer to stencil entries (owned) */
+//     } Cache;
 
-    #define PESKIN_SUPPORT_RADIUS 2
-    #define sq(x) ((x)*(x))
-    #define cube(x) ((x)*(x)*(x))
+//     #define PESKIN_SUPPORT_RADIUS 2
+//     #define sq(x) ((x)*(x))
+//     #define cube(x) ((x)*(x)*(x))
 
-    #include "library/ibm/IBNode.h"
-    #include "library/ibm/IBNodeList.h"
-}
+//     #include "library/ibm/IBNode.h"
+//     #include "library/ibm/IBNodeList.h"
+// }
 
 namespace {
 

@@ -16,7 +16,7 @@ either with the centered Navier-Stokes solver or with the "all Mach"
 solver (in incompressible mode). */
 
  
-#include "library/ibm/navier-stokes/new.h" 
+#include "navier-stokes/centered.h" 
  
 
 
@@ -57,9 +57,9 @@ init(i = 0)
   We also need to define the initial centered pressure gradient (this
   improves the accuracy of the initial conditions). */
 
-  // foreach()
-  //   foreach_dimension()
-  //     g.x[] = - (p[1] - p[-1])/(2.*Delta);
+  foreach()
+    foreach_dimension()
+      g.x[] = - (p[1] - p[-1])/(2.*Delta);
 }
 
 event logfile (i++) {

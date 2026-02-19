@@ -1,174 +1,179 @@
-#pragma once
-
 #include "library/ibm/IBNode.h"
 
-#include <assert.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <stdlib.h>
+/* Type Definitions */
 
-/*!
- * \brief Dynamic array of \c IBNode.
+/**
+ * @struct IBNodeList
+ * @brief Non-owning dynamic array of pointers to @ref IBNode.
  *
- * Ownership / lifetime:
- * - The list owns the nodes stored in \c nodes[0..size-1].
- * - \ref ibnodelist_add_copy deep-copies a node into the list using \c ibnode_copy.
- * - \ref ibnodelist_free releases all nodes in the list using \c ibnode_free, then frees storage.
- *
- * Invariants:
- * - \c 0 <= size <= capacity
- * - If \c capacity == 0 then \c nodes may be NULL
+ * @details The container stores borrowed pointers; it does not allocate or
+ * destroy the referenced IBNode objects. It simply manages the pointer array.
  */
 typedef struct {
-  IBNode  *nodes;     /*!< Pointer to contiguous storage of length \c capacity. */
-  size_t   size;      /*!< Number of valid/owned nodes in \c nodes[0..size-1]. */
-  size_t   capacity;  /*!< Allocated length of \c nodes in elements. */
+  IBNode** ptrs;   /**< borrowed pointers to nodes */
+  size_t size;     /**< active count */
+  size_t capacity; /**< allocated length of ptrs[] */
 } IBNodeList;
 
-/*!
- * \brief Compute the next capacity when growing a list.
- *
- * \param cap Current capacity.
- * \return Suggested next capacity (geometric growth).
- *
- * This uses a small non-zero base capacity to handle the \c cap==0 case.
+/* Function Declarations */
+
+int ibnodelist_init (IBNodeList* list, size_t initial_capacity);
+void ibnodelist_free (IBNodeList* list);
+int ibnodelist_reserve (IBNodeList* list, size_t newcap);
+int ibnodelist_push (IBNodeList* list, IBNode* node);
+IBNode* ibnodelist_remove_swap (IBNodeList* list, size_t i);
+static inline IBNode* ibnodelist_get (IBNodeList* list, size_t i);
+static size_t ibnodelist_next_cap_ (size_t cap);
+
+/* Function Definitions */
+
+/**
+ * @brief
  */
-static size_t ibnodelist_next_cap_(size_t cap) {
-  return (cap == 0) ? 8u : (cap * 2u);
+static size_t ibnodelist_next_cap_ (size_t cap) {
+  return cap ? cap * 2u : 8u;
 }
 
-/*!
- * \brief Initialize an \c IBNodeList.
+/**
+ * @brief Initialize an IBNodeList with an optional initial capacity.
  *
- * \param list Pointer to the list to initialize.
- * \param initial_capacity Initial storage capacity (may be 0).
- * \return 0 on success, -1 on allocation failure or invalid input.
+ * @param list Pointer to the IBNodeList to initialize. Must not be NULL.
+ * @param initial_capacity Initial number of pointers to allocate. If 0, no
+ * memory is allocated.
  *
- * After successful initialization:
- * - \c list->size is 0
- * - \c list->capacity is \p initial_capacity
- * - \c list->nodes is allocated if \p initial_capacity > 0
+ * @return 0 on success, -1 on failure (invalid input or memory allocation
+ * failure).
  *
- * \note This function does not call \c ibnode_init on capacity slots; nodes are
- *       initialized on insertion.
+ * @details Sets the size to 0 and capacity to 0. If initial_capacity > 0,
+ * allocates memory for that many IBNode pointers.
+ *
+ * @relates IBNodeList
  */
-int ibnodelist_init(IBNodeList *list, size_t initial_capacity) {
-  if (!list) return -1;
-
-  list->nodes    = NULL;
-  list->size     = 0;
+int ibnodelist_init (IBNodeList* list, size_t initial_capacity) {
+  if (!list)
+    return -1;
+  list->ptrs = NULL;
+  list->size = 0;
   list->capacity = 0;
 
-  if (initial_capacity == 0) return 0;
-
-  list->nodes = (IBNode *)malloc(initial_capacity * sizeof(*list->nodes));
-  if (!list->nodes) return -1;
-
+  if (initial_capacity == 0)
+    return 0;
+  list->ptrs = (IBNode**) malloc (initial_capacity * sizeof (*list->ptrs));
+  if (!list->ptrs)
+    return -1;
   list->capacity = initial_capacity;
   return 0;
 }
 
-/*!
- * \brief Free all nodes and storage owned by a list.
+/**
+ * @brief Free all allocated memory and reset the IBNodeList.
  *
- * \param list Pointer to the list to free (may be NULL).
+ * @param list Pointer to the IBNodeList to free. If NULL, this function does
+ * nothing.
  *
- * For each element in \c nodes[0..size-1], calls \c ibnode_free, then frees the
- * underlying storage. Resets \c nodes to NULL and \c size/capacity to 0.
+ * @details Deallocates the internal pointer array, resets size and capacity to
+ * 0, and sets ptrs to NULL. Does not free the IBNode objects themselves.
+ *
+ * @relates IBNodeList
  */
-void ibnodelist_free(IBNodeList *list) {
-  if (!list) return;
-
-  for (size_t i = 0; i < list->size; i++) {
-    ibnode_free(&list->nodes[i]);
-  }
-
-  free(list->nodes);
-  list->nodes    = NULL;
-  list->size     = 0;
+void ibnodelist_free (IBNodeList* list) {
+  if (!list)
+    return;
+  free (list->ptrs);
+  list->ptrs = NULL;
+  list->size = 0;
   list->capacity = 0;
 }
 
-/*!
- * \brief Ensure the list has at least the given capacity.
+/**
+ * @brief Reserve capacity for at least newcap elements in the IBNodeList.
  *
- * \param list Pointer to the list.
- * \param new_capacity Minimum required capacity.
- * \return 0 on success, -1 on allocation failure or invalid input.
+ * @param list Pointer to the IBNodeList. Must not be NULL.
+ * @param newcap New capacity to reserve.
  *
- * If \p new_capacity is less than or equal to the current capacity, this is a
- * no-op. Otherwise the underlying storage is reallocated.
+ * @return 0 on success or if newcap <= current capacity, -1 on failure (memory
+ * allocation error).
  *
- * \warning Reallocation may move the storage; any outstanding pointers into
- *          \c list->nodes become invalid after this call.
+ * @details If newcap is less than or equal to the current capacity, no action
+ * is taken. Otherwise, reallocates the internal pointer array to accommodate
+ * newcap elements.
+ *
+ * @relates IBNodeList
  */
-int ibnodelist_reserve(IBNodeList *list, size_t new_capacity) {
-  if (!list) return -1;
-  if (new_capacity <= list->capacity) return 0;
-
-  IBNode *p = (IBNode *)realloc(list->nodes, new_capacity * sizeof(*p));
-  if (!p) return -1;
-
-  list->nodes    = p;
-  list->capacity = new_capacity;
+int ibnodelist_reserve (IBNodeList* list, size_t newcap) {
+  if (!list)
+    return -1;
+  if (newcap <= list->capacity)
+    return 0;
+  IBNode** p = (IBNode**) realloc (list->ptrs, newcap * sizeof (*p));
+  if (!p)
+    return -1;
+  list->ptrs = p;
+  list->capacity = newcap;
   return 0;
 }
 
-/*!
- * \brief Append a node to the list by deep-copying it.
+/**
+ * @brief Add an IBNode pointer to the end of the IBNodeList.
  *
- * \param list Pointer to the list.
- * \param node Pointer to the node to copy from.
- * \return The inserted index on success, -1 on failure.
+ * @param list Pointer to the IBNodeList. Must not be NULL.
+ * @param node Pointer to the IBNode to add. Must not be NULL.
  *
- * This function grows the list if necessary, initializes the destination slot
- * via \c ibnode_init, then deep-copies the contents using \c ibnode_copy.
+ * @return 0 on success, -1 on failure (invalid input or memory allocation
+ * failure).
  *
- * Ownership:
- * - The list owns the copied node.
- * - The caller retains ownership of \p node and may free/modify it independently.
+ * @details If the list is at capacity, automatically reserves more capacity
+ * (doubling the current capacity, or setting to 8 if empty) before adding the
+ * node.
  *
- * \note This assumes \c ibnode_copy performs a deep copy compatible with
- *       \c ibnode_free.
+ * @relates IBNodeList
  */
-int ibnodelist_add_copy(IBNodeList *list, const IBNode *node) {
-  if (!list || !node) return -1;
-
+int ibnodelist_push (IBNodeList* list, IBNode* node) {
+  if (!list || !node)
+    return -1;
   if (list->size == list->capacity) {
-    size_t new_cap = ibnodelist_next_cap_(list->capacity);
-    if (new_cap < list->size + 1) new_cap = list->size + 1;
-    if (ibnodelist_reserve(list, new_cap) != 0) return -1;
+    size_t newcap = ibnodelist_next_cap_ (list->capacity);
+    if (ibnodelist_reserve (list, newcap) != 0)
+      return -1;
   }
-
-  size_t idx = list->size++;
-  ibnode_init(&list->nodes[idx]);        /* destination in known state */
-  ibnode_copy(&list->nodes[idx], node);  /* deep copy into owned storage */
-
-  return (idx <= (size_t)INT32_MAX) ? (int)idx : -1;
+  list->ptrs[list->size++] = node;
+  return 0;
 }
 
-/*!
- * \brief Get a mutable pointer to an element by index.
+/**
+ * @brief Remove an element at index i using swap-with-last removal.
  *
- * \param list Pointer to the list.
- * \param index Index in \c [0, size).
- * \return Pointer to the element, or NULL if out of range or \p list is NULL.
+ * @param list Pointer to the IBNodeList. Must not be NULL.
+ * @param i Index of the element to remove. Must be < size.
+ *
+ * @return Pointer to the removed IBNode, or NULL if invalid input.
+ *
+ * @details Swaps the element at index i with the last element and decrements
+ * size. This is efficient but does not preserve list order. The caller is
+ * responsible for deciding how or if to destroy the returned IBNode object.
+ *
+ * @relates IBNodeList
  */
-IBNode *ibnodelist_get(IBNodeList *list, size_t index) {
-  if (!list) return NULL;
-  if (index >= list->size) return NULL;
-  return &list->nodes[index];
+IBNode* ibnodelist_remove_swap (IBNodeList* list, size_t i) {
+  if (!list || i >= list->size)
+    return NULL;
+  IBNode* dead = list->ptrs[i];
+  list->ptrs[i] = list->ptrs[list->size - 1];
+  list->size--;
+  return dead; /* caller decides how/if to destroy it */
 }
 
-/*!
- * \brief Get a const pointer to an element by index.
+/**
+ * @brief Retrieve the IBNode pointer at index i.
  *
- * \param list Pointer to the list.
- * \param index Index in \c [0, size).
- * \return Const pointer to the element, or NULL if out of range or \p list is NULL.
+ * @param list Pointer to the IBNodeList. If NULL, returns NULL.
+ * @param i Index of the element to retrieve. Must be < size.
+ *
+ * @return Pointer to the IBNode at index i, or NULL if invalid input or out of
+ * bounds.
+ *
+ * @relates IBNodeList
  */
-const IBNode *ibnodelist_get_const(const IBNodeList *list, size_t index) {
-  if (!list) return NULL;
-  if (index >= list->size) return NULL;
-  return &list->nodes[index];
+IBNode* ibnodelist_get (IBNodeList* list, size_t i) {
+  return (list && i < list->size) ? list->ptrs[i] : NULL;
 }

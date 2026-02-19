@@ -12,6 +12,7 @@ option(BUILD_BASILISK_EXAMPLES "Build basilisk example programs" ON)
 
 if(BUILD_BASILISK_EXAMPLES)
   find_package(basilisk CONFIG REQUIRED) 
+  find_package(MPI REQUIRED)
   include(elff_basilisk_add_executable)
   add_subdirectory(examples/serial)
 endif()
