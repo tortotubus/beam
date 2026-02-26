@@ -23,6 +23,7 @@
 #include "_config.hpp"
 #endif
 
+
 namespace ELFF
 {
 
@@ -32,8 +33,6 @@ namespace ELFF
 #else
 #define ELFF_HOST_DEVICE
 #endif
-
-// BEAM precision configuration
 
 #if defined ELFF_USE_SINGLE && defined ELFF_USE_DOUBLE
 #error "DOUBLE and SINGLE precision cannot both be specified"
@@ -46,9 +45,9 @@ typedef double real_t;
 #else
 #error "Either DOUBLE or SINGLE precision must be specified"
 #endif
+ 
 
-
-} // namespace beam
+} // namespace ELFF
 
 // Return value for main function in examples that should be skipped by testing
 // in some case. This return value prevents failures in testing.

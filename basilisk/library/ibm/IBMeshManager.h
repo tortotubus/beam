@@ -10,6 +10,7 @@ typedef struct {
   IBMesh* meshes;
   IBMempool pool;
   int nm;
+  bool dirty;
 } IBMeshManager;
 
 /**
@@ -22,7 +23,8 @@ IBMeshManager ibmm = {
     .active = {0},
     .len = 0, 
   }, 
-  .nm = 0
+  .nm = 0,
+  .dirty = true
 };
 
 
@@ -35,7 +37,7 @@ IBMeshManager ibmm = {
 /**
  * @brief Loops through all meshes
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 macro foreach_ibmesh () {
   for (int mesh_id = 0; mesh_id < ibmm.nm; mesh_id++) {
@@ -50,7 +52,7 @@ macro foreach_ibmesh () {
 /**
  * @brief Loops through all nodes in the node pool
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 macro foreach_ibnode () {
   for (size_t node_id = 0; node_id < ibmm.pool.active.size; node_id++) {
@@ -65,13 +67,13 @@ macro foreach_ibnode () {
 /**
  * @brief Loops through all nodes of all meshes
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 macro foreach_ibnode_per_ibmesh () {
   for (size_t mesh_id = 0; mesh_id < ibmm.nm; mesh_id++) {
     IBMesh *mesh = &ibmm.meshes[mesh_id];
     NOT_UNUSED(mesh);
-    for (size_t node_id = 0; node_id < ibmm.pool.active.size; node_id++) {
+    for (size_t node_id = 0; node_id < mesh->nodes.size; node_id++) {
       IBNode* node = mesh->nodes.ptrs[node_id];
       NOT_UNUSED (node);
       // clang-format off
@@ -86,13 +88,12 @@ macro foreach_ibnode_per_ibmesh () {
 
 void ibmeshmanager_init (int mesh_count);
 void ibmeshmanager_free ();
-
 int ibmeshmanager_add_mesh();
 void ibmeshmanager_delete_mesh (int mesh_id);
-// void ibmeshmanager_delete_all_meshes();
-
 void ibmeshmanager_add_nodes (int mesh_id, int count);
 void ibmeshmanager_delete_all_nodes (int mesh_id);
+void ibmeshmanager_init_stencil_caches();
+void ibmeshmanager_update_stencil_caches();
 
 /* Function definitions */
 
@@ -101,7 +102,7 @@ void ibmeshmanager_delete_all_nodes (int mesh_id);
  *
  * @param nm The number of meshes you plan to have
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 void ibmeshmanager_init (int mesh_count) {
   if (!ibmm.meshes) {
@@ -123,7 +124,7 @@ void ibmeshmanager_init (int mesh_count) {
 /**
  * @brief Free all members in the immersed boundary mesh manager.
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 void ibmeshmanager_free () {
   IBMempool* pool = &ibmm.pool;
@@ -139,7 +140,7 @@ void ibmeshmanager_free () {
 /**
  * @brief Creates a new mesh returning the index
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 int ibmeshmanager_add_mesh () {
   int mesh_id = ibmm.nm;
@@ -154,7 +155,7 @@ int ibmeshmanager_add_mesh () {
  * @brief Deletes the mesh from the manager, freeing the mesh object, and
  * marking as free its nodes in the pool.
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 void ibmeshmanager_delete_mesh (int mesh_id) {
   assert (mesh_id >= 0 && mesh_id < ibmm.nm);
@@ -173,7 +174,7 @@ void ibmeshmanager_delete_mesh (int mesh_id) {
  * @brief Deletes the mesh from the manager, freeing the mesh object, and
  * marking as free its nodes in the pool.
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 // void ibmeshmanager_delete_all_meshes () {
 //   IBMempool* pool = &ibmm.pool;
@@ -189,7 +190,7 @@ void ibmeshmanager_delete_mesh (int mesh_id) {
 /**
  * @brief Bulk adds nodes to a given mesh
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 void ibmeshmanager_add_nodes (int mesh_id, int count) {
   assert (ibmm.nm > mesh_id);
@@ -201,10 +202,40 @@ void ibmeshmanager_add_nodes (int mesh_id, int count) {
 /**
  * @brief Deletes all nodes of a given mesh
  *
- * @memberof IBMeshManager
+ * @relates IBMeshManager
  */
 void ibmeshmanager_delete_all_nodes (int mesh_id) {
   IBMesh* mesh = &ibmm.meshes[mesh_id];
   IBMempool* pool = &ibmm.pool;
   ibmesh_delete_all_nodes (mesh, pool);
+}
+
+/**
+ * @brief Initialize all node stencil caches
+ * 
+ * @relates IBMeshManager
+ */
+void ibmeshmanager_init_stencil_caches() {
+  foreach_ibnode_per_ibmesh() {
+    foreach_neighborhood_coord_level(node->lagpos, PESKIN_SUPPORT_RADIUS, mesh->refinement_level) {
+      cache_append(&node->stencil, point, 0);
+    }
+  }
+}
+
+/**
+ * @brief Update all node stencil caches
+ * 
+ * @relates IBMeshManages
+ */
+void ibmeshmanager_update_stencil_caches() {
+  foreach_ibnode_per_ibmesh() {
+    ibnode_free_stencil(node);
+    ibnode_init_stencil(node);
+  }
+  ibmeshmanager_init_stencil_caches();
+}
+
+void ibmeshmanager_mpi_reduction() {
+
 }

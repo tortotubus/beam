@@ -1,1 +1,1 @@
-#include "IBEulerBeam.hpp"
+#include "models/beam/IBEulerBeam.hpp"

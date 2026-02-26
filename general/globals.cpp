@@ -54,21 +54,21 @@ std::string MakeParFilename(const std::string &prefix, const int myid,
 }
 
 
-#ifdef ELFF_USE_MPI
+// #ifdef ELFF_USE_MPI
 
-MPI_Comm ELFF_COMM_WORLD = MPI_COMM_WORLD;
+// MPI_Comm ELFF_COMM_WORLD = MPI_COMM_WORLD;
 
-MPI_Comm GetGlobalMPI_Comm()
-{
-   return ELFF_COMM_WORLD;
-}
+// MPI_Comm GetGlobalMPI_Comm()
+// {
+//    return ELFF_COMM_WORLD;
+// }
 
-void SetGlobalMPI_Comm(MPI_Comm comm)
-{
-   ELFF_COMM_WORLD = comm;
-}
+// void SetGlobalMPI_Comm(MPI_Comm comm)
+// {
+//    ELFF_COMM_WORLD = comm;
+// }
 
-#endif
+// #endif
 
 const char *GetEnv(const char* name)
 {

@@ -8,11 +8,10 @@
 #include <cstdlib>
 
 #include <array>
-// #include <cmath>
 #include <vector>
 
 namespace ELFF {
-
+namespace Models {
 /**
  * @brief This class helps provide a standard mesh for the various methods to
  * use. All implementations of E-B methods should update the mesh at the end
@@ -83,7 +82,7 @@ public:
   {
     return centerline[i];
   }
- 
+
   /**
    * @brief Returns a reference to all tangents of the centerline
    * \f(\{\vec{r}'_0, \dots, \vec{r}'_n\}\f).
@@ -112,7 +111,7 @@ public:
   {
     return centerline_velocity;
   }
- 
+
   /**
    * @brief Returns one vector \f(\dot{\vec{r}}_i\f) contained in the centerline
    * velocity.
@@ -124,14 +123,14 @@ public:
   {
     return centerline_velocity[i];
   }
- 
+
   /**
    * @brief Returns a reference to the curvilinear axis \f(s\in[0,L]\f).
    *
    * @return Reference to the vector of curvilinear coordinates \f(s_i\f)
    */
   inline std::vector<real_t>& get_curvilinear_axis() { return s; }
- 
+
   /**
    * @brief Returns a reference to one point \f(s_i \in [0,L]\f).
    *
@@ -250,4 +249,5 @@ private:
   }
 };
 
-}
+} // namespace Models
+} // namespace ELFF 

@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "EulerBeam.hpp"
 #include "Shapes.hpp"
 
@@ -11,22 +10,24 @@
 #include <utility>
 #include <vector>
 
-
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
 #include <Eigen/SparseCholesky> // for SimplicialLLT
 #include <unsupported/Eigen/AutoDiff>
 
+using namespace Eigen;
+
 namespace ELFF {
+namespace Models {
 
 class EulerBeamStaticInextensibleAugKKT : public EulerBeam
 {
 public:
   EulerBeamStaticInextensibleAugKKT(real_t length,
-                                 real_t EI,
-                                 size_t nodes,
-                                 EulerBeam::EulerBeamBCs bcs,
-                                 real_t r_penalty)
+                                    real_t EI,
+                                    size_t nodes,
+                                    EulerBeam::EulerBeamBCs bcs,
+                                    real_t r_penalty)
     : EulerBeam(length, EI, nodes, bcs)
     , elements(nodes - 1)
     , nodes(nodes)
@@ -43,25 +44,22 @@ public:
     , r_penalty(r_penalty)
     , max_iter(100)
     , tol(1e-6)
-    , jacobian(Eigen::MatrixXd::Zero(ndof, ndof))
-    , residual(Eigen::VectorXd::Zero(ndof))
-    , u(Eigen::VectorXd::Zero(ndof))
+    , jacobian(MatrixXd::Zero(ndof, ndof))
+    , residual(VectorXd::Zero(ndof))
+    , u(VectorXd::Zero(ndof))
   {
     apply_initial_condition(this->mesh);
   };
 
   ~EulerBeamStaticInextensibleAugKKT() {};
 
-
   /**
-   * 
+   *
    */
-  virtual void solve() override {
-    solve({0.,0.,0.});
-  }
+  virtual void solve() override { solve({ 0., 0., 0. }); }
 
   /**
-   * 
+   *
    */
   virtual void solve(std::array<real_t, 3> load) override
   {
@@ -76,10 +74,11 @@ public:
         std::cout << "Converged in " << it << " iters.\n";
         break;
       } else if (it == max_iter) {
-        ELFF_ABORT("EulerBeamStaticInextensibleAugKKT::solve() did not converge.\n");
+        ELFF_ABORT(
+          "EulerBeamStaticInextensibleAugKKT::solve() did not converge.\n");
       }
 
-      Eigen::VectorXd delta_u;
+      VectorXd delta_u;
       delta_u = jacobian.colPivHouseholderQr().solve(-residual);
 
       // 4) update
@@ -88,9 +87,6 @@ public:
 
     update_mesh();
   }
-
-
-
 
   virtual void apply_initial_condition()
   {
@@ -149,16 +145,16 @@ protected:
   size_t max_iter;
   real_t tol;
 
-  Eigen::VectorXd residual;
-  Eigen::MatrixXd jacobian;
-  Eigen::VectorXd u;
+  VectorXd residual;
+  MatrixXd jacobian;
+  VectorXd u;
 
   EulerBeamStaticInextensibleAugKKT(real_t length,
-                                 real_t EI,
-                                 real_t mu,
-                                 size_t nodes,
-                                 EulerBeam::EulerBeamBCs bcs,
-                                 real_t r_penalty)
+                                    real_t EI,
+                                    real_t mu,
+                                    size_t nodes,
+                                    EulerBeam::EulerBeamBCs bcs,
+                                    real_t r_penalty)
     : EulerBeam(length, EI, mu, nodes, bcs)
     , elements(nodes - 1)
     , nodes(nodes)
@@ -175,29 +171,32 @@ protected:
     , r_penalty(r_penalty)
     , max_iter(1000)
     , tol(1e-5)
-    , jacobian(Eigen::MatrixXd::Zero(ndof, ndof))
-    , residual(Eigen::VectorXd::Zero(ndof))
-    , u(Eigen::VectorXd::Zero(ndof))
+    , jacobian(MatrixXd::Zero(ndof, ndof))
+    , residual(VectorXd::Zero(ndof))
+    , u(VectorXd::Zero(ndof))
   {
     apply_initial_condition(this->mesh);
   };
 
   /**
-   * 
+   *
    */
-  void assemble_residual(std::array<real_t, 3> load) { residual = assemble_residual_template<real_t>(u, load); }
+  void assemble_residual(std::array<real_t, 3> load)
+  {
+    residual = assemble_residual_template<real_t>(u, load);
+  }
 
   /**
-   * 
+   *
    */
   virtual void assemble_system(std::array<real_t, 3> load)
   {
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+    using AD = AutoDiffScalar<VectorXd>;
+    using ADVec = Matrix<AD, Dynamic, 1>;
 
     ADVec x_ad(ndof);
     for (int i = 0; i < int(ndof); ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      VectorXd seed = VectorXd::Zero(ndof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
@@ -336,7 +335,7 @@ protected:
   /**
    * @brief Assemble the residual vector for the nonlinear system
    *
-   * @tparam T Scalar type (real_t or autodiff)   
+   * @tparam T Scalar type (real_t or autodiff)
    * @param u Current solution vector
    * @param load Current load on the beam
    * @return Assembled residual vector containing:
@@ -347,14 +346,15 @@ protected:
    * Uses Gauss quadrature with 3 points for numerical integration.
    */
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_template(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u, const std::array<real_t,3> load) const
+  Matrix<T, Dynamic, 1> assemble_residual_template(
+    const Matrix<T, Dynamic, 1>& u,
+    const std::array<real_t, 3> load) const
   {
     real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
     real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
 
-    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
-      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(ndof);
+    Matrix<T, Dynamic, 1> residual =
+      Matrix<T, Dynamic, 1>::Zero(ndof);
 
     for (size_t e = 0; e < elements; ++e) {
       std::vector<size_t> elem_nodes = { e, e + 1 };
@@ -457,4 +457,5 @@ protected:
   }
 };
 
+} // namespace Models
 } // namespace ELFF

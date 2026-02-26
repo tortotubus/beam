@@ -17,7 +17,10 @@
 #include <Eigen/SparseCholesky> // for SimplicialLLT
 #include <unsupported/Eigen/AutoDiff>
 
+using namespace Eigen;
+
 namespace ELFF {
+namespace Models {
 
 class EulerBeamStaticInextensibleMoMSparse : public EulerBeam
 {
@@ -40,10 +43,10 @@ public:
     , offset_y(ndof_x)
     , offset_z(ndof_x + ndof_y)
     // , offset_l(ndof_x + ndof_y + ndof_z)
-    , jacobian(Eigen::SparseMatrix<real_t>(ndof, ndof))
-    , residual(Eigen::VectorXd::Zero(ndof))
-    , lambda(Eigen::VectorXd::Zero(ndof_l))
-    , u(Eigen::VectorXd::Zero(ndof))
+    , jacobian(SparseMatrix<real_t>(ndof, ndof))
+    , residual(VectorXd::Zero(ndof))
+    , lambda(VectorXd::Zero(ndof_l))
+    , u(VectorXd::Zero(ndof))
     , r_penalty(r_penalty)
     , max_iter_inner(1000)
     , max_iter_outer(1000)
@@ -61,18 +64,18 @@ public:
   {
     real_t S_norm = 0;
 
-    // Eigen::ConjugateGradient<
-    //   Eigen::SparseMatrix<real_t>,          // or SparseMatrix<double>
-    //   Eigen::Lower | Eigen::Upper,          // tell it K is symmetric
-    //   Eigen::DiagonalPreconditioner<real_t> // Jacobi preconditioner
+    // ConjugateGradient<
+    //   SparseMatrix<real_t>,          // or SparseMatrix<double>
+    //   Lower | Upper,          // tell it K is symmetric
+    //   DiagonalPreconditioner<real_t> // Jacobi preconditioner
     // >
     //   solver;
 
-    // Eigen::SimplicialLLT<Eigen::SparseMatrix<real_t>> solver;
+    // SimplicialLLT<SparseMatrix<real_t>> solver;
 
-    Eigen::ConjugateGradient<Eigen::SparseMatrix<real_t>,
-                             Eigen::Lower | Eigen::Upper,
-                             Eigen::IncompleteCholesky<real_t>>
+    ConjugateGradient<SparseMatrix<real_t>,
+                      Lower | Upper,
+                      IncompleteCholesky<real_t>>
       solver;
 
     for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
@@ -92,12 +95,12 @@ public:
       // solver.setMaxIterations(100);
       solver.compute(jacobian);
 
-      if (solver.info() != Eigen::Success) {
+      if (solver.info() != Success) {
         ELFF_ABORT("EulerBeamStaticInextensibleMoMSparse::solve(): "
                    "Preconditioner failed.\n");
       }
 
-      Eigen::VectorXd delta_u = solver.solve(-residual);
+      VectorXd delta_u = solver.solve(-residual);
       u += delta_u;
 
       S_norm = update_lambda();
@@ -150,9 +153,9 @@ protected:
   size_t max_iter_inner, max_iter_outer;
   real_t tol_inner, tol_outer;
 
-  Eigen::VectorXd residual, lambda;
-  Eigen::SparseMatrix<real_t> jacobian;
-  Eigen::VectorXd u;
+  VectorXd residual, lambda;
+  SparseMatrix<real_t> jacobian;
+  VectorXd u;
 
   EulerBeamStaticInextensibleMoMSparse(real_t length,
                                        real_t EI,
@@ -172,10 +175,10 @@ protected:
     , offset_x(0)
     , offset_y(ndof_x)
     , offset_z(ndof_x + ndof_y)
-    , jacobian(Eigen::SparseMatrix<real_t>(ndof, ndof))
-    , residual(Eigen::VectorXd::Zero(ndof))
-    , lambda(Eigen::VectorXd::Zero(ndof_l))
-    , u(Eigen::VectorXd::Zero(ndof))
+    , jacobian(SparseMatrix<real_t>(ndof, ndof))
+    , residual(VectorXd::Zero(ndof))
+    , lambda(VectorXd::Zero(ndof_l))
+    , u(VectorXd::Zero(ndof))
     , r_penalty(r_penalty)
     , max_iter_inner(1000)
     , max_iter_outer(1000)
@@ -198,8 +201,8 @@ protected:
     real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
     real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
 
-    Eigen::Matrix<real_t, Eigen::Dynamic, 1> lambda_n =
-      Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(ndof_l);
+    Matrix<real_t, Dynamic, 1> lambda_n =
+      Matrix<real_t, Dynamic, 1>::Zero(ndof_l);
 
     for (size_t e = 0; e < elements; ++e) {
       std::vector<size_t> elem_nodes = { e, e + 1 };
@@ -294,14 +297,14 @@ protected:
 
   void assemble_system(std::array<real_t, 3> load)
   {
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
-    using Tpl = Eigen::Triplet<real_t>;
+    using AD = AutoDiffScalar<VectorXd>;
+    using ADVec = Matrix<AD, Dynamic, 1>;
+    using Tpl = Triplet<real_t>;
 
     // --- 1) Build the AutoDiff input vector x_ad ---
     ADVec x_ad(ndof);
     for (int i = 0; i < ndof; ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      VectorXd seed = VectorXd::Zero(ndof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
@@ -320,7 +323,7 @@ protected:
       residual(i) = R_ad(i).value();
 
       // Access the derivative vector for row i
-      const Eigen::VectorXd& dRi = R_ad(i).derivatives();
+      const VectorXd& dRi = R_ad(i).derivatives();
       const int nnz = static_cast<int>(dRi.size());
 
       // OPTION A: Filter zeros on the fly
@@ -447,7 +450,7 @@ protected:
         default:
           for (auto i : idx) {
             // 1) Zero out column i:
-            for (Eigen::SparseMatrix<real_t>::InnerIterator it(jacobian, i); it;
+            for (SparseMatrix<real_t>::InnerIterator it(jacobian, i); it;
                  ++it) {
               it.valueRef() = 0.0;
             }
@@ -455,8 +458,7 @@ protected:
             // 2) Zero out row i: because Eigen is column‐major, we loop over
             // each column
             for (int col = 0; col < jacobian.outerSize(); ++col) {
-              for (Eigen::SparseMatrix<real_t>::InnerIterator it(jacobian, col);
-                   it;
+              for (SparseMatrix<real_t>::InnerIterator it(jacobian, col); it;
                    ++it) {
                 if (it.row() == i) {
                   it.valueRef() = 0.0;
@@ -491,15 +493,14 @@ protected:
    * Uses Gauss quadrature with 3 points for numerical integration.
    */
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_template(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
-    const std::array<real_t, 3> load)
-  const {
+  Matrix<T, Dynamic, 1> assemble_residual_template(
+    const Matrix<T, Dynamic, 1>& u,
+    const std::array<real_t, 3> load) const
+  {
     real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
     real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
 
-    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
-      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(ndof);
+    Matrix<T, Dynamic, 1> residual = Matrix<T, Dynamic, 1>::Zero(ndof);
 
     for (size_t e = 0; e < elements; ++e) {
       std::vector<size_t> elem_nodes = { e, e + 1 };
@@ -601,3 +602,4 @@ protected:
 };
 
 } // namespace ELFF
+} // namespace Models

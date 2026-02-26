@@ -2,15 +2,19 @@
 
 #include "library/ibm/IBAdapt.h"
 #include "library/ibm/IBMeshManager.h"
+#include "library/ibm/IBKernels.h"
 
 #include "library/ibm/IBOutput.h"
 #include "library/io/vtk/vtkHDFHyperTreeGrid.h"
 
-const int maxlevel = 5;
-const int minlevel = 2;
+const int maxlevel = 6;
+const int minlevel = 5;
+const int ibmlevel = 10;
 
-scalar noisef[];
+scalar suppf[];
+scalar weightf[];
 scalar levelf[];
+scalar pidf[];
 
 coord
 circle(int n, int N, coord centre, double radius)
@@ -26,7 +30,7 @@ int
 main()
 {
   init_grid(1 << minlevel);
-  X0 = -1.85, Y0 = -4, L0 = 8;
+  X0 = -4, Y0 = -4, L0 = 8;
 
   periodic(right);
   periodic(top);
@@ -38,15 +42,15 @@ main()
   int new_id = ibmeshmanager_add_mesh();
 
   // Add a single node to the first mesh
-  const int N_circ = 100;
+  const int N_circ = 101;
   const double r_circ = 0.15;
-  const coord cen_circ = { 0 };
+  const coord cen_circ = { 0.0 };
 
   ibmeshmanager_add_nodes(new_id, N_circ);
 
   foreach_ibmesh()
   {
-    mesh->refinement_level = 10;
+    mesh->refinement_level = ibmlevel;
   }
 
   foreach_ibnode_per_ibmesh()
@@ -54,26 +58,32 @@ main()
     node->lagpos = circle(node_id, N_circ, cen_circ, r_circ);
   }
 
-  for (int i = 0; i < maxlevel - minlevel; i++) {
-    // Inject noise with noise
-    foreach_cell()
-    {
-      noisef[] = noise();
-    }
+  // Refine and coarsen around nodes 
+  adapt_wavelet_ibm(NULL, NULL, maxlevel, minlevel);
 
-    // Refine and coarsen around nodes
-    // adapt_wavelet_ibm({noisef}, (double[]){1e-1}, maxlevel, minlevel);
-    adapt_wavelet_ibm(NULL, NULL, maxlevel, minlevel);
-    printf("\n\n");
+  ibmeshmanager_init_stencil_caches();
+
+  foreach() {
+    levelf[] = point.level;
+    suppf[] = 0.;
+    weightf[] = 0.;
+    pidf[] = pid();
   }
 
-  foreach () {
-    levelf[] = point.level;
+  foreach_ibnode() {
+    peskin_cosine_kernel_dimensionless(node) {
+      suppf[] = pid();
+      weightf[] += weight;
+    }
+  }
+
+  foreach_ibnode() {
+    
   }
 
   // Output
   vtkHDFHyperTreeGrid vtkhdf = vtk_HDF_hypertreegrid_init_static(
-    { levelf, noisef }, NULL, "kernels_test.vtkhdf", true);
+    { levelf, weightf, suppf, pidf }, NULL, "kernels_test.vtkhdf", true);
   vtk_HDF_hypertreegrid_close(&vtkhdf);
 
 

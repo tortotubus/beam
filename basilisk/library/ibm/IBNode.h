@@ -7,22 +7,12 @@
  * @brief Immersed-boundary node state.
  */
 typedef struct {
-  coord lagpos; /**< Lagrangian nodal position */
-  coord force;  /**< Lagrange multiplier as a force */
-  coord lagvel; /**< Lagrangian nodal velocity */
-  coord eulvel; /**< Eulerian fluid velocity interpolated at the Lagrangian node */
-
-  // coord rhs; /**< b_i = lagvel_i - (J u*)_i (constraint mismatch) */
-  // coord res; /**< r_i (residual) */
-  // coord w;   /**< w_i (search direction) */
-  // coord Ay;  /**< y_i = (A w)_i */
-
-  // double dV; /**< Quadrature weight */
-  double weight;
-  // coord gravity; /**< Gravity */
-
-  int pid; /**< MPI rank that owns this node */
-
+  coord lagpos;  /**< Lagrangian nodal position */
+  coord force;   /**< Lagrange multiplier as a force */
+  coord lagvel;  /**< Lagrangian nodal velocity */
+  coord eulvel;  /**< Eulerian fluid velocity interpolated at the Lagrangian node */
+  double weight; /**< \f(\sum w^2\f)  where \f(w\f) is the dimensionless weight for a cell */
+  int pid;       /**< MPI rank that owns this node: -1 if unknown */
   Cache stencil; /**< Stencil cache (owns stencil.p) */
 } IBNode;
 
@@ -48,9 +38,9 @@ size_t ibnode_stencil_capacity_ (void) {
  * @param node Node to initialize.
  * @return 0 on success, -1 on allocation failure or invalid input.
  *
- * Allocates \c node->stencil.p and sets:
- * - \c stencil.n = 0
- * - \c stencil.nm = required capacity for the stencil buffer
+ * Allocates @c node->stencil.p and sets:
+ * - @c stencil.n = 0
+ * - @c stencil.nm = required capacity for the stencil buffer
  *
  * @relates IBNode
  */
@@ -106,33 +96,18 @@ int ibnode_init (IBNode* node) {
   node->force.x = 0.;
   node->lagvel.x = 0.;
   node->eulvel.x = 0.;
-  // node->rhs.x = 0.;
-  // node->res.x = 0.;
-  // node->w.x = 0.;
-  // node->Ay.x = 0.;
-  // node->gravity.x = 0.;
 
   node->lagpos.y = 0.;
   node->force.y = 0.;
   node->lagvel.y = 0.;
   node->eulvel.y = 0.;
-  // node->rhs.y = 0.;
-  // node->res.y = 0.;
-  // node->w.y = 0.;
-  // node->Ay.y = 0.;
-  // node->gravity.y = 0.;
 
   node->lagpos.z = 0.;
   node->force.z = 0.;
   node->lagvel.z = 0.;
   node->eulvel.z = 0.;
-  // node->rhs.z = 0.;
-  // node->res.z = 0.;
-  // node->w.z = 0.;
-  // node->Ay.z = 0.;
-  // node->gravity.z = 0.;
 
-  // node->weight = 1.;
+  node->weight = 0.;
   node->pid = -1;
 
   return ibnode_init_stencil (node);
@@ -230,8 +205,20 @@ void ibnode_swap (IBNode* a, IBNode* b) {
  * @brief Populates the @c stencil member of @ref IBNode with adjacent cells for
  * its stencil.
  */
-void ibnode_fill_stencil_cache (IBNode* node) {
-  foreach_neighborhood_coord(node->lagpos, PESKIN_SUPPORT_RADIUS) {
-    cache_append(&node->stencil, point, 0);
+// void ibnode_fill_stencil_cache (IBNode* node) {
+//   foreach_neighborhood_coord_level(node->lagpos, PESKIN_SUPPORT_RADIUS, ) {
+//     cache_append(&node->stencil, point, 0);
+//   }
+// }
+
+void ibnode_update_pid(IBNode *node) {
+  coord centre_coord = node->lagpos;
+  Point centre_point = locate_nonlocal(centre_coord);
+  
+  {
+    Point point = {0};
+    point = centre_point;
+    POINT_VARIABLES();
+    node->pid = cell.pid;
   }
 }

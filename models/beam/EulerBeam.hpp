@@ -1,12 +1,13 @@
 #pragma once
 
-#include "EulerBeamMesh.hpp"
 #include "config/config.hpp"
+#include "models/beam/EulerBeamMesh.hpp"
 
 #include <array>
 #include <vector>
 
 namespace ELFF {
+namespace Models {
 
 /**
  * @brief Base class for Euler-Bernoulli beam implementations.
@@ -303,4 +304,5 @@ protected:
     , boundary_conditions(bcs) {};
 };
 
-} // namespace ELFF
+} // namespace Models
+} // namespace ELFF 

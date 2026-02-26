@@ -1,14 +1,3 @@
-// Copyright (c) 2010-2025, Lawrence Livermore National Security, LLC. Produced
-// at the Lawrence Livermore National Laboratory. All Rights reserved. See files
-// LICENSE and NOTICE for details. LLNL-CODE-806117.
-//
-// This file is part of the BEAM library. For more information and source code
-// availability visit https://beam.org.
-//
-// BEAM is free software; you can redistribute it and/or modify it under the
-// terms of the BSD-3 license. We welcome feedback and contributions, see file
-// CONTRIBUTING.md for details.
-
 #pragma once
 
 // BEAM version: integer of the form: (major*100 + minor)*100 + patch.
@@ -21,19 +10,19 @@
 // #define ELFF_VERSION_TYPE ((ELFF_VERSION)%2)
 
 // BEAM version type constants.
-// #define ELFF_VERSION_TYPE_RELEASE 0
-// #define ELFF_VERSION_TYPE_DEVELOPMENT 1
+#define ELFF_VERSION_TYPE_RELEASE 0
+#define ELFF_VERSION_TYPE_DEVELOPMENT 1
 
 // Separate BEAM version numbers for major, minor, and patch.
-// #define ELFF_VERSION_MAJOR ((ELFF_VERSION)/10000)
-// #define ELFF_VERSION_MINOR (((ELFF_VERSION)/100)%100)
-// #define ELFF_VERSION_PATCH ((ELFF_VERSION)%100)
+#define ELFF_VERSION_MAJOR ((ELFF_VERSION)/10000)
+#define ELFF_VERSION_MINOR (((ELFF_VERSION)/100)%100)
+#define ELFF_VERSION_PATCH ((ELFF_VERSION)%100)
 
 // BEAM source directory.
-// #define ELFF_SOURCE_DIR "@ELFF_SOURCE_DIR@"
+#define ELFF_SOURCE_DIR "@ELFF_SOURCE_DIR@"
 
 // BEAM install directory.
-// #define ELFF_INSTALL_DIR "@ELFF_INSTALL_DIR@"
+#define ELFF_INSTALL_DIR "@ELFF_INSTALL_DIR@"
 
 // Description of the git commit used to build BEAM.
 // #cmakedefine ELFF_GIT_STRING "@ELFF_GIT_STRING@"
@@ -42,8 +31,16 @@
 // #cmakedefine ELFF_SHARED_BUILD
 
 // Build the parallel BEAM library.
-// Requires an MPI compiler, and the libraries HYPRE and METIS.
-// #cmakedefine ELFF_USE_MPI
+#cmakedefine ELFF_USE_MPI
+
+// Build the parallel BEAM library.
+#cmakedefine ELFF_USE_OPENMP
+
+// Enable functionality based on the HDF5 library (reading VTKHDF files).
+#cmakedefine ELFF_USE_HDF5
+
+// Enable functionality based on the HDF5 library (reading VTKHDF files).
+#cmakedefine ELFF_USE_EIGEN3
 
 // Use double-precision floating point type
 #cmakedefine ELFF_USE_DOUBLE
@@ -57,154 +54,6 @@
 // Throw an exception on errors.
 #cmakedefine ELFF_USE_EXCEPTIONS
 
-// Enable zlib in BEAM.
-// #cmakedefine ELFF_USE_ZLIB
-
-// Enable backtraces for elff_error through libunwind.
-// #cmakedefine ELFF_USE_LIBUNWIND
-
-// Enable BEAM features that use the METIS library (parallel BEAM).
-// #cmakedefine ELFF_USE_METIS
-
-// Enable this option if linking with METIS version 5 (parallel BEAM).
-// #cmakedefine ELFF_USE_METIS_5
-
-// Use LAPACK routines for various dense linear algebra operations.
-#cmakedefine ELFF_USE_LAPACK
-
-// Use thread-safe implementation. This comes at the cost of extra memory
-// allocation and de-allocation.
-// #cmakedefine ELFF_THREAD_SAFE
-
-// Enable the OpenMP backend.
-// #cmakedefine ELFF_USE_OPENMP
-
-// [Deprecated] Enable experimental OpenMP support. Requires ELFF_THREAD_SAFE.
-// #cmakedefine ELFF_USE_LEGACY_OPENMP
-
-// Internal BEAM option: enable group/batch allocation for some small objects.
-// #cmakedefine ELFF_USE_MEMALLOC
-
-// Which library functions to use in class StopWatch for measuring time.
-// For a list of the available options, see INSTALL.
-// If not defined, an option is selected automatically.
-// #cmakedefine ELFF_TIMER_TYPE @ELFF_TIMER_TYPE@
-
-// Enable BEAM functionality based on the SUNDIALS libraries.
-// #cmakedefine ELFF_USE_SUNDIALS
-
-// Enable BEAM functionality based on the SuiteSparse library.
-// #cmakedefine ELFF_USE_SUITESPAR// SE
-
-// Enable BEAM functionality based on the SuperLU_DIST library.
-// #cmakedefine ELFF_USE_SUPERLU
-// #cmakedefine ELFF_USE_SUPERLU5
-
-// Enable BEAM functionality based on the MUMPS library.
-// #cmakedefine ELFF_USE_MUMPS
-// #cmakedefine ELFF_MUMPS_VERSION @ELFF_MUMPS_VERSION@
-
-// Enable BEAM functionality based on the STRUMPACK library.
-// #cmakedefine ELFF_USE_STRUMPACK
-
-// Enable functionality based on the Ginkgo library.
-// #cmakedefine ELFF_USE_GINKGO
-
-// Enable BEAM functionality based on the AmgX library.
-// #cmakedefine ELFF_USE_AMGX
-
-// Enable BEAM functionality based on the MAGMA library.
-// #cmakedefine ELFF_USE_MAGMA
-
-// Enable secure socket streams based on the GNUTLS library.
-// #cmakedefine ELFF_USE_GNUTLS
-
-// Enable Sidre support.
-// #cmakedefine ELFF_USE_SIDRE
-
-// Enable the use of SIMD in the high performance templated classes.
-// #cmakedefine ELFF_USE_SIMD
-
-// Enable FMS support.
-// #cmakedefine ELFF_USE_FMS
-
-// Enable Conduit support.
-// #cmakedefine ELFF_USE_CONDUIT
-
-// Enable functionality based on the HDF5 library (reading VTKHDF files).
-// #cmakedefine ELFF_USE_HDF5
-
-// Enable functionality based on the NetCDF library (reading CUBIT files).
-// #cmakedefine ELFF_USE_NETCDF
-
-// Enable functionality based on the PETSc library.
-// #cmakedefine ELFF_USE_PETSC
-
-// Enable functionality based on the SLEPc library.
-// #cmakedefine ELFF_USE_SLEPC
-
-// Enable functionality based on the MPFR library.
-// #cmakedefine ELFF_USE_MPFR
-
-// Enable BEAM functionality based on the PUMI library.
-// #cmakedefine ELFF_USE_PUMI
-
-// Enable Moonolith-based general interpolation between finite element spaces.
-// #cmakedefine ELFF_USE_MOONOLITH
-
-// Enable BEAM functionality based on the HIOP library.
-// #cmakedefine ELFF_USE_HIOP
-
-// Enable BEAM functionality based on the GSLIB library.
-// #cmakedefine ELFF_USE_GSLIB
-
-// Build the NVIDIA GPU/CUDA-enabled version of the BEAM library.
-// Requires a CUDA compiler (nvcc).
-// #cmakedefine ELFF_USE_CUDA
-
-// Build the AMD GPU/HIP-enabled version of the BEAM library.
-// Requires a HIP compiler (hipcc).
-// #cmakedefine ELFF_USE_HIP
-
-// Enable functionality based on the RAJA library.
-// #cmakedefine ELFF_USE_RAJA
-
-// Enable functionality based on the OCCA library.
-// #cmakedefine ELFF_USE_OCCA
-
-// Enable functionality based on the libCEED library.
-// #cmakedefine ELFF_USE_CEED
-
-// Enable functionality based on the Caliper library.
-// #cmakedefine ELFF_USE_CALIPER
-
-// Enable functionality based on the Algoim library.
-// #cmakedefine ELFF_USE_ALGOIM
-
-// Enable functionality based on the Umpire library.
-// #cmakedefine ELFF_USE_UMPIRE
-
-// Enable IO functionality based on the ADIOS2 library.
-// #cmakedefine ELFF_USE_ADIOS2
-
-// Version of HYPRE used for building BEAM.
-// #cmakedefine ELFF_HYPRE_VERSION @ELFF_HYPRE_VERSION@
-
-// Macro defined when PUMI is built with support for the Simmetrix SimModSuite
-// library.
-// #cmakedefine ELFF_USE_SIMMETRIX
-
-// Enable interface to the MKL CPardiso library.
-// #cmakedefine ELFF_USE_MKL_CPARDISO
-
-// Enable interface to the MKL Pardiso library.
-// #cmakedefine ELFF_USE_MKL_PARDISO
-
-// Use forward mode for automatic differentiation.
-// #cmakedefine ELFF_USE_ADFORWARD
-
-// Enable the use of the CoDiPack library for AD.
-// #cmakedefine ELFF_USE_CODIPACK
 
 // Enable functionality based on the Google Benchmark library.
 // #cmakedefine ELFF_USE_BENCHMARK

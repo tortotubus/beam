@@ -1,1 +1,1 @@
-#include "EulerBeamStaticInextensibleAugKKT.hpp"
+#include "models/beam/EulerBeamStaticInextensibleAugKKT.hpp"

@@ -1,1 +1,1 @@
-#include "EulerBeamDynamicInextensibleADDM.hpp"
+#include "models/beam/EulerBeamDynamicInextensibleADDM.hpp"

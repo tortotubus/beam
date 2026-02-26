@@ -25,20 +25,20 @@ face vector muv[];
 double Reynolds = 100.;
 double U0 = 1.;
 
-const int maxlevel = 8;
+const int maxlevel = 9;
 const int minlevel = 4;
 
-const int N_circ = 100;
+const int N_circ = 90;
 const double R_circ = 0.15;
-const int L_circ = 10;
+const int L_circ = 11;
 const coord c_circ = { 0 };
 
 int
 main()
 {
-  L0 = 8.;
+  L0 = 16;
   origin(-1.85, -L0/2.);
-  N = 1 << 8;
+  N = 1 << 5;
   mu = muv;
 
   display_control(Reynolds, 10, 1000);
@@ -87,11 +87,12 @@ init(t = 0)
 }
 
 event logfile(i++) { 
-  fprintf(stderr, "%d %g %d %d\n", i, t, mgp.i, mgu.i); 
+  fprintf(stderr, "%d %g %d %d %d\n", i, t, mgp.i, mgu_a.i, mgu_b.i); 
 }
 
 event
 output(t += 0.25; t <= 30.)
+// output(i += 1; t <= 30.)
 {
   scalar omega[];
   vorticity(u, omega);

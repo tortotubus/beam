@@ -1,23 +1,31 @@
 #pragma once
 
-#include "EulerBeamStaticInextensibleMoMSparse.hpp"
+#include "models/beam/EulerBeamStaticInextensibleMoMSparse.hpp"
+
+using namespace Eigen;
 
 namespace ELFF {
+namespace Models {
+
 class EulerBeamDynamicInextensibleMoMSparse : public EulerBeamStaticInextensibleMoMSparse
 {
 public:
   EulerBeamDynamicInextensibleMoMSparse(real_t length,
-                                  real_t EI,
-                                  real_t mu,
-                                  size_t nodes,
-                                  EulerBeam::EulerBeamBCs bcs,
-                                  real_t r_penalty)
-    : EulerBeamStaticInextensibleMoMSparse(length, EI, mu, nodes, bcs, r_penalty)
-    , u_prev(Eigen::VectorXd::Zero(ndof))
-    , u_prev_prev(Eigen::VectorXd::Zero(ndof))
-    , v_prev(Eigen::VectorXd::Zero(ndof))
-    , a_prev(Eigen::VectorXd::Zero(ndof)) 
-    {};
+                                        real_t EI,
+                                        real_t mu,
+                                        size_t nodes,
+                                        EulerBeam::EulerBeamBCs bcs,
+                                        real_t r_penalty)
+    : EulerBeamStaticInextensibleMoMSparse(length,
+                                           EI,
+                                           mu,
+                                           nodes,
+                                           bcs,
+                                           r_penalty)
+    , u_prev(VectorXd::Zero(ndof))
+    , u_prev_prev(VectorXd::Zero(ndof))
+    , v_prev(VectorXd::Zero(ndof))
+    , a_prev(VectorXd::Zero(ndof)) {};
 
   virtual void solve(real_t dt, std::array<real_t, 3> load) override
   {
@@ -33,27 +41,28 @@ public:
                      real_t beta,
                      real_t gamma)
   {
-    
+
     if (time_iter == 0) {
-      Eigen::VectorXd R0 = EulerBeamStaticInextensibleMoMSparse ::assemble_residual_template<real_t>(u, load);
+      VectorXd R0 =
+        EulerBeamStaticInextensibleMoMSparse ::assemble_residual_template<
+          real_t>(u, load);
 
       for (size_t n = 0; n < nodes; ++n) {
         size_t ix = offset_x + 2 * n;
         size_t iy = offset_y + 2 * n;
         size_t iz = offset_z + 2 * n;
-        a_prev(ix) = (-R0(ix)) / (mu*ds);
-        a_prev(iy) = (-R0(iy)) / (mu*ds);
-        a_prev(iz) = (-R0(iz)) / (mu*ds);
+        a_prev(ix) = (-R0(ix)) / (mu * ds);
+        a_prev(iy) = (-R0(iy)) / (mu * ds);
+        a_prev(iz) = (-R0(iz)) / (mu * ds);
       }
     }
 
     u_prev = u;
 
-    Eigen::ConjugateGradient<
-      Eigen::SparseMatrix<real_t>, 
-      Eigen::Lower | Eigen::Upper,
-      Eigen::IncompleteCholesky<real_t>
-    > solver;
+    ConjugateGradient<SparseMatrix<real_t>,
+                             Lower | Upper,
+                             IncompleteCholesky<real_t>>
+      solver;
 
     real_t S_norm = 0;
 
@@ -68,14 +77,15 @@ public:
         // std::cout << "\t ||S|| = " << S_norm << std::endl;
         break;
       } else if (iter_outer == max_iter_outer - 1) {
-        // ELFF_ABORT( "EulerBeamDynamicInextensibleMoMSparse::solve() did not converge.\n");
+        // ELFF_ABORT( "EulerBeamDynamicInextensibleMoMSparse::solve() did not
+        // converge.\n");
       } else {
         // std::cout << iter_outer << ": ||r|| = " << res_norm;
         // std::cout << "\t ||S|| = " << S_norm << std::endl;
       }
 
       solver.compute(jacobian);
-      Eigen::VectorXd delta_u = solver.solve(-residual);
+      VectorXd delta_u = solver.solve(-residual);
       u += delta_u;
 
       S_norm = update_lambda();
@@ -124,9 +134,9 @@ public:
   }
 
 protected:
-  Eigen::VectorXd v_prev;
-  Eigen::VectorXd a_prev;
-  Eigen::VectorXd u_prev, u_prev_prev;
+  VectorXd v_prev;
+  VectorXd a_prev;
+  VectorXd u_prev, u_prev_prev;
   std::array<real_t, 3> load_prev;
 
   /**
@@ -136,16 +146,16 @@ protected:
                                std::array<real_t, 3> load,
                                real_t beta,
                                real_t gamma)
-  
+
   {
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
-    using Tpl = Eigen::Triplet<real_t>;
+    using AD = AutoDiffScalar<VectorXd>;
+    using ADVec = Matrix<AD, Dynamic, 1>;
+    using Tpl = Triplet<real_t>;
 
     // --- 1) Build the AutoDiff input vector x_ad ---
     ADVec x_ad(ndof);
     for (int i = 0; i < ndof; ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      VectorXd seed = VectorXd::Zero(ndof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
@@ -164,7 +174,7 @@ protected:
       residual(i) = R_ad(i).value();
 
       // Access the derivative vector for row i
-      const Eigen::VectorXd& dRi = R_ad(i).derivatives();
+      const VectorXd& dRi = R_ad(i).derivatives();
       const int nnz = static_cast<int>(dRi.size());
 
       // OPTION A: Filter zeros on the fly
@@ -194,14 +204,15 @@ protected:
   }
 
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_newmark(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
+  Matrix<T, Dynamic, 1> assemble_residual_newmark(
+    const Matrix<T, Dynamic, 1>& u,
     real_t dt,
     const std::array<real_t, 3> load,
     real_t beta,
     real_t gamma) const
   {
-    Eigen::Matrix<T, Eigen::Dynamic, 1> res = assemble_residual_template<T>(u, load);
+    Matrix<T, Dynamic, 1> res =
+      assemble_residual_template<T>(u, load);
 
     // Guards to avoid NaNs/Infs:
     if (!(dt > 0.0))
@@ -214,26 +225,28 @@ protected:
     const double inv_bt = 1.0 / (beta * dt);   // = 1/(β Δt)
     const double kappa = (1.0 - 2.0 * beta) / (2.0 * beta);
 
-    auto newmark_a = [&](Eigen::Index i) -> T {
+    auto newmark_a = [&](Index i) -> T {
       // u(i) is AD (T); u_prev/v_prev/a_prev are doubles
       return inv * (u(i) - u_prev(i)) - inv_bt * v_prev(i) - kappa * a_prev(i);
     };
 
     for (size_t n = 0; n < nodes; ++n) {
-      const Eigen::Index ix = static_cast<Eigen::Index>(offset_x + 2 * n);
-      const Eigen::Index iy = static_cast<Eigen::Index>(offset_y + 2 * n);
-      const Eigen::Index iz = static_cast<Eigen::Index>(offset_z + 2 * n);
+      const Index ix = static_cast<Index>(offset_x + 2 * n);
+      const Index iy = static_cast<Index>(offset_y + 2 * n);
+      const Index iz = static_cast<Index>(offset_z + 2 * n);
 
       const T ax = newmark_a(ix);
       const T ay = newmark_a(iy);
       const T az = newmark_a(iz);
 
-      res(ix) += (mu*ds) * ax; // mu is double; AD ⊗ scalar is fine
-      res(iy) += (mu*ds) * ay;
-      res(iz) += (mu*ds) * az;
+      res(ix) += (mu * ds) * ax; // mu is double; AD ⊗ scalar is fine
+      res(iy) += (mu * ds) * ay;
+      res(iz) += (mu * ds) * az;
     }
 
     return res;
   }
 };
-}
+
+} // namespace Models 
+} // namespace ELFF 

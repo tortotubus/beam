@@ -1,1 +1,1 @@
-#include "EulerBeamStaticInextensibleMoM.hpp"
+#include "models/beam/EulerBeamStaticInextensibleMoM.hpp"

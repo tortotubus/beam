@@ -16,7 +16,10 @@
 #include <Eigen/IterativeLinearSolvers>
 #include <unsupported/Eigen/AutoDiff>
 
+using namespace Eigen;
+
 namespace ELFF {
+namespace Models {
 
 /**
  * @brief A class to solve the static inextensible Euler–Bernoulli beam
@@ -61,24 +64,24 @@ public:
     , dimension(3)
     , dof((2 * nodes))
 
-    , A(Eigen::MatrixXd::Zero(dof, dof))
-    , f_x(Eigen::VectorXd::Zero(dof))
-    , f_y(Eigen::VectorXd::Zero(dof))
-    , f_z(Eigen::VectorXd::Zero(dof))
-    , x(Eigen::VectorXd::Zero(dof))
-    , y(Eigen::VectorXd::Zero(dof))
-    , z(Eigen::VectorXd::Zero(dof))
+    , A(MatrixXd::Zero(dof, dof))
+    , f_x(VectorXd::Zero(dof))
+    , f_y(VectorXd::Zero(dof))
+    , f_z(VectorXd::Zero(dof))
+    , x(VectorXd::Zero(dof))
+    , y(VectorXd::Zero(dof))
+    , z(VectorXd::Zero(dof))
     , llt()
 
-    , xp(Eigen::VectorXd::Zero(nodes + elements))
-    , yp(Eigen::VectorXd::Zero(nodes + elements))
-    , zp(Eigen::VectorXd::Zero(nodes + elements))
-    , lambda_x(Eigen::VectorXd::Zero(nodes + elements))
-    , lambda_y(Eigen::VectorXd::Zero(nodes + elements))
-    , lambda_z(Eigen::VectorXd::Zero(nodes + elements))
-    , p(Eigen::VectorXd::Ones(nodes + elements))
-    , q(Eigen::VectorXd::Zero(nodes + elements))
-    , r(Eigen::VectorXd::Zero(nodes + elements))
+    , xp(VectorXd::Zero(nodes + elements))
+    , yp(VectorXd::Zero(nodes + elements))
+    , zp(VectorXd::Zero(nodes + elements))
+    , lambda_x(VectorXd::Zero(nodes + elements))
+    , lambda_y(VectorXd::Zero(nodes + elements))
+    , lambda_z(VectorXd::Zero(nodes + elements))
+    , p(VectorXd::Ones(nodes + elements))
+    , q(VectorXd::Zero(nodes + elements))
+    , r(VectorXd::Zero(nodes + elements))
 
     , r_penalty(r_penalty)
     , tol_outer(1e-7)
@@ -93,16 +96,14 @@ public:
   ~EulerBeamStaticInextensibleADDM() {};
 
   /**
-   * 
+   *
    */
-  virtual void solve() {
-    solve({0.,0.,0.});
-  }
+  virtual void solve() { solve({ 0., 0., 0. }); }
 
   /**
-   * 
+   *
    */
-  virtual void solve(std::array<real_t,3> load)
+  virtual void solve(std::array<real_t, 3> load)
   {
     for (size_t iter = 0; iter < max_outer; ++iter) {
       std::cout << "Iter " << iter << std::endl;
@@ -129,10 +130,10 @@ public:
     apply_initial_condition_pq();
   }
 
-  const Eigen::VectorXd& get_lambda_x() const { return lambda_x; }
-  const Eigen::VectorXd& get_lambda_y() const { return lambda_y; }
-  const Eigen::VectorXd& get_lambda_z() const { return lambda_z; }
-  const Eigen::MatrixXd& get_A() const { return A; }
+  const VectorXd& get_lambda_x() const { return lambda_x; }
+  const VectorXd& get_lambda_y() const { return lambda_y; }
+  const VectorXd& get_lambda_z() const { return lambda_z; }
+  const MatrixXd& get_A() const { return A; }
 
 protected:
   size_t dimension;
@@ -140,15 +141,15 @@ protected:
   size_t dof;
   real_t r_penalty, alpha;
 
-  Eigen::MatrixXd A;
-  Eigen::VectorXd x, y, z;
-  Eigen::VectorXd f_x, f_y, f_z;
+  MatrixXd A;
+  VectorXd x, y, z;
+  VectorXd f_x, f_y, f_z;
 
-  Eigen::LLT<Eigen::MatrixXd> llt;
+  LLT<MatrixXd> llt;
 
-  Eigen::VectorXd lambda_x, lambda_y, lambda_z;
-  Eigen::VectorXd p, q, r;
-  Eigen::VectorXd xp, yp, zp;
+  VectorXd lambda_x, lambda_y, lambda_z;
+  VectorXd p, q, r;
+  VectorXd xp, yp, zp;
 
   size_t max_outer;
   real_t tol_outer;
@@ -164,24 +165,24 @@ protected:
     , dimension(3)
     , dof((2 * nodes))
 
-    , A(Eigen::MatrixXd::Zero(dof, dof))
-    , f_x(Eigen::VectorXd::Zero(dof))
-    , f_y(Eigen::VectorXd::Zero(dof))
-    , f_z(Eigen::VectorXd::Zero(dof))
-    , x(Eigen::VectorXd::Zero(dof))
-    , y(Eigen::VectorXd::Zero(dof))
-    , z(Eigen::VectorXd::Zero(dof))
+    , A(MatrixXd::Zero(dof, dof))
+    , f_x(VectorXd::Zero(dof))
+    , f_y(VectorXd::Zero(dof))
+    , f_z(VectorXd::Zero(dof))
+    , x(VectorXd::Zero(dof))
+    , y(VectorXd::Zero(dof))
+    , z(VectorXd::Zero(dof))
     , llt()
 
-    , xp(Eigen::VectorXd::Zero(nodes + elements))
-    , yp(Eigen::VectorXd::Zero(nodes + elements))
-    , zp(Eigen::VectorXd::Zero(nodes + elements))
-    , lambda_x(Eigen::VectorXd::Zero(nodes + elements))
-    , lambda_y(Eigen::VectorXd::Zero(nodes + elements))
-    , lambda_z(Eigen::VectorXd::Zero(nodes + elements))
-    , p(Eigen::VectorXd::Ones(nodes + elements))
-    , q(Eigen::VectorXd::Zero(nodes + elements))
-    , r(Eigen::VectorXd::Zero(nodes + elements))
+    , xp(VectorXd::Zero(nodes + elements))
+    , yp(VectorXd::Zero(nodes + elements))
+    , zp(VectorXd::Zero(nodes + elements))
+    , lambda_x(VectorXd::Zero(nodes + elements))
+    , lambda_y(VectorXd::Zero(nodes + elements))
+    , lambda_z(VectorXd::Zero(nodes + elements))
+    , p(VectorXd::Ones(nodes + elements))
+    , q(VectorXd::Zero(nodes + elements))
+    , r(VectorXd::Zero(nodes + elements))
 
     , r_penalty(r_penalty)
     , tol_outer(1e-7)
@@ -206,7 +207,6 @@ protected:
       centerline[i][2] = z(2 * i);
     }
   }
-
 
   // Set initial condition
   void apply_initial_condition_xy()
@@ -458,8 +458,8 @@ protected:
     const real_t w_q[3] = { 0.2777777778, 0.4444444444, 0.2777777778 };
 
     // Local stiffness matrices
-    Eigen::MatrixXd K4 = Eigen::MatrixXd::Zero(this->dof, this->dof);
-    Eigen::MatrixXd K2 = Eigen::MatrixXd::Zero(this->dof, this->dof);
+    MatrixXd K4 = MatrixXd::Zero(this->dof, this->dof);
+    MatrixXd K2 = MatrixXd::Zero(this->dof, this->dof);
 
     for (size_t e = 0; e < this->elements; ++e) {
       const size_t edofs[4] = {
@@ -674,7 +674,6 @@ protected:
     }
   }
 
-
   // compute the inf norm ||\mathbf{p} - \mathbf{x}'||_{\infty} and ||\mathbf{q}
   // - \mathbf{y}'||_{\infty}
   bool is_converged(bool recompute_slopes = true)
@@ -692,4 +691,6 @@ protected:
   }
 };
 
-} // namespace ELFF
+
+} // namespace Models 
+} // namespace ELFF 

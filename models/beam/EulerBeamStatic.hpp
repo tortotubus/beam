@@ -5,11 +5,15 @@
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
 
-#include "EulerBeam.hpp"
-#include "Shapes.hpp"
 #include "config/config.hpp"
 
+#include "models/beam/EulerBeam.hpp"
+#include "models/beam/Shapes.hpp"
+
+using namespace Eigen;
+
 namespace ELFF {
+namespace Models {
 
 /**
  * @brief A class to solve the static Euler–Bernoulli beam equation; this
@@ -80,11 +84,11 @@ public:
     : EulerBeam(length, EI, nodes, bcs)
     , elements(nodes - 1)
     , dof(2 * nodes)
-    , K_global(Eigen::MatrixXd::Zero(dof, dof))
-    , F_global(Eigen::VectorXd::Zero(dof))
-    , M_global(Eigen::MatrixXd::Zero(dof, dof))
-    , u(Eigen::VectorXd::Zero(dof))
-    , residual(Eigen::VectorXd::Zero(dof))
+    , K_global(MatrixXd::Zero(dof, dof))
+    , F_global(VectorXd::Zero(dof))
+    , M_global(MatrixXd::Zero(dof, dof))
+    , u(VectorXd::Zero(dof))
+    , residual(VectorXd::Zero(dof))
   {
   }
 
@@ -106,24 +110,23 @@ public:
 
   void solve()
   {
-    assemble_load({0.,0.,0.});
+    assemble_load({ 0., 0., 0. });
     assemble_stiffness();
     assemble_residual();
     apply_boundary_conditions();
 
-    Eigen::ConjugateGradient<
-      Eigen::MatrixXd,                      // or SparseMatrix<double>
-      Eigen::Lower | Eigen::Upper,          // tell it K is symmetric
-      Eigen::DiagonalPreconditioner<double> // Jacobi preconditioner
-      >
+    ConjugateGradient<MatrixXd,                      // or SparseMatrix<double>
+                      Lower | Upper,                 // tell it K is symmetric
+                      DiagonalPreconditioner<double> // Jacobi preconditioner
+                      >
       cg;
 
     cg.compute(K_global);
-    if (cg.info() != Eigen::Success)
+    if (cg.info() != Success)
       ELFF_ABORT("CG decomposition failed");
 
     u = cg.solve(F_global);
-    if (cg.info() != Eigen::Success)
+    if (cg.info() != Success)
       ELFF_ABORT("CG did not converge");
 
     std::cout << "CG iters: " << cg.iterations()
@@ -139,19 +142,18 @@ public:
     assemble_residual();
     apply_boundary_conditions();
 
-    Eigen::ConjugateGradient<
-      Eigen::MatrixXd,                      // or SparseMatrix<double>
-      Eigen::Lower | Eigen::Upper,          // tell it K is symmetric
-      Eigen::DiagonalPreconditioner<double> // Jacobi preconditioner
-      >
+    ConjugateGradient<MatrixXd,                      // or SparseMatrix<double>
+                      Lower | Upper,                 // tell it K is symmetric
+                      DiagonalPreconditioner<double> // Jacobi preconditioner
+                      >
       cg;
 
     cg.compute(K_global);
-    if (cg.info() != Eigen::Success)
+    if (cg.info() != Success)
       ELFF_ABORT("CG decomposition failed");
 
     u = cg.solve(F_global);
-    if (cg.info() != Eigen::Success)
+    if (cg.info() != Success)
       ELFF_ABORT("CG did not converge");
 
     std::cout << "CG iters: " << cg.iterations()
@@ -162,8 +164,8 @@ public:
 
 protected:
   size_t elements, dof;
-  Eigen::MatrixXd K_global, M_global;
-  Eigen::VectorXd F_global, u, residual;
+  MatrixXd K_global, M_global;
+  VectorXd F_global, u, residual;
 
   EulerBeamStatic(real_t length,
                   real_t EI,
@@ -173,11 +175,11 @@ protected:
     : EulerBeam(length, EI, nodes, bcs)
     , elements(nodes - 1)
     , dof(2 * nodes)
-    , K_global(Eigen::MatrixXd::Zero(dof, dof))
-    , F_global(Eigen::VectorXd::Zero(dof))
-    , M_global(Eigen::MatrixXd::Zero(dof, dof))
-    , u(Eigen::VectorXd::Zero(dof))
-    , residual(Eigen::VectorXd::Zero(dof))
+    , K_global(MatrixXd::Zero(dof, dof))
+    , F_global(VectorXd::Zero(dof))
+    , M_global(MatrixXd::Zero(dof, dof))
+    , u(VectorXd::Zero(dof))
+    , residual(VectorXd::Zero(dof))
   {
   }
 
@@ -198,13 +200,13 @@ protected:
                                                   real_t(0.2777777778) };
 
     // local element load (4 DOFs per beam element)
-    Eigen::Matrix<real_t, 4, 1> F_e = Eigen::Matrix<real_t, 4, 1>::Zero();
+    Matrix<real_t, 4, 1> F_e = Matrix<real_t, 4, 1>::Zero();
 
     // integrate q(x) * H(xi) over the element
     for (int i = 0; i < 3; ++i) {
       auto H_arr = CubicHermite<real_t>::values(q_points[i], h);
       // wrap it in a 4×1 Eigen vector (no copy)
-      Eigen::Map<const Eigen::Matrix<real_t, 4, 1>> H_map(H_arr.data());
+      Map<const Matrix<real_t, 4, 1>> H_map(H_arr.data());
 
       // then assemble
       F_e += q_weights[i] * (h * load[1]) * H_map;
@@ -237,12 +239,12 @@ protected:
                                                   real_t(0.2777777778) };
 
     // element stiffness (4×4) accumulator
-    Eigen::Matrix<real_t, 4, 4> K_e = Eigen::Matrix<real_t, 4, 4>::Zero();
+    Matrix<real_t, 4, 4> K_e = Matrix<real_t, 4, 4>::Zero();
 
     // integrate EI/h³ ∫ (d²H/dxi² ⊗ d²H/dxi²) dxi
     for (int q = 0; q < 3; ++q) {
       auto d2H_arr = CubicHermite<real_t>::second_derivs(q_points[q], h);
-      Eigen::Map<const Eigen::Matrix<real_t, 4, 1>> d2H_map(d2H_arr.data());
+      Map<const Matrix<real_t, 4, 1>> d2H_map(d2H_arr.data());
 
       // then accumulate
       const real_t factor = (EI)*q_weights[q] * (h);
@@ -276,12 +278,12 @@ protected:
 
     // Local element matrix (4×4 for cubic Hermite)
     for (size_t e = 0; e < elements; ++e) {
-      Eigen::Matrix<real_t, 4, 4> M_e = Eigen::Matrix<real_t, 4, 4>::Zero();
+      Matrix<real_t, 4, 4> M_e = Matrix<real_t, 4, 4>::Zero();
 
       // Quadrature
       for (int qp = 0; qp < 3; ++qp) {
         auto H_arr = CubicHermite<real_t>::values(q_points[qp], h);
-        Eigen::Map<const Eigen::Matrix<real_t, 4, 1>> H_map(H_arr.data());
+        Map<const Matrix<real_t, 4, 1>> H_map(H_arr.data());
 
         // accumulate: ∫ N_i N_j dx ≈ ∑ h * w_q * H * H^T
         M_e.noalias() += (h * q_weights[qp]) * (H_map * H_map.transpose());
@@ -379,7 +381,7 @@ protected:
       centerline[i][2] = 0.;
     }
   }
-
 };
 
-}
+} // namespace Models
+} // namespace ELFF

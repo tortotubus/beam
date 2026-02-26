@@ -1,0 +1,156 @@
+
+#include <stdlib.h>
+
+#include "c/models/ibm/IBVelocityCoupled.h"
+#include "models/ibm/IBVelocityCoupled.hpp"
+
+using namespace ELFF::Models;
+
+extern "C"
+{
+
+  /**
+   * @brief
+   */
+  int ib_velocity_coupled_get_number_of_nodes(
+    ib_velocity_coupled_t handle)
+  {
+    IBVelocityCoupled* model =
+      reinterpret_cast<IBVelocityCoupled*>(handle);
+    return static_cast<int>(model->GetNumberOfPoints());
+  }
+
+  /**
+   * @brief
+   */
+  ib_mesh_t ib_velocity_coupled_get_current(
+    ib_velocity_coupled_t handle)
+  {
+    IBVelocityCoupled* model =
+      reinterpret_cast<IBVelocityCoupled*>(handle);
+    IBMesh& mesh = model->GetCurrent();
+
+    std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
+    std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
+    int nm = mesh.GetNumberOfPoints();
+
+    ib_mesh_t mesh_str = {
+      .n = nm, .position = NULL, .velocity = NULL, .forces = NULL
+    };
+
+    mesh_str.position = (vertex_t*)calloc(nm, sizeof(vertex_t));
+    mesh_str.velocity = (vertex_t*)calloc(nm, sizeof(vertex_t));
+    mesh_str.forces = (vertex_t*)calloc(nm, sizeof(vertex_t));
+
+    for (int i = 0; i < nm; ++i) {
+      mesh_str.position[i].x = position[i].x;
+      mesh_str.position[i].y = position[i].y;
+      mesh_str.position[i].z = position[i].z;
+      mesh_str.forces[i].x = forces[i].x;
+      mesh_str.forces[i].y = forces[i].y;
+      mesh_str.forces[i].z = forces[i].z;
+    }
+
+    return mesh_str;
+  }
+
+  /**
+   * @brief
+   */
+  ib_mesh_t ib_velocity_coupled_get_midpoint(
+    ib_velocity_coupled_t handle,
+    vertex_t* velocity,
+    int nv,
+    double dt)
+  {
+    // Get the pointer from the handle
+    IBVelocityCoupled* model =
+      reinterpret_cast<IBVelocityCoupled*>(handle);
+
+    // Pack the raw C array into ELFF::Array<ELFF::fem:Vertex>
+    // Array<Vertex> velocity_arr(nv);
+    std::vector<IBMesh::IBVertex> velocity_arr(nv);
+
+    for (int i = 0; i < nv; ++i) {
+      velocity_arr[i].x = velocity[i].x;
+      velocity_arr[i].y = velocity[i].y;
+      velocity_arr[i].z = velocity[i].z;
+    }
+
+    // Call GetMidpoint() and receive a reference to the proteced member
+    IBMesh& mesh = model->GetMidpoint(velocity_arr, dt);
+    std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
+    std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
+    int nn = mesh.GetNumberOfPoints();
+
+    // Pack the IBMesh into our C struct
+    ib_mesh_t mesh_str = {
+      .n = nn, .position = NULL, .velocity = NULL, .forces = NULL
+    };
+
+    mesh_str.position = (vertex_t*)calloc(nn, sizeof(vertex_t));
+    mesh_str.velocity = (vertex_t*)calloc(nn, sizeof(vertex_t));
+    mesh_str.forces = (vertex_t*)calloc(nn, sizeof(vertex_t));
+
+    for (int i = 0; i < nn; ++i) {
+      mesh_str.position[i].x = position[i].x;
+      mesh_str.position[i].y = position[i].y;
+      mesh_str.position[i].z = position[i].z;
+      mesh_str.forces[i].x = forces[i].x;
+      mesh_str.forces[i].y = forces[i].y;
+      mesh_str.forces[i].z = forces[i].z;
+    }
+
+    return mesh_str;
+  }
+
+  /**
+   * @brief
+   */
+  ib_mesh_t ib_velocity_coupled_get_next(
+    ib_velocity_coupled_t handle,
+    vertex_t* velocity,
+    int nv,
+    double dt)
+  {
+    // Get the pointer from the handle
+    IBVelocityCoupled* model =
+      reinterpret_cast<IBVelocityCoupled*>(handle);
+
+    // Pack the raw C array
+    std::vector<IBMesh::IBVertex> velocity_arr(nv);
+
+    for (int i = 0; i < nv; ++i) {
+      velocity_arr[i].x = velocity[i].x;
+      velocity_arr[i].y = velocity[i].y;
+      velocity_arr[i].z = velocity[i].z;
+    }
+
+    // Call GetMidpoint() and receive a reference to the proteced member
+    IBMesh& mesh = model->GetNext(velocity_arr, dt);
+    std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
+    std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
+    int nm = mesh.GetNumberOfPoints();
+
+    // Pack the IBMesh into our C struct
+    ib_mesh_t mesh_str = {
+      .n = nm, .position = NULL, .velocity = NULL, .forces = NULL
+    };
+
+    mesh_str.position = (vertex_t*)calloc(nm, sizeof(vertex_t));
+    mesh_str.velocity = (vertex_t*)calloc(nm, sizeof(vertex_t));
+    mesh_str.forces = (vertex_t*)calloc(nm, sizeof(vertex_t));
+
+    for (int i = 0; i < nm; ++i) {
+      mesh_str.position[i].x = position[i].x;
+      mesh_str.position[i].y = position[i].y;
+      mesh_str.position[i].z = position[i].z;
+      mesh_str.forces[i].x = forces[i].x;
+      mesh_str.forces[i].y = forces[i].y;
+      mesh_str.forces[i].z = forces[i].z;
+    }
+
+    return mesh_str;
+  }
+
+} // extern "C"

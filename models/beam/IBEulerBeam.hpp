@@ -1,15 +1,17 @@
 #pragma once
 
-#include "../ibm/immersedboundary.hpp"
-#include "EulerBeamDynamicInextensibleMoM.hpp"
+#include "models/ibm/IBForceCoupled.hpp"
+#include "models/beam/EulerBeamDynamicInextensibleMoM.hpp"
+
 
 namespace ELFF {
+namespace Models {
 
 /**
  * @brief The immersed boundary force-coupling class for @ref EulerBeam
  */
 class IBEulerBeam
-  : public IBForceCoupledStructureModel
+  : public IBForceCoupled
   , public EulerBeamDynamicInextensibleMoM
 
 {
@@ -20,8 +22,8 @@ private:
     EulerBeamDynamicInextensibleMoM::update_mesh();
 
     // Get refernce to IB Mesh
-    auto& ib_points = IBForceCoupledStructureModel::mesh_next.GetPoints();
-    auto& ib_velocity = IBForceCoupledStructureModel::mesh_next.GetVelocity();
+    auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
+    auto& ib_velocity = IBForceCoupled::mesh_next.GetVelocity();
 
     // Get reference to E-B Mesh
     auto& eb_points = EulerBeam::mesh.get_centerline();
@@ -45,8 +47,8 @@ private:
     EulerBeamDynamicInextensibleMoM::update_mesh();
 
     // Get refernce to IB Mesh
-    auto& ib_points = IBForceCoupledStructureModel::mesh.GetPoints();
-    auto& ib_velocity = IBForceCoupledStructureModel::mesh.GetVelocity();
+    auto& ib_points = IBForceCoupled::mesh.GetPoints();
+    auto& ib_velocity = IBForceCoupled::mesh.GetVelocity();
 
     // Get reference to E-B Mesh
     auto& eb_points = EulerBeam::mesh.get_centerline();
@@ -72,18 +74,19 @@ public:
               EulerBeamBCs bcs,
               real_t r_penalty)
     : EulerBeamDynamicInextensibleMoM(length, EI, mu, nodes, bcs, r_penalty)
-    , IBForceCoupledStructureModel(nodes)
+    , IBForceCoupled(nodes)
   {
     EBMeshToIBMeshCurrent();
     EBMeshToIBMeshNext();
   };
 
-  void apply_initial_condition(EulerBeamMesh &mesh) override {
+  void apply_initial_condition(EulerBeamMesh& mesh) override
+  {
     EulerBeamDynamicInextensibleMoM::apply_initial_condition(mesh);
     EBMeshToIBMeshCurrent();
   }
 
-  void ComputeNextPoints(std::vector<IBStructureMesh::IBVertex> force,
+  void ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
                          real_t dt) override
   {
     ELFF_ASSERT(force.size() == nodes, "Force array must match node count.\n");
@@ -97,8 +100,8 @@ public:
 
     EulerBeamDynamicInextensibleMoM::solve(dt, load);
 
-    auto& ib_points = IBForceCoupledStructureModel::mesh_next.GetPoints();
-    auto& ib_velocity = IBForceCoupledStructureModel::mesh_next.GetVelocity();
+    auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
+    auto& ib_velocity = IBForceCoupled::mesh_next.GetVelocity();
 
     auto& eb_points = EulerBeamDynamicInextensibleMoM::mesh.get_centerline();
     auto& eb_velocity =
@@ -116,4 +119,5 @@ public:
   }
 };
 
-}
+} // namespace Models 
+} // namespace ELFF 

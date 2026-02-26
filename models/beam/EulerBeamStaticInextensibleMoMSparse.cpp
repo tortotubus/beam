@@ -1,1 +1,1 @@
-#include "EulerBeamStaticInextensibleMoMSparse.hpp"
+#include "models/beam/EulerBeamStaticInextensibleMoMSparse.hpp"

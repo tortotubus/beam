@@ -92,7 +92,7 @@ for which inertia is negligible compared to viscosity. */
 bool stokes = false;
 
 face vector mu_alpha[], mu_beta[];
-mgstats mgp = {0}, mgpf = {0}, mgu = {0};
+mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
 
 double alpha_split = 0.5;
 double beta_split = 0.5;
@@ -154,10 +154,11 @@ event defaults (i = 0)
 
   /**
   We reset the multigrid parameters to their default values. */
-  
+
   mgp = (mgstats){0};
   mgpf = (mgstats){0};
-  mgu = (mgstats){0};  
+  mgu_a = (mgstats){0};  
+  mgu_b = (mgstats){0};  
   
   CFL = 0.8;
 
@@ -251,9 +252,11 @@ event init (i = 0)
 #if TREE
   adapt_wavelet_ibm(NULL,NULL,10);
 #endif
-  foreach_ibnode() {
-    ibnode_fill_stencil_cache(node);
-  }
+  // foreach_ibnode() {
+  //   ibnode_fill_stencil_cache(node);
+  // }
+
+  ibmeshmanager_init_stencil_caches();
 }
 
 
@@ -401,7 +404,7 @@ event alpha_viscous_term (i++,last)
 {
   if (constant(mu.x) != 0. && alpha_split != 0.) {
     correction (dt);
-    mgu = viscosity (u, mu_alpha, rho, dt, mgu.nrelax);
+    mgu_a = viscosity (u, mu_alpha, rho, dt, mgu_a.nrelax);
     correction (-dt);
   }
 }
@@ -434,7 +437,7 @@ event interface_compute_constraint(i++,last) {
   // Compute forcing
   foreach_ibnode () {
     foreach_dimension () {
-      node->force.x = (node->lagvel.x - node->eulvel.x);
+      node->force.x = (node->lagvel.x - node->eulvel.x) / dt;
     }
   }
 }
@@ -443,11 +446,12 @@ event interface_compute_constraint(i++,last) {
 
 event interface_spread_force(i++,last) {
   foreach_ibnode () {
-    double dV = 1.0;
     peskin_cosine_kernel (node) {
       foreach_dimension() {
+        // double dV = dv();
+        // fprintf(stdout, "dv %f\n", dv());
         // ibmf.x[] += (dt / (rho[] * node->weight)) * weight * node->force.x;;
-        ibmf.x[] += (weight / node->weight) * node->force.x;
+        ibmf.x[] += (weight * dt * node->force.x ) / (node->weight);
       }
     }
   }
@@ -463,7 +467,7 @@ event beta_viscous_term (i++,last)
 {
   if (constant(mu.x) != 0. && beta_split != 0.) {
     correction (dt);
-    mgu = viscosity (u, mu_beta, rho, dt, mgu.nrelax);
+    mgu_b = viscosity (u, mu_beta, rho, dt, mgu_b.nrelax);
     correction (-dt);
   }
 }
@@ -575,11 +579,12 @@ event adapt (i++,last) {
 #endif
   event ("properties");
 
-  foreach_ibnode() {
-    ibnode_free_stencil(node);
-    ibnode_init_stencil(node);
-    ibnode_fill_stencil_cache(node);
-  }
+  // foreach_ibnode() {
+  //   ibnode_free_stencil(node);
+  //   ibnode_init_stencil(node);
+  //   ibnode_fill_stencil_cache(node);
+  // }
+  ibmeshmanager_update_stencil_caches();
 }
 #endif
 

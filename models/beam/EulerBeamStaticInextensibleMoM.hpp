@@ -18,7 +18,10 @@
 #include <Eigen/SparseCholesky> // for SimplicialLLT
 #include <unsupported/Eigen/AutoDiff>
 
-namespace ELFF {
+using namespace Eigen;
+
+namespace ELFF { 
+namespace Models { 
 
 class EulerBeamStaticInextensibleMoM : public EulerBeam
 {
@@ -46,10 +49,10 @@ public:
     , max_iter_inner(1000)
     , tol_outer(1e-5)
     , tol_inner(1e-5)
-    , jacobian(Eigen::MatrixXd::Zero(ndof, ndof))
-    , residual(Eigen::VectorXd::Zero(ndof))
-    , u(Eigen::VectorXd::Zero(ndof))
-    , lambda(Eigen::VectorXd::Zero(ndof_l))
+    , jacobian(MatrixXd::Zero(ndof, ndof))
+    , residual(VectorXd::Zero(ndof))
+    , u(VectorXd::Zero(ndof))
+    , lambda(VectorXd::Zero(ndof_l))
   {
     apply_initial_condition(this->mesh);
   };
@@ -69,11 +72,11 @@ public:
   {
     real_t S_norm = 0;
 
-    Eigen::LDLT<Eigen::MatrixXd> solver;
-    // Eigen::LLT<Eigen::MatrixXd> solver;
-    // Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver;
-    // Eigen::BiCGSTAB<Eigen::MatrixXd> solver;
-    // Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Upper | Eigen::Lower> solver; solver.setTolerance(tol_inner);
+    LDLT<MatrixXd> solver;
+    // LLT<MatrixXd> solver;
+    // ColPivHouseholderQR<MatrixXd> solver;
+    // BiCGSTAB<MatrixXd> solver;
+    // ConjugateGradient<MatrixXd, Upper | Lower> solver; solver.setTolerance(tol_inner);
 
     for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
       assemble_system(load);
@@ -95,12 +98,12 @@ public:
 
       solver.compute(jacobian);
 
-      if (solver.info() != Eigen::Success) {
+      if (solver.info() != Success) {
         ELFF_ABORT("EulerBeamStaticInextensibleMoM::solve(): "
                    "Preconditioner failed.\n");
       }
 
-      Eigen::VectorXd delta_u = solver.solve(-residual);
+      VectorXd delta_u = solver.solve(-residual);
       u += delta_u;
 
       S_norm = update_lambda();
@@ -113,11 +116,11 @@ public:
   {
     real_t S_norm = 0;
 
-    Eigen::LDLT<Eigen::MatrixXd> solver;
-    //Eigen::LLT<Eigen::MatrixXd> solver;
-    // Eigen::ColPivHouseholderQR<Eigen::MatrixXd> solver;
-    // Eigen::BiCGSTAB<Eigen::MatrixXd> solver;
-    //Eigen::ConjugateGradient<Eigen::MatrixXd, Eigen::Upper | Eigen::Lower> solver; solver.setTolerance(tol_inner);
+    LDLT<MatrixXd> solver;
+    //LLT<MatrixXd> solver;
+    // ColPivHouseholderQR<MatrixXd> solver;
+    // BiCGSTAB<MatrixXd> solver;
+    //ConjugateGradient<MatrixXd, Upper | Lower> solver; solver.setTolerance(tol_inner);
 
     for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
       assemble_system(load);
@@ -139,12 +142,12 @@ public:
 
       solver.compute(jacobian);
 
-      if (solver.info() != Eigen::Success) {
+      if (solver.info() != Success) {
         ELFF_ABORT("EulerBeamStaticInextensibleMoM::solve(): "
                    "Preconditioner failed.\n");
       }
 
-      Eigen::VectorXd delta_u = solver.solve(-residual);
+      VectorXd delta_u = solver.solve(-residual);
       u += delta_u;
 
       S_norm = update_lambda();
@@ -201,9 +204,9 @@ protected:
   size_t max_iter_outer, max_iter_inner;
   real_t tol_outer, tol_inner;
 
-  Eigen::VectorXd residual;
-  Eigen::MatrixXd jacobian, mass;
-  Eigen::VectorXd u, lambda;
+  VectorXd residual;
+  MatrixXd jacobian, mass;
+  VectorXd u, lambda;
 
   EulerBeamStaticInextensibleMoM(real_t length,
                                  real_t EI,
@@ -228,10 +231,10 @@ protected:
     , max_iter_inner(1000)
     , tol_outer(1e-5)
     , tol_inner(1e-5)
-    , jacobian(Eigen::MatrixXd::Zero(ndof, ndof))
-    , residual(Eigen::VectorXd::Zero(ndof))
-    , u(Eigen::VectorXd::Zero(ndof))
-    , lambda(Eigen::VectorXd::Zero(ndof_l))
+    , jacobian(MatrixXd::Zero(ndof, ndof))
+    , residual(VectorXd::Zero(ndof))
+    , u(VectorXd::Zero(ndof))
+    , lambda(VectorXd::Zero(ndof_l))
   {
     apply_initial_condition(this->mesh);
   };
@@ -248,8 +251,8 @@ protected:
     static constexpr std::array<real_t, 3> w_q = { 0.2777777778,
                                                    0.4444444444,
                                                    0.2777777778 };
-    Eigen::Matrix<real_t, Eigen::Dynamic, 1> lambda_n =
-      Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(ndof_l);
+    Matrix<real_t, Dynamic, 1> lambda_n =
+      Matrix<real_t, Dynamic, 1>::Zero(ndof_l);
 
     // #pragma omp for
     for (size_t e = 0; e < elements; ++e) {
@@ -344,12 +347,12 @@ protected:
    */
   virtual void assemble_system(std::array<real_t, 3> load)
   {
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+    using AD = AutoDiffScalar<VectorXd>;
+    using ADVec = Matrix<AD, Dynamic, 1>;
 
     ADVec x_ad(ndof);
     for (int i = 0; i < int(ndof); ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      VectorXd seed = VectorXd::Zero(ndof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
@@ -369,12 +372,12 @@ protected:
    */
   virtual void assemble_system(std::vector<std::array<real_t, 3>> load)
   {
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+    using AD = AutoDiffScalar<VectorXd>;
+    using ADVec = Matrix<AD, Dynamic, 1>;
 
     ADVec x_ad(ndof);
     for (int i = 0; i < int(ndof); ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      VectorXd seed = VectorXd::Zero(ndof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
@@ -409,7 +412,7 @@ protected:
    * - simple_bc: Position constraints only
    * - clamped_bc: Position and slope constraints
    */
-  void apply_boundary_conditions(Eigen::MatrixXd &A, Eigen::VectorXd &R)
+  void apply_boundary_conditions(MatrixXd &A, VectorXd &R)
   {
     for (size_t bi = 0; bi < 2; ++bi) {
       EulerBeamBCEnd bcend = boundary_conditions.end[bi];
@@ -536,8 +539,8 @@ protected:
    * Uses Gauss quadrature with 3 points for numerical integration.
    */
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_template(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
+  Matrix<T, Dynamic, 1> assemble_residual_template(
+    const Matrix<T, Dynamic, 1>& u,
     const std::array<real_t, 3> load) const
   {
     static constexpr real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
@@ -545,8 +548,8 @@ protected:
                                       0.4444444444,
                                       0.2777777778 };
 
-    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
-      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(ndof);
+    Matrix<T, Dynamic, 1> residual =
+      Matrix<T, Dynamic, 1>::Zero(ndof);
 
     real_t Hq[3][4], dHq[3][4], ddHq[3][4], Mq[3][2];
     for (int qi = 0; qi < 3; ++qi) {
@@ -655,8 +658,8 @@ protected:
    * Uses Gauss quadrature with 3 points for numerical integration.
    */
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_template(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
+  Matrix<T, Dynamic, 1> assemble_residual_template(
+    const Matrix<T, Dynamic, 1>& u,
     const std::vector<std::array<real_t, 3>> load) const
   {
 
@@ -667,8 +670,8 @@ protected:
                                       0.4444444444,
                                       0.2777777778 };
 
-    Eigen::Matrix<T, Eigen::Dynamic, 1> residual =
-      Eigen::Matrix<T, Eigen::Dynamic, 1>::Zero(ndof);
+    Matrix<T, Dynamic, 1> residual =
+      Matrix<T, Dynamic, 1>::Zero(ndof);
 
     real_t Hq[3][4], dHq[3][4], ddHq[3][4], Mq[3][2];
     for (int qi = 0; qi < 3; ++qi) {
@@ -780,4 +783,5 @@ protected:
   }
 };
 
-} // namespace ELFF
+} // namespace Models  
+} // namespace ELFF 

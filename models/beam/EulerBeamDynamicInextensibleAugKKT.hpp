@@ -2,7 +2,10 @@
 
 #include "EulerBeamStaticInextensibleAugKKT.hpp"
 
+using namespace Eigen;
+
 namespace ELFF {
+namespace Models {
 class EulerBeamDynamicInextensibleAugKKT
   : public EulerBeamStaticInextensibleAugKKT
 {
@@ -14,10 +17,10 @@ public:
                                      EulerBeam::EulerBeamBCs bcs,
                                      real_t r_penalty)
     : EulerBeamStaticInextensibleAugKKT(length, EI, mu, nodes, bcs, r_penalty)
-    , u_prev(Eigen::VectorXd::Zero(ndof))
-    , u_prev_prev(Eigen::VectorXd::Zero(ndof))
-    , v_prev(Eigen::VectorXd::Zero(ndof))
-    , a_prev(Eigen::VectorXd::Zero(ndof)) {};
+    , u_prev(VectorXd::Zero(ndof))
+    , u_prev_prev(VectorXd::Zero(ndof))
+    , v_prev(VectorXd::Zero(ndof))
+    , a_prev(VectorXd::Zero(ndof)) {};
 
   virtual void solve(real_t dt, std::array<real_t, 3> load) override
   {
@@ -35,7 +38,7 @@ public:
                      real_t gamma)
   {
     if (time_iter == 0) {
-      Eigen::VectorXd R0 =
+      VectorXd R0 =
         EulerBeamStaticInextensibleAugKKT ::assemble_residual_template<real_t>(
           u, load);
 
@@ -43,9 +46,9 @@ public:
         size_t ix = offset_x + 2 * n;
         size_t iy = offset_y + 2 * n;
         size_t iz = offset_z + 2 * n;
-        a_prev(ix) = (-R0(ix)) / (mu*ds);
-        a_prev(iy) = (-R0(iy)) / (mu*ds);
-        a_prev(iz) = (-R0(iz)) / (mu*ds);
+        a_prev(ix) = (-R0(ix)) / (mu * ds);
+        a_prev(iy) = (-R0(iy)) / (mu * ds);
+        a_prev(iz) = (-R0(iz)) / (mu * ds);
       }
     }
 
@@ -61,7 +64,7 @@ public:
       if (res_norm < tol) {
         break;
       }
-      Eigen::VectorXd delta_u = jacobian.colPivHouseholderQr().solve(-residual);
+      VectorXd delta_u = jacobian.colPivHouseholderQr().solve(-residual);
       u += delta_u;
     }
 
@@ -107,7 +110,7 @@ public:
       if (res_norm < tol) {
         break;
       }
-      Eigen::VectorXd delta_u = jacobian.colPivHouseholderQr().solve(-residual);
+      VectorXd delta_u = jacobian.colPivHouseholderQr().solve(-residual);
       u += delta_u;
     }
 
@@ -134,9 +137,9 @@ public:
   }
 
 protected:
-  Eigen::VectorXd v_prev;
-  Eigen::VectorXd a_prev;
-  Eigen::VectorXd u_prev, u_prev_prev;
+  VectorXd v_prev;
+  VectorXd a_prev;
+  VectorXd u_prev, u_prev_prev;
   std::array<real_t, 3> load_prev;
 
   /**
@@ -147,13 +150,13 @@ protected:
                                real_t beta,
                                real_t gamma)
   {
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+    using AD = AutoDiffScalar<VectorXd>;
+    using ADVec = Matrix<AD, Dynamic, 1>;
 
     ADVec x_ad(ndof);
 
     for (int i = 0; i < int(ndof); ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      VectorXd seed = VectorXd::Zero(ndof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
@@ -169,14 +172,14 @@ protected:
   }
 
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_newmark(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
+  Matrix<T, Dynamic, 1> assemble_residual_newmark(
+    const Matrix<T, Dynamic, 1>& u,
     real_t dt,
     std::array<real_t, 3> load,
     real_t beta,
     real_t /*gamma*/) const
   {
-    Eigen::Matrix<T, Eigen::Dynamic, 1> res =
+    Matrix<T, Dynamic, 1> res =
       EulerBeamStaticInextensibleAugKKT::assemble_residual_template<T>(u, load);
 
     // Guards to avoid NaNs/Infs:
@@ -190,15 +193,15 @@ protected:
     const double inv_bt = 1.0 / (beta * dt);   // = 1/(β Δt)
     const double kappa = (1.0 - 2.0 * beta) / (2.0 * beta);
 
-    auto newmark_a = [&](Eigen::Index i) -> T {
+    auto newmark_a = [&](Index i) -> T {
       // u(i) is AD (T); u_prev/v_prev/a_prev are doubles
       return inv * (u(i) - u_prev(i)) - inv_bt * v_prev(i) - kappa * a_prev(i);
     };
 
     for (size_t n = 1; n < nodes; ++n) {
-      const Eigen::Index ix = static_cast<Eigen::Index>(offset_x + 2 * n);
-      const Eigen::Index iy = static_cast<Eigen::Index>(offset_y + 2 * n);
-      const Eigen::Index iz = static_cast<Eigen::Index>(offset_z + 2 * n);
+      const Index ix = static_cast<Index>(offset_x + 2 * n);
+      const Index iy = static_cast<Index>(offset_y + 2 * n);
+      const Index iz = static_cast<Index>(offset_z + 2 * n);
 
       const T ax = newmark_a(ix);
       const T ay = newmark_a(iy);
@@ -218,13 +221,13 @@ protected:
   void assemble_system_be(real_t dt, std::array<real_t, 3> load)
   {
     std::cout << "Dynamic::assemble_be_system()\n";
-    using AD = Eigen::AutoDiffScalar<Eigen::VectorXd>;
-    using ADVec = Eigen::Matrix<AD, Eigen::Dynamic, 1>;
+    using AD = AutoDiffScalar<VectorXd>;
+    using ADVec = Matrix<AD, Dynamic, 1>;
 
     ADVec x_ad(ndof);
 
     for (int i = 0; i < int(ndof); ++i) {
-      Eigen::VectorXd seed = Eigen::VectorXd::Zero(ndof);
+      VectorXd seed = VectorXd::Zero(ndof);
       seed(i) = 1.0;
       x_ad(i) = AD(u(i), seed);
     }
@@ -254,27 +257,31 @@ protected:
    * Uses Gauss quadrature with 3 points for numerical integration.
    */
   template<typename T>
-  Eigen::Matrix<T, Eigen::Dynamic, 1> assemble_residual_be(
-    const Eigen::Matrix<T, Eigen::Dynamic, 1>& u,
-    real_t dt,
-    std::array<real_t, 3> load) const
+  Matrix<T, Dynamic, 1> assemble_residual_be(const Matrix<T, Dynamic, 1>& u,
+                                             real_t dt,
+                                             std::array<real_t, 3> load) const
   {
-    Eigen::Matrix<T, Eigen::Dynamic, 1> res =
+    Matrix<T, Dynamic, 1> res =
       EulerBeamStaticInextensibleAugKKT::assemble_residual_template<T>(u, load);
 
     for (size_t n = 0; n < nodes; n++) {
       res(offset_x + 2 * n) +=
-        ((mu*ds) / (dt * dt)) * (u[offset_x + 2 * n] - 2 * u_prev[offset_x + 2 * n] +
-                            u_prev_prev[offset_x + 2 * n]);
+        ((mu * ds) / (dt * dt)) *
+        (u[offset_x + 2 * n] - 2 * u_prev[offset_x + 2 * n] +
+         u_prev_prev[offset_x + 2 * n]);
       res(offset_y + 2 * n) +=
-        ((mu*ds) / (dt * dt)) * (u[offset_y + 2 * n] - 2 * u_prev[offset_y + 2 * n] +
-                            u_prev_prev[offset_y + 2 * n]);
+        ((mu * ds) / (dt * dt)) *
+        (u[offset_y + 2 * n] - 2 * u_prev[offset_y + 2 * n] +
+         u_prev_prev[offset_y + 2 * n]);
       res(offset_z + 2 * n) +=
-        ((mu*ds) / (dt * dt)) * (u[offset_z + 2 * n] - 2 * u_prev[offset_z + 2 * n] +
-                            u_prev_prev[offset_z + 2 * n]);
+        ((mu * ds) / (dt * dt)) *
+        (u[offset_z + 2 * n] - 2 * u_prev[offset_z + 2 * n] +
+         u_prev_prev[offset_z + 2 * n]);
     }
 
     return res;
   }
 };
-}
+
+} // namespace Models
+} // namespace ELFF

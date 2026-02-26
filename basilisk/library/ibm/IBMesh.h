@@ -36,7 +36,7 @@ void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool);
  * @details Initializes the internal IBNodeList with zero initial capacity.
  * After this, nodes may be manually added by the user, or set a model on the
  * mesh.
- * 
+ *
  * @memberof IBMesh
  */
 void ibmesh_init (IBMesh* mesh) {
@@ -52,7 +52,7 @@ void ibmesh_init (IBMesh* mesh) {
  *
  * @details Deallocates the internal IBNodeList. Does not free the IBNode
  * objects themselves (they should be freed through the IBMempool).
- * 
+ *
  * @memberof IBMesh
  */
 void ibmesh_free (IBMesh* mesh) {
@@ -75,7 +75,7 @@ void ibmesh_free (IBMesh* mesh) {
  * allocation or initialization fails for a particular node, that node is
  * skipped and the operation continues. Reserves capacity in the node list
  * before adding.
- * 
+ *
  * @memberof IBMesh
  */
 void ibmesh_add_nodes (IBMesh* mesh, IBMempool* pool, int count) {
@@ -106,7 +106,7 @@ void ibmesh_add_nodes (IBMesh* mesh, IBMempool* pool, int count) {
  * @details Removes all nodes from the mesh using swap-with-last removal and
  * returns each node's memory to the pool. The mesh will be empty after this
  * call.
- * 
+ *
  * @memberof IBMesh
  */
 void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool) {
@@ -119,3 +119,13 @@ void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool) {
       ibmempool_free_node_ptr (pool, node);
   }
 }
+
+// void ibmesh_fill_stencil_cache (IBMesh* mesh) {
+//   for (size_t node_id = 0; node_id < mesh->nodes.size; node_id++) {
+//     IBNode* node = mesh->nodes.ptrs[node_id];
+//     foreach_neighborhood_coord_level (
+//       node->lagpos, PESKIN_SUPPORT_RADIUS, mesh->refinement_level) {
+//       cache_append (&node->stencil, point, 0);
+//     }
+//   }
+// }

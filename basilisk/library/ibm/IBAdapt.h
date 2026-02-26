@@ -1,11 +1,11 @@
 #include "library/ibm/IBMeshManager.h"
 #include "library/ibm/IBMacros.h"
 
-astats adapt_wavelet_ibm (scalar* slist,    // list of scalars
-                                double* max,      // tolerance for each scalar
-                                int maxlevel,     // maximum level of refinement
-                                int minlevel = 1, // minimum level of refinement
-                                scalar* list = all) // list of fields to update
+astats adapt_wavelet_ibm (scalar* slist,      // list of scalars
+                          double* max,        // tolerance for each scalar
+                          int maxlevel,       // maximum level of refinement
+                          int minlevel = 1,   // minimum level of refinement
+                          scalar* list = all) // list of fields to update
 {
   scalar* ilist = list;
 
@@ -45,39 +45,68 @@ astats adapt_wavelet_ibm (scalar* slist,    // list of scalars
   // ibm refinement
   for (int it = 0; it < 20; it++) {
     int nrf = 0, nrc = 0;
-    foreach_ibnode_per_ibmesh() {
+    foreach_ibnode_per_ibmesh () {
       coord c = node->lagpos;
-      coord_periodic_boundary(c);
+      coord_periodic_boundary (c);
       int L = mesh->refinement_level;
-      int l = locate(c.x,c.y,c.z).level;
+      int l = locate_nonlocal (c.x, c.y, c.z).level;
       if (l >= 0) {
-        int d = L-l;
-        int r = (PESKIN_SUPPORT_RADIUS + 1 + (1 << d) - 1) >> d;
-        if (d > 0) { // Too coarse
-          foreach_neighborhood_coord(c,r) {
-            refine_cell(point, listc, refined, &tree->refined);
+        int d = L - l;
+        // int r = (PESKIN_SUPPORT_RADIUS + (1 << d) - 1) >> d;
+        int r;
+        if (d > 0) {                                       // Too coarse
+          r = (PESKIN_SUPPORT_RADIUS + (1 << d) - 1) >> d; // ceil((R+1)/2^d)
+          foreach_neighborhood_coord_nonlocal (c, r) {
+            if (is_local (cell)) {
+            refine_cell (point, listc, refined, &tree->refined);
             st.nf++;
             nrf++;
+            }
           }
         } else if (d < 0) { // Too fine
-          foreach_neighborhood_coord(c,r) {
-            coarsen_cell(point, listc);
+          r = (PESKIN_SUPPORT_RADIUS) << (-d);
+          foreach_neighborhood_coord_nonlocal (c, r) {
+            if (is_local (cell)) {
+            coarsen_cell (point, listc);
             st.nc++;
             nrc++;
+            }
           }
         } else { // Juuust right
-          foreach_neighborhood_coord(c,r) {
-            cell.flags |= just_fine_ibm;
+          r = PESKIN_SUPPORT_RADIUS;
+          foreach_neighborhood_coord_nonlocal (c, r) {
+            if (is_local (cell)) {
+            if ((aparent (0).flags & leaf)) {
+              point.level--;
+#if dimension == 1
+              point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
+#elif dimension == 2
+              point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
+              point.j = ((point.j - GHOSTS) >> 1) + GHOSTS;
+#else
+              point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
+              point.j = ((point.j - GHOSTS) >> 1) + GHOSTS;
+              point.k = ((point.k - GHOSTS) >> 1) + GHOSTS;
+#endif
+              refine_cell (point, listc, refined, &tree->refined);
+              st.nf++;
+              nrf++;
+            } else {
+              cell.flags |= just_fine_ibm;
+            }
+            }
           }
         }
       }
+      // mpi_boundary_refine (listc);  
     }
-    mpi_boundary_refine(listc);
-    // mpi_all_reduce(nf, MPI_INT, MPI_SUM);
+    mpi_boundary_refine (listc);
+    mpi_boundary_update(listc);
+    mpi_all_reduce(nrf, MPI_INT, MPI_SUM);
+    mpi_all_reduce(nrc, MPI_INT, MPI_SUM);
     if (!nrf && !nrc)
       break; // reached target everywhere
   }
-
 
   // recurse
   foreach_cell () {
@@ -88,8 +117,7 @@ astats adapt_wavelet_ibm (scalar* slist,    // list of scalars
           cell.flags &= ~too_coarse;
           refine_cell (point, listc, refined, &tree->refined);
           st.nf++;
-        } 
-        else if ((cell.flags & too_coarse) && (cell.flags & just_fine_ibm)) {
+        } else if ((cell.flags & too_coarse) && (cell.flags & just_fine_ibm)) {
           cell.flags &= ~too_coarse;
         }
         continue;
@@ -98,7 +126,7 @@ astats adapt_wavelet_ibm (scalar* slist,    // list of scalars
 
         // Tagging for refinement
 
-        if (cell.flags & refined) {          
+        if (cell.flags & refined) {
           // cell has already been refined, skip its children
           cell.flags &= ~too_coarse;
           continue;
@@ -122,16 +150,16 @@ astats adapt_wavelet_ibm (scalar* slist,    // list of scalars
           for (scalar s in slist) {
             double emax = max[i++], sc[1 << dimension];
             int c = 0;
-            foreach_child () { 
-              sc[c++] = s[]; 
+            foreach_child () {
+              sc[c++] = s[];
             }
             s.prolongation (point, s);
             c = 0;
 
-
             foreach_child () {
               double e = fabs (sc[c] - s[]);
-              if (e > emax && (level < maxlevel || cell.flags & just_fine_ibm)) {
+              if (e > emax &&
+                  (level < maxlevel || cell.flags & just_fine_ibm)) {
                 cell.flags &= ~too_fine;
                 cell.flags |= too_coarse;
               } else if ((e <= emax / 1.5 || level > maxlevel) &&
@@ -176,13 +204,14 @@ astats adapt_wavelet_ibm (scalar* slist,    // list of scalars
             // cell was refined previously, unset the flag
             cell.flags &= ~(refined | too_fine);
           else if ((cell.flags & too_fine)) {
-            bool just_fine_ibm_children = false; 
-            foreach_child() {
-              if (cell.flags & just_fine_ibm) { 
+            bool just_fine_ibm_children = false;
+            foreach_child () {
+              if (cell.flags & just_fine_ibm) {
                 just_fine_ibm_children = true;
               }
             }
-            if (is_local (cell) && !just_fine_ibm_children && coarsen_cell (point, listc))
+            if (is_local (cell) && !just_fine_ibm_children &&
+                coarsen_cell (point, listc))
               st.nc++;
             cell.flags &= ~too_fine; // do not coarsen parent
           }

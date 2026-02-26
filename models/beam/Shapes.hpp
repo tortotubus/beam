@@ -1,27 +1,14 @@
-/**
- * @file Shapes.hpp
- * @brief Finite element shape function library.
- *
- * This module provides compile-time templates for various shape functions
- * commonly used in finite element methods (FEM), including:
- * - Cubic-Hermite (C1-continuous) polynomials for Euler-Bernoulli beams
- * - Linear hat functions for standard FEM
- * - Quadratic Lagrange polynomials for higher-order elements
- *
- * All shape functions are defined on the reference element \f( [0,1] \f)
- * with template parameter \f( T \f) allowing automatic differentiation
- * or other numeric types.
- */
-
 #pragma once
+
 #include <array>
 #include <cstddef>
 
 namespace ELFF {
+namespace Models { 
 
 /**
  * @class CubicHermite
- * 
+ *
  * @brief Cubic-Hermite shape functions on the reference element \f( [0,1] \f).
  *
  * Cubic-Hermite polynomials are C1-continuous piecewise cubics defined by
@@ -29,7 +16,8 @@ namespace ELFF {
  * These are the standard basis functions for Euler-Bernoulli beam theory.
  *
  * For an element with length \f( h \f), the interpolation is:
- * \f[ u(x) = H_1(\xi) u_1 + H_2(\xi, h) \theta_1 + H_3(\xi) u_2 + H_4(\xi, h) \theta_2 \f]
+ * \f[ u(x) = H_1(\xi) u_1 + H_2(\xi, h) \theta_1 + H_3(\xi) u_2 + H_4(\xi, h)
+ * \theta_2 \f]
  *
  * where \f( \xi = x/h \in [0,1] \f) is the normalized reference coordinate.
  *
@@ -215,7 +203,8 @@ struct CubicHermite
    *
    * @param xi Reference coordinate in \f( [0,1] \f)
    * @param h  Element length
-   * @return Array of \f( [\frac{dH_1}{dx}, \frac{dH_2}{dx}, \frac{dH_3}{dx}, \frac{dH_4}{dx}] \f)
+   * @return Array of \f( [\frac{dH_1}{dx}, \frac{dH_2}{dx}, \frac{dH_3}{dx},
+   * \frac{dH_4}{dx}] \f)
    */
   static std::array<T, 4> derivs(T xi, T h) noexcept
   {
@@ -231,7 +220,8 @@ struct CubicHermite
    *
    * @param xi Reference coordinate in \f( [0,1] \f)
    * @param h  Element length
-   * @return Array of \f( [\frac{d^2H_1}{dx^2}, \frac{d^2H_2}{dx^2}, \frac{d^2H_3}{dx^2}, \frac{d^2H_4}{dx^2}] \f)
+   * @return Array of \f( [\frac{d^2H_1}{dx^2}, \frac{d^2H_2}{dx^2},
+   * \frac{d^2H_3}{dx^2}, \frac{d^2H_4}{dx^2}] \f)
    */
   static std::array<T, 4> second_derivs(T xi, T h) noexcept
   {
@@ -290,14 +280,16 @@ struct LinearShape
 
 /**
  * @class QuadraticLagrange
- * @brief Quadratic Lagrange shape functions on the reference element \f( [0,1] \f).
+ * @brief Quadratic Lagrange shape functions on the reference element \f( [0,1]
+ * \f).
  *
  * Quadratic Lagrange polynomials are second-order elements with three nodes:
  * two at the ends and one at the midpoint. They provide higher accuracy
  * than linear elements for smooth solutions.
  *
  * Interpolation: \f[ u(x) = L_0(\xi) u_1 + L_m(\xi) u_m + L_1(\xi) u_2 \f]
- * where \f( \xi = x/h \in [0,1] \f), and the midpoint node is at \f( \xi = 0.5 \f).
+ * where \f( \xi = x/h \in [0,1] \f), and the midpoint node is at \f( \xi = 0.5
+ * \f).
  *
  * @tparam T Numeric type (e.g., double, float)
  */
@@ -307,7 +299,8 @@ struct QuadraticLagrange
   /**
    * @brief Shape function \f( L_0(\xi) \f) for node at \f( \xi = 0 \f).
    *
-   * Returns 1 at \f( \xi = 0 \f), 0 at \f( \xi = 0.5 \f), and 0 at \f( \xi = 1 \f).
+   * Returns 1 at \f( \xi = 0 \f), 0 at \f( \xi = 0.5 \f), and 0 at \f( \xi = 1
+   * \f).
    *
    * @param xi Reference coordinate in \f( [0,1] \f)
    * @return Value of \f( L_0 = 2(\xi - 0.5)(\xi - 1) \f)
@@ -315,10 +308,11 @@ struct QuadraticLagrange
   static T L0(T xi) noexcept { return 2.0 * (xi - 0.5) * (xi - 1.0); }
 
   /**
-   * @brief Shape function \f( L_m(\xi) \f) for midpoint node at \f( \xi = 0.5 \f).
+   * @brief Shape function \f( L_m(\xi) \f) for midpoint node at \f( \xi = 0.5
+   * \f).
    *
-   * Returns 0 at \f( \xi = 0 \f), 1 at \f( \xi = 0.5 \f), and 0 at \f( \xi = 1 \f).
-   * This is the only shape function that is non-zero at the midpoint.
+   * Returns 0 at \f( \xi = 0 \f), 1 at \f( \xi = 0.5 \f), and 0 at \f( \xi = 1
+   * \f). This is the only shape function that is non-zero at the midpoint.
    *
    * @param xi Reference coordinate in \f( [0,1] \f)
    * @return Value of \f( L_m = 4\xi(1 - \xi) \f)
@@ -328,7 +322,8 @@ struct QuadraticLagrange
   /**
    * @brief Shape function \f( L_1(\xi) \f) for node at \f( \xi = 1 \f).
    *
-   * Returns 0 at \f( \xi = 0 \f), 0 at \f( \xi = 0.5 \f), and 1 at \f( \xi = 1 \f).
+   * Returns 0 at \f( \xi = 0 \f), 0 at \f( \xi = 0.5 \f), and 1 at \f( \xi = 1
+   * \f).
    *
    * @param xi Reference coordinate in \f( [0,1] \f)
    * @return Value of \f( L_1 = 2\xi(\xi - 0.5) \f)
@@ -347,4 +342,5 @@ struct QuadraticLagrange
   }
 };
 
-}
+} // namespace Models 
+} // namespace ELFF

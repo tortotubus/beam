@@ -1,3 +1,62 @@
+Point locate_nonlocal (double xp = 0., double yp = 0., double zp = 0.) {
+  for (int l = depth (); l >= 0; l--) {
+    Point point = {0};
+    point.level = l;
+    int n = 1 << point.level;
+    point.i = (xp - X0) / L0 * n + GHOSTS;
+#if dimension >= 2
+    point.j = (yp - Y0) / L0 * n + GHOSTS;
+#endif
+#if dimension >= 3
+    point.k = (zp - Z0) / L0 * n + GHOSTS;
+#endif
+    if (point.i >= 0 && point.i < n + 2 * GHOSTS
+#if dimension >= 2
+        && point.j >= 0 && point.j < n + 2 * GHOSTS
+#endif
+#if dimension >= 3
+        && point.k >= 0 && point.k < n + 2 * GHOSTS
+#endif
+    ) {
+      if (allocated (0) && is_leaf (cell))
+        return point;
+    } else
+      break;
+  }
+  Point point = {0};
+  point.level = -1;
+  return point;
+}
+
+Point locate_level (double xp = 0., double yp = 0., double zp = 0., int level) {
+  {
+    Point point = {0};
+    point.level = level;
+    int n = 1 << point.level;
+    point.i = (xp - X0) / L0 * n + GHOSTS;
+#if dimension >= 2
+    point.j = (yp - Y0) / L0 * n + GHOSTS;
+#endif
+#if dimension >= 3
+    point.k = (zp - Z0) / L0 * n + GHOSTS;
+#endif
+    if (level >= 0 && level <= depth()
+        && point.i >= 0 && point.i < n + 2 * GHOSTS
+#if dimension >= 2
+        && point.j >= 0 && point.j < n + 2 * GHOSTS
+#endif
+#if dimension >= 3
+        && point.k >= 0 && point.k < n + 2 * GHOSTS
+#endif
+    ) {
+      return point;
+    }
+  }
+  Point point = {0};
+  point.level = -1;
+  return point;
+}
+
 /**
  * @def coord_periodic_boundary
  *
@@ -65,14 +124,19 @@ macro2 foreach_neighborhood_coord (coord c, size_t radius) {
 
   // Set point level to the located Point
   Point point = {0};
-  point.level = centre_point.level;
+  Point iterpoint = {0};
 
-  if (point.level != -1) {
+  point.level = centre_point.level;
+  iterpoint.level = centre_point.level;
+
+  if (iterpoint.level != -1) {
 #if dimension == 1
-    for (point.i = -radius + centre.i; point.i <= radius + centre.i;
-         point.i++) {
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      point = iterpoint;
       if (!allocated (0, 0, 0)) {
-        fprintf (stderr, "warning: Neighborhood not fully resolved\n");
+        continue;
       } else {
         // point_periodic_boundary (point);
         int ig = point.i;
@@ -82,44 +146,132 @@ macro2 foreach_neighborhood_coord (coord c, size_t radius) {
       }
     }
 #elif dimension == 2
-    for (point.i = -radius + centre_point.i; point.i <= radius + centre_point.i;
-         point.i++) {
-      for (point.j = -radius + centre_point.j;
-           point.j <= radius + centre_point.j;
-           point.j++) {
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      for (iterpoint.j = -radius + centre_point.j;
+           iterpoint.j <= radius + centre_point.j;
+           iterpoint.j++) {
+        point.i = iterpoint.i;
+        point.j = iterpoint.j;
         if (!allocated (0, 0, 0)) {
-          fprintf (stderr,
-                   "warning: Neighborhood not fully resolved: %d %d\n",
-                   point.i,
-                   point.j);
+          continue;
         } else {
           // point_periodic_boundary (point);
           int ig = point.i;
           int jg = point.j;
           // clang-format off
-        {...}
+          {...}
           // clang-format on
         }
       }
     }
 #else // dimension == 3
-    for (point.i = -radius + centre_point.i; point.i <= radius + centre_point.i;
-         point.i++) {
-      for (point.j = -radius + centre_point.j;
-           point.j <= radius + centre_point.j;
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      for (iterpoint.j = -radius + centre_point.j;
+           iterpoint.j <= radius + centre_point.j;
            point.j++) {
-        for (point.k = -radius + centre_point.k;
-             point.k <= radius + centre_point.k;
-             point.k++) {
+        for (iterpoint.k = -radius + centre_point.k;
+             iterpoint.k <= radius + centre_point.k;
+             iterpoint.k++) {
+          point = iterpoint;
           if (!allocated (0, 0, 0)) {
-            fprintf (stderr, "warning: Neighborhood not fully resolved\n");
+            continue;
           } else {
             // point_periodic_boundary (point);
             int ig = point.i;
             int jg = point.j;
             int kg = point.k;
             // clang-format off
+            {...}
+            // clang-format on
+          }
+        }
+      }
+    }
+#endif
+  }
+}
+
+macro2 foreach_neighborhood_coord_nonlocal (coord c, size_t radius) {
+
+  // Wrap the coordinate according to any periodic boundary conditions
+  coord centre_coord = c;
+  coord_periodic_boundary (centre_coord);
+  // printf ("Periodic coord: %f %f %f\n",
+  //         centre_coord.x,
+  //         centre_coord.y,
+  //         centre_coord.z);
+  Point centre_point =
+    locate_nonlocal (centre_coord.x, centre_coord.y, centre_coord.z);
+  // printf ("Periodic point: %d %d\n", centre_point.i, centre_point.j);
+
+  // Set point level to the located Point
+  Point point = {0};
+  Point iterpoint = {0};
+
+  point.level = centre_point.level;
+  iterpoint.level = centre_point.level;
+
+  if (iterpoint.level != -1) {
+#if dimension == 1
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      point = iterpoint;
+      if (!allocated (0, 0, 0) || !is_local (cell)) {
+        continue;
+      } else {
+        // point_periodic_boundary (point);
+        int ig = point.i;
+        // clang-format off
+      {...}
+        // clang-format on
+      }
+    }
+#elif dimension == 2
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      for (iterpoint.j = -radius + centre_point.j;
+           iterpoint.j <= radius + centre_point.j;
+           iterpoint.j++) {
+        point.i = iterpoint.i;
+        point.j = iterpoint.j;
+        if (!allocated (0, 0, 0) || !is_local (cell)) {
+          continue;
+        } else {
+          // point_periodic_boundary (point);
+          int ig = point.i;
+          int jg = point.j;
+          // clang-format off
           {...}
+          // clang-format on
+        }
+      }
+    }
+#else // dimension == 3
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      for (iterpoint.j = -radius + centre_point.j;
+           iterpoint.j <= radius + centre_point.j;
+           point.j++) {
+        for (iterpoint.k = -radius + centre_point.k;
+             iterpoint.k <= radius + centre_point.k;
+             iterpoint.k++) {
+          point = iterpoint;
+          if (!allocated (0, 0, 0)) {
+            continue;
+          } else {
+            // point_periodic_boundary (point);
+            int ig = point.i;
+            int jg = point.j;
+            int kg = point.k;
+            // clang-format off
+            {...}
             // clang-format on
           }
         }
@@ -138,72 +290,78 @@ macro2 foreach_neighborhood_coord (coord c, size_t radius) {
  */
 macro2 foreach_neighborhood_coord_level (coord c, size_t radius, int lvl) {
 
-  // Wrap the coordinate according to any periodic boundary conditions
   coord centre_coord = c;
   coord_periodic_boundary (centre_coord);
-  // printf ("Periodic coord: %f %f %f\n",
-  //         centre_coord.x,
-  //         centre_coord.y,
-  //         centre_coord.z);
+  Point centre_point =
+    locate_level (centre_coord.x, centre_coord.y, centre_coord.z, lvl);
 
-  int n = 1 << lvl;
-  Point centre_point = {
-    .level = lvl,
-#if dimension == 1
-    .i = (centre_coord.x - X0) / L0 * n + GHOSTS,
-#elif dimension == 2
-    .i = (centre_coord.x - X0) / L0 * n + GHOSTS,
-    .j = (centre_coord.y - Y0) / L0 * n + GHOSTS
-#else
-    .i = (centre_coord.x - X0) / L0 * n + GHOSTS,
-    .j = (centre_coord.y - Y0) / L0 * n + GHOSTS,
-    .k = (centre_coord.z - Z0) / L0 * n + GHOSTS
-#endif
-  };
-
-  // printf ("Periodic point: %d %d\n", centre_point.i, centre_point.j);
-
-  // Set point level to the located Point
   Point point = {0};
-  point.level = centre_point.level;
+  Point iterpoint = {0};
 
+  point.level = centre_point.level;
+  iterpoint.level = centre_point.level;
+
+  if (iterpoint.level != -1) {
 #if dimension == 1
-  for (point.i = -radius + centre.i; point.i <= radius + centre.i; point.i++) {
-    int ig = point.i;
-    // clang-format off
-    {...}
-    // clang-format on
-  }
-#elif dimension == 2
-  for (point.i = -radius + centre_point.i; point.i <= radius + centre_point.i;
-       point.i++) {
-    for (point.j = -radius + centre_point.j; point.j <= radius + centre_point.j;
-         point.j++) {
-      // point_periodic_boundary (point);
-      int ig = point.i;
-      int jg = point.j;
-      // clang-format off
-      {...}
-      // clang-format on
-    }
-  }
-#else // dimension == 3
-  for (point.i = -radius + centre_point.i; point.i <= radius + centre_point.i;
-       point.i++) {
-    for (point.j = -radius + centre_point.j; point.j <= radius + centre_point.j;
-         point.j++) {
-      for (point.k = -radius + centre_point.k;
-           point.k <= radius + centre_point.k;
-           point.k++) {
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      point.i = iterpoint.i;
+      point.level = centre_point.level;
+      if (allocated (0) && is_local (cell) && is_leaf (cell)) {
         // point_periodic_boundary (point);
         int ig = point.i;
-        int jg = point.j;
-        int kg = point.k;
         // clang-format off
         {...}
         // clang-format on
       }
     }
-  }
+#elif dimension == 2
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      for (iterpoint.j = -radius + centre_point.j;
+           iterpoint.j <= radius + centre_point.j;
+           iterpoint.j++) {
+        point.i = iterpoint.i;
+        point.j = iterpoint.j;
+        point.level = centre_point.level;
+        if (allocated (0) && is_local (cell) && is_leaf (cell)) {
+          // point_periodic_boundary (point);
+          int ig = point.i;
+          int jg = point.j;
+          // clang-format off
+          {...}
+          // clang-format on
+        }
+      }
+    }
+#else // dimension == 3
+    for (iterpoint.i = -radius + centre_point.i;
+         iterpoint.i <= radius + centre_point.i;
+         iterpoint.i++) {
+      for (iterpoint.j = -radius + centre_point.j;
+           iterpoint.j <= radius + centre_point.j;
+           point.j++) {
+        for (iterpoint.k = -radius + centre_point.k;
+             iterpoint.k <= radius + centre_point.k;
+             iterpoint.k++) {
+          point.i = iterpoint.i;
+          point.j = iterpoint.j;
+          point.k = iterpoint.k;
+          point.level = centre_point.level;
+          if (allocated (0) && is_local (cell) && is_leaf (cell)) {
+            // point_periodic_boundary (point);
+            int ig = point.i;
+            int jg = point.j;
+            int kg = point.k;
+            // clang-format off
+            {...}
+            // clang-format on
+          }
+        }
+      }
+    }
 #endif
+  }
 }
