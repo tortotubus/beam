@@ -1,11 +1,13 @@
 #include "grid/quadtree.h"
 
 #include "library/ibm/IBAdapt.h"
-#include "library/ibm/IBMeshManager.h"
 #include "library/ibm/IBKernels.h"
+#include "library/ibm/IBMeshManager.h"
 
-#include "library/ibm/IBOutput.h"
-#include "library/io/vtk/vtkHDFHyperTreeGrid.h"
+// #include "library/ibm/IBOutput.h"
+// #include "library/io/vtk/vtkHDFHyperTreeGrid.h"
+
+#include "library/io/output-vtk.h"
 
 const int maxlevel = 6;
 const int minlevel = 5;
@@ -15,6 +17,8 @@ scalar suppf[];
 scalar weightf[];
 scalar levelf[];
 scalar pidf[];
+scalar gradientf[];
+scalar testf[];
 
 coord
 circle(int n, int N, coord centre, double radius)
@@ -58,36 +62,69 @@ main()
     node->lagpos = circle(node_id, N_circ, cen_circ, r_circ);
   }
 
-  // Refine and coarsen around nodes 
+  // Refine and coarsen around nodes
   adapt_wavelet_ibm(NULL, NULL, maxlevel, minlevel);
 
   ibmeshmanager_init_stencil_caches();
 
-  foreach() {
+  foreach () {
     levelf[] = point.level;
     suppf[] = 0.;
     weightf[] = 0.;
     pidf[] = pid();
+    gradientf[] = 0.;
+    foreach_dimension()
+    {
+      gradientf[] += x;
+    }
   }
 
-  foreach_ibnode() {
-    peskin_cosine_kernel_dimensionless(node) {
+  // foreach_ibnode() {
+  //   peskin_cosine_kernel_gather_dimensionless(node) {
+  //     node->force.x = 
+  //   }
+  // }
+
+  foreach_ibnode()
+  {
+    peskin_cosine_kernel_spread_dimensionless(node)
+    {
       suppf[] = pid();
       weightf[] += weight;
     }
   }
 
-  foreach_ibnode() {
-    
+  // Output
+  // vtkHDFHyperTreeGrid vtkhdf = vtk_HDF_hypertreegrid_init_static(
+  //   { levelf, weightf, suppf, gradientf, pidf }, NULL, "kernels_test.vtkhdf",
+  //   true);
+  // vtk_HDF_hypertreegrid_close(&vtkhdf);
+
+  // foreach_ibnode() {
+  //   foreach_point(0.,0.) {
+  //     foreach_neighbor(2) {
+  //       testf[] = 2.;
+  //     }
+  //   }
+  // }
+  {
+  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  Point point = locate(0., 0., 0.);
+  if (point.level >= 0)
+    foreach_neighbor (2)
+      testf[] = 2.;
+    testf[] = 1.;
   }
 
-  // Output
-  vtkHDFHyperTreeGrid vtkhdf = vtk_HDF_hypertreegrid_init_static(
-    { levelf, weightf, suppf, pidf }, NULL, "kernels_test.vtkhdf", true);
-  vtk_HDF_hypertreegrid_close(&vtkhdf);
+  {
+    int i = 0;
+    double t = 0;
+    output_hdf_htg();
+    output_hdf_pd();
+  }
+  // output_ibnodes("kernels_test.vtk", 0, 0);
 
 
-  output_ibnodes("kernels_test.vtk", 0, 0);
 
   ibmeshmanager_free();
 

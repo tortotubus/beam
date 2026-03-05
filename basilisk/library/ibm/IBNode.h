@@ -13,7 +13,9 @@ typedef struct {
   coord eulvel;  /**< Eulerian fluid velocity interpolated at the Lagrangian node */
   double weight; /**< \f(\sum w^2\f)  where \f(w\f) is the dimensionless weight for a cell */
   int pid;       /**< MPI rank that owns this node: -1 if unknown */
+#if TREE
   Cache stencil; /**< Stencil cache (owns stencil.p) */
+#endif
 } IBNode;
 
 /**
@@ -32,6 +34,7 @@ size_t ibnode_stencil_capacity_ (void) {
 #endif
 }
 
+#if TREE
 /**
  * @brief Initialize the stencil member of an @ref IBNode.
  *
@@ -63,7 +66,9 @@ int ibnode_init_stencil (IBNode* node) {
   }
   return 0;
 }
+#endif 
 
+#if TREE
 /**
  * @brief Free the \c stencil member of an \c IBNode.
  *
@@ -79,6 +84,7 @@ void ibnode_free_stencil (IBNode* node) {
   node->stencil.n = 0;
   node->stencil.nm = 0;
 }
+#endif
 
 /**
  * @brief Initialize an \c IBNode.
@@ -110,7 +116,11 @@ int ibnode_init (IBNode* node) {
   node->weight = 0.;
   node->pid = -1;
 
+#if TREE
   return ibnode_init_stencil (node);
+#else 
+  return 0;
+#endif
 }
 
 /**
@@ -123,7 +133,9 @@ int ibnode_init (IBNode* node) {
 void ibnode_free (IBNode* node) {
   if (!node)
     return;
+#if TREE
   ibnode_free_stencil (node);
+#endif 
 }
 
 /**
@@ -145,6 +157,8 @@ int ibnode_copy (IBNode* dst, const IBNode* src) {
 
   /* Copy trivially-copiable fields first (but DO NOT keep src->stencil.p) */
   *dst = *src;
+
+#if TREE
   dst->stencil.p = NULL;
 
   if (src->stencil.nm > 0) {
@@ -159,6 +173,7 @@ int ibnode_copy (IBNode* dst, const IBNode* src) {
             src->stencil.p,
             (size_t) src->stencil.nm * sizeof (Index));
   }
+#endif 
 
   return 0;
 }
@@ -180,9 +195,11 @@ void ibnode_move (IBNode* dst, IBNode* src) {
 
   *dst = *src;
 
+#if TREE
   src->stencil.p = NULL;
   src->stencil.n = 0;
   src->stencil.nm = 0;
+#endif 
 }
 
 /**
@@ -212,12 +229,25 @@ void ibnode_swap (IBNode* a, IBNode* b) {
 // }
 
 void ibnode_update_pid(IBNode *node) {
+
   coord centre_coord = node->lagpos;
-  Point centre_point = locate_nonlocal(centre_coord);
+
+  Point centre_point = locate_nonlocal(centre_coord.x,centre_coord.y,centre_coord.z);
   
+  if (centre_point.level > 0)
   {
     Point point = {0};
     point = centre_point;
+#if dimension == 1
+    int ig = point.i;
+#elif dimension == 2
+    int ig = point.i;
+    int jg = point.j;
+#else 
+    int ig = point.i;
+    int jg = point.j;
+    int kg = point.j;
+#endif
     POINT_VARIABLES();
     node->pid = cell.pid;
   }

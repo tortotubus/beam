@@ -425,7 +425,7 @@ event interface_compute_constraint(i++,last) {
       node->eulvel.x = 0;
     }
     double sumw2 = 0.;
-    peskin_cosine_kernel_dimensionless (node) {
+    peskin_cosine_kernel_gather_dimensionless (node) {
       sumw2 += weight*weight;
       foreach_dimension () {
         node->eulvel.x += weight * u.x[];
@@ -446,7 +446,7 @@ event interface_compute_constraint(i++,last) {
 
 event interface_spread_force(i++,last) {
   foreach_ibnode () {
-    peskin_cosine_kernel (node) {
+    peskin_cosine_kernel_spread_dimensionless (node) {
       foreach_dimension() {
         // double dV = dv();
         // fprintf(stdout, "dv %f\n", dv());

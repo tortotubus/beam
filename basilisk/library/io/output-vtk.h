@@ -1,4 +1,3 @@
-#include "library/io/vtk/vtkHDFHyperTreeGrid.h"
 
 #include "library/io/output-common.h"
 
@@ -6,21 +5,14 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "library/io/vtk/vtkHDFHyperTreeGrid.h"
+
 trace void output_hdf_htg_series (scalar* scalar_list,
                                   vector* vector_list,
                                   const char* basename,
                                   int iter,
                                   double time,
                                   bool overwrite) {
-// #if _MPI
-//   for (scalar s in scalar_list)
-//     s.dirty = true;
-//   for (scalar s in vector_list)
-//     s.dirty = true;
-//   boundary (scalar_list);
-//   boundary (vector_list);
-// #endif
-
   char pname[128];
   sprintf (pname, "%s-vtkhdf-series", basename);
   create_path (pname);
@@ -40,64 +32,6 @@ trace void output_hdf_htg_series (scalar* scalar_list,
     fname_timeseries, "%s.vtkhdf.series", basename); // assuming fname exists
 
   if (!timeseries_len) {
-#ifdef OUTPUT_DUMP_H
-    if (checkpoint_state.restored) {
-      // Read the existing timeseries file into our buffer
-      FILE* fp = fopen (fname_timeseries, "r");
-
-      char line[8192];
-      size_t line_no = 1;
-      bool found = false;
-
-      while (fgets (line, sizeof line, fp) && !found) {
-        if (line_no <= 3) {
-          timeseries_len += sprintf (timeseries + timeseries_len, "%s", line);
-        } else {
-          int iter_val;
-          // matches: \t\t{ "iter" : 268, ...
-          if (sscanf (line, "\t\t{ \"iter\" : %d,", &iter_val) == 1) {
-            if (iter_val >= checkpoint_state.restored_i) {
-              found = true;
-            }
-          }
-          // keep the line
-          timeseries_len += sprintf (timeseries + timeseries_len, "%s", line);
-        }
-        line_no++;
-      }
-      timeseries_len +=
-        sprintf (timeseries + timeseries_len - strlen(",\n"), "%s", timeseries_tail);
-      fclose (fp);
-
-      // We currently have ... { last entry }",\n\t]}"
-      // The tail begins at timeseries_len - timeseries_delta
-      int start = timeseries_len - timeseries_delta;
-
-      // Overwrite the tail with: ",\n\t\t{ new entry }<tail again>"
-      // This keeps all old content up to 'start', and appends a new entry
-      timeseries_len =
-        start +
-        sprintf (timeseries + start,
-                 "\t\t{ \"iter\" : %d, \"time\" : %f, \"name\" : \"%s\" }%s",
-                 iter,
-                 time,
-                 fname,
-                 timeseries_tail);
-
-    } else {
-      // First time: write full JSON with one entry and the tail
-      timeseries_len +=
-        sprintf (timeseries,
-                 "{\n"
-                 "\t\"file-series-version\" : \"1.0\",\n"
-                 "\t\"files\" : [\n"
-                 "\t\t{ \"iter\" : %d, \"time\" : %f, \"name\" : \"%s\" }%s",
-                 iter,
-                 time,
-                 fname,
-                 timeseries_tail);
-    }
-#else
     timeseries_len +=
       sprintf (timeseries,
                "{\n"
@@ -108,7 +42,6 @@ trace void output_hdf_htg_series (scalar* scalar_list,
                time,
                fname,
                timeseries_tail);
-#endif
   } else {
     // We currently have ... { last entry }",\n\t]}"
     // The tail begins at timeseries_len - timeseries_delta
@@ -165,48 +98,168 @@ trace void output_hdf_htg (scalar* scalar_list = all,
 
   output_hdf_htg_series (
     scalar_list, vector_list, basename_buff, iter, time, overwrite);
+}
 
-  // if (use_ab && use_transient) {
+#include "library/io/vtk/vtkHDFPolyData.h"
+#include "library/io/vtk/vtkPolyData.h"
+#include "library/ibm/IBMeshManager.h"
 
-  //   static bool first_iter = true;
+trace void output_hdf_pd_series (const char* basename,
+                                 int iter,
+                                 double time,
+                                 bool overwrite) {
 
-  //   char fname_a[64];
-  //   sprintf (fname_a, "%s_a.vtkhdf", basename_buff);
-  //   char fname_b[64];
-  //   sprintf (fname_b, "%s_b.vtkhdf", basename_buff);
+  char fname[128];
+  sprintf (fname, "%s-vtkhdf-series/%s_%d.vtkhdf", basename, basename, iter);
 
-  //   if (first_iter) {
-  //     first_iter = false;
-  //     vtkHDFHyperTreeGrid vtk_hdf = vtk_HDF_hypertreegrid_init_transient (
-  //       scalar_list, vector_list, time, fname_a, overwrite);
-  //     vtk_HDF_hypertreegrid_close (&vtk_hdf);
-  //     if (pid () == 0)
-  //       copy_file (fname_a, fname_b);
-  //   } else {
-  //     vtkHDFHyperTreeGrid vtk_hdf = vtk_HDF_hypertreegrid_append_transient (
-  //       scalar_list, vector_list, time, fname_a);
-  //     vtk_HDF_hypertreegrid_close (&vtk_hdf);
-  //     if (pid () == 0)
-  //       copy_file (fname_a, fname_b);
-  //   }
-  // } else if (use_transient) {
+  if (pid () == 0) {
+    char pname[128];
+    sprintf (pname, "%s-vtkhdf-series", basename);
+    create_path (pname);
 
-  //   static bool first_iter = true;
+    static int timeseries_len = 0;
+    static char timeseries[1 << 16]; // 64 MB buffer
 
-  //   char fname[64];
-  //   sprintf (fname, "%s.vtkhdf", basename_buff);
-  //   if (first_iter && !checkpoint_state.restored) {
-  //     first_iter = false;
-  //     vtkHDFHyperTreeGrid vtk_hdf = vtk_HDF_hypertreegrid_init_transient (
-  //       scalar_list, vector_list, time, fname, overwrite);
-  //     vtk_HDF_hypertreegrid_close (&vtk_hdf);
-  //   } else {
-  //     vtkHDFHyperTreeGrid vtk_hdf = vtk_HDF_hypertreegrid_append_transient (
-  //       scalar_list, vector_list, time, fname);
-  //     vtk_HDF_hypertreegrid_close (&vtk_hdf);
-  //   }
-  // } else {
-  //   output_hdf_htg_series (
-  //     scalar_list, vector_list, basename_buff, iter, time, overwrite);
-  // }
+    // Tail that always lives *after* the last entry
+    static const char timeseries_tail[] = ",\n\t]}";
+    const int timeseries_delta = (int) strlen (timeseries_tail);
+
+    char fname_timeseries[128];
+    sprintf (
+      fname_timeseries, "%s.vtkhdf.series", basename); // assuming fname exists
+
+    if (!timeseries_len) {
+      timeseries_len +=
+        sprintf (timeseries,
+                 "{\n"
+                 "\t\"file-series-version\" : \"1.0\",\n"
+                 "\t\"files\" : [\n"
+                 "\t\t{ \"iter\" : %d, \"time\" : %f, \"name\" : \"%s\" }%s",
+                 iter,
+                 time,
+                 fname,
+                 timeseries_tail);
+    } else {
+      // We currently have ... { last entry }",\n\t]}"
+      // The tail begins at timeseries_len - timeseries_delta
+      int start = timeseries_len - timeseries_delta;
+
+      // Overwrite the tail with: ",\n\t\t{ new entry }<tail again>"
+      // This keeps all old content up to 'start', and appends a new entry
+      timeseries_len =
+        start +
+        sprintf (timeseries + start,
+                 ",\n\t\t{ \"iter\" : %d, \"time\" : %f, \"name\" : \"%s\" }%s",
+                 iter,
+                 time,
+                 fname,
+                 timeseries_tail);
+    }
+
+    FILE* f = fopen (fname_timeseries, "w");
+    if (f) {
+      fwrite (timeseries, 1, (size_t) timeseries_len, f);
+      fclose (f);
+    }
+  }
+
+  // Init polydata
+
+  size_t n_points_local = 0;
+  foreach_ibnode () {
+    ibnode_update_pid (node);
+    if (node->pid == pid ())
+      n_points_local++;
+  }
+
+  size_t n_points = n_points_local;
+  size_t n_vertices = n_points;
+  size_t n_lines = 0;
+  size_t n_strips = 0;
+  size_t n_polygons = 0;
+  size_t n_pointdata = 4;
+
+  vtkPolyData vtk_pd = vtk_polydata_init (
+    n_points, n_vertices, n_lines, n_strips, n_polygons, n_pointdata);
+
+  // Populate polydata
+  foreach_ibnode () {
+    if (node->pid == pid ()) {
+      coord pos = node->lagpos;
+      vtk_polydata_add_point (&vtk_pd, pos.x, pos.y, pos.z);
+    }
+  }
+
+  for (size_t i = 0; i < n_points; i++) {
+    vtk_polydata_add_vertex (&vtk_pd, i);
+  }
+
+  size_t ncomp = dimension;
+
+  int64_t force_id =
+    vtk_polydata_add_pointdata_vector (&vtk_pd, "force", ncomp);
+  double* force_data = vtk_polydata_get_pointdata_data (&vtk_pd, force_id);
+
+  int64_t lagvel_id =
+    vtk_polydata_add_pointdata_vector (&vtk_pd, "lagvel", ncomp);
+  double* lagvel_data = vtk_polydata_get_pointdata_data (&vtk_pd, lagvel_id);
+
+  int64_t eulvel_id =
+    vtk_polydata_add_pointdata_vector (&vtk_pd, "eulvel", ncomp);
+  double* eulvel_data = vtk_polydata_get_pointdata_data (&vtk_pd, eulvel_id);
+
+  int64_t pid_id = vtk_polydata_add_pointdata_scalar (&vtk_pd, "node_pid");
+  double* pid_data = vtk_polydata_get_pointdata_data (&vtk_pd, pid_id);
+
+  {
+    size_t i = 0;
+    foreach_ibnode () {
+      if (node->pid == pid ()) {
+#if dimension >= 1
+        force_data[i * dimension + 0] = node->force.x;
+        lagvel_data[i * dimension + 0] = node->lagvel.x;
+        eulvel_data[i * dimension + 0] = node->eulvel.x;
+#endif
+#if dimension >= 2
+        force_data[i * dimension + 1] = node->force.y;
+        lagvel_data[i * dimension + 1] = node->lagvel.y;
+        eulvel_data[i * dimension + 1] = node->eulvel.y;
+#endif
+#if dimension >= 3
+        force_data[i * dimension + 2] = node->force.z;
+        lagvel_data[i * dimension + 2] = node->lagvel.z;
+        eulvel_data[i * dimension + 2] = node->eulvel.z;
+#endif
+        pid_data[i] = node->pid;
+
+        i++;
+      }
+    }
+  }
+
+  // Write vtkhdf polydata
+  vtkHDFPolyData vtk_hdf_pd =
+    vtk_HDF_polydata_init_static (fname, true, &vtk_pd);
+  vtk_HDF_polydata_close (&vtk_hdf_pd);
+
+  // Free vtkPolyData
+  vtk_polydata_free (&vtk_pd);
+}
+
+trace void output_hdf_pd (const char* basename = NULL,
+                          int iter = i,
+                          double time = t,
+                          bool use_transient = false,
+                          bool overwrite = true,
+                          bool use_ab = false) {
+  char basename_buff[32];
+
+  if (!basename) {
+    snprintf (
+      basename_buff, sizeof (basename_buff), "%s-pd", get_executable_name ());
+  } else {
+    snprintf (basename_buff, sizeof (basename_buff), "%s-pd", basename);
+  }
+
+  output_hdf_pd_series (basename_buff, iter, time, overwrite);
 }

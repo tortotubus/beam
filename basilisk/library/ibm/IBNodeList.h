@@ -23,6 +23,7 @@ int ibnodelist_reserve (IBNodeList* list, size_t newcap);
 int ibnodelist_push (IBNodeList* list, IBNode* node);
 IBNode* ibnodelist_remove_swap (IBNodeList* list, size_t i);
 static inline IBNode* ibnodelist_get (IBNodeList* list, size_t i);
+void ibnodelist_clear (IBNodeList* list);
 static size_t ibnodelist_next_cap_ (size_t cap);
 
 /* Function Definitions */
@@ -176,4 +177,20 @@ IBNode* ibnodelist_remove_swap (IBNodeList* list, size_t i) {
  */
 IBNode* ibnodelist_get (IBNodeList* list, size_t i) {
   return (list && i < list->size) ? list->ptrs[i] : NULL;
+}
+
+/**
+ * @brief Clear the list without freeing its storage.
+ *
+ * @param list Pointer to the IBNodeList. If NULL, this function does nothing.
+ *
+ * @details Sets size to 0 and leaves capacity/ptrs unchanged. Does not free
+ * any IBNode objects (non-owning container).
+ *
+ * @relates IBNodeList
+ */
+void ibnodelist_clear (IBNodeList* list) {
+  if (!list)
+    return;
+  list->size = 0;
 }

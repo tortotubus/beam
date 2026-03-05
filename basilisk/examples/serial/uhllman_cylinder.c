@@ -5,7 +5,7 @@
 #include "library/ibm/navier-stokes/centered-split.h"
 #include "tracer.h"
 
-#include "library/ibm/IBOutput.h"
+// #include "library/ibm/IBOutput.h"
 #include "library/io/output-vtk.h"
 
 coord
@@ -43,7 +43,7 @@ main()
 
   display_control(Reynolds, 10, 1000);
 
-  // DT = 0.003;
+  DT = 0.000625;
 
   run();
 }
@@ -91,13 +91,15 @@ event logfile(i++) {
 }
 
 event
-output(t += 0.25; t <= 30.)
+output(t += 0.25; t <= 5.)
 // output(i += 1; t <= 30.)
 {
   scalar omega[];
   vorticity(u, omega);
-  output_hdf_htg({ p, omega, f }, { u, ibmf });
-  output_ibnodes("uhllman_cylinder", i, t);
+  // output_hdf_htg({ p, omega, f }, { u, ibmf });
+  // output_ibnodes("uhllman_cylinder", i, t);
+  output_hdf_htg();
+  output_hdf_pd();
 }
 
 event

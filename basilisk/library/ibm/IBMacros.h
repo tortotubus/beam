@@ -1,61 +1,4 @@
-Point locate_nonlocal (double xp = 0., double yp = 0., double zp = 0.) {
-  for (int l = depth (); l >= 0; l--) {
-    Point point = {0};
-    point.level = l;
-    int n = 1 << point.level;
-    point.i = (xp - X0) / L0 * n + GHOSTS;
-#if dimension >= 2
-    point.j = (yp - Y0) / L0 * n + GHOSTS;
-#endif
-#if dimension >= 3
-    point.k = (zp - Z0) / L0 * n + GHOSTS;
-#endif
-    if (point.i >= 0 && point.i < n + 2 * GHOSTS
-#if dimension >= 2
-        && point.j >= 0 && point.j < n + 2 * GHOSTS
-#endif
-#if dimension >= 3
-        && point.k >= 0 && point.k < n + 2 * GHOSTS
-#endif
-    ) {
-      if (allocated (0) && is_leaf (cell))
-        return point;
-    } else
-      break;
-  }
-  Point point = {0};
-  point.level = -1;
-  return point;
-}
-
-Point locate_level (double xp = 0., double yp = 0., double zp = 0., int level) {
-  {
-    Point point = {0};
-    point.level = level;
-    int n = 1 << point.level;
-    point.i = (xp - X0) / L0 * n + GHOSTS;
-#if dimension >= 2
-    point.j = (yp - Y0) / L0 * n + GHOSTS;
-#endif
-#if dimension >= 3
-    point.k = (zp - Z0) / L0 * n + GHOSTS;
-#endif
-    if (level >= 0 && level <= depth()
-        && point.i >= 0 && point.i < n + 2 * GHOSTS
-#if dimension >= 2
-        && point.j >= 0 && point.j < n + 2 * GHOSTS
-#endif
-#if dimension >= 3
-        && point.k >= 0 && point.k < n + 2 * GHOSTS
-#endif
-    ) {
-      return point;
-    }
-  }
-  Point point = {0};
-  point.level = -1;
-  return point;
-}
+#include "library/ibm/IBLocate.h"
 
 /**
  * @def coord_periodic_boundary
@@ -115,12 +58,7 @@ macro2 foreach_neighborhood_coord (coord c, size_t radius) {
   // Wrap the coordinate according to any periodic boundary conditions
   coord centre_coord = c;
   coord_periodic_boundary (centre_coord);
-  // printf ("Periodic coord: %f %f %f\n",
-  //         centre_coord.x,
-  //         centre_coord.y,
-  //         centre_coord.z);
   Point centre_point = locate (centre_coord.x, centre_coord.y, centre_coord.z);
-  // printf ("Periodic point: %d %d\n", centre_point.i, centre_point.j);
 
   // Set point level to the located Point
   Point point = {0};
@@ -197,16 +135,9 @@ macro2 foreach_neighborhood_coord (coord c, size_t radius) {
 
 macro2 foreach_neighborhood_coord_nonlocal (coord c, size_t radius) {
 
-  // Wrap the coordinate according to any periodic boundary conditions
   coord centre_coord = c;
   coord_periodic_boundary (centre_coord);
-  // printf ("Periodic coord: %f %f %f\n",
-  //         centre_coord.x,
-  //         centre_coord.y,
-  //         centre_coord.z);
-  Point centre_point =
-    locate_nonlocal (centre_coord.x, centre_coord.y, centre_coord.z);
-  // printf ("Periodic point: %d %d\n", centre_point.i, centre_point.j);
+  Point centre_point = locate_nonlocal (centre_coord.x, centre_coord.y, centre_coord.z);
 
   // Set point level to the located Point
   Point point = {0};
@@ -215,7 +146,7 @@ macro2 foreach_neighborhood_coord_nonlocal (coord c, size_t radius) {
   point.level = centre_point.level;
   iterpoint.level = centre_point.level;
 
-  if (iterpoint.level != -1) {
+  if (iterpoint.level > 0) {
 #if dimension == 1
     for (iterpoint.i = -radius + centre_point.i;
          iterpoint.i <= radius + centre_point.i;
@@ -308,7 +239,7 @@ macro2 foreach_neighborhood_coord_level (coord c, size_t radius, int lvl) {
          iterpoint.i++) {
       point.i = iterpoint.i;
       point.level = centre_point.level;
-      if (allocated (0) && is_local (cell) && is_leaf (cell)) {
+      if (allocated (0) && is_leaf (cell)) {
         // point_periodic_boundary (point);
         int ig = point.i;
         // clang-format off
@@ -326,7 +257,7 @@ macro2 foreach_neighborhood_coord_level (coord c, size_t radius, int lvl) {
         point.i = iterpoint.i;
         point.j = iterpoint.j;
         point.level = centre_point.level;
-        if (allocated (0) && is_local (cell) && is_leaf (cell)) {
+        if (allocated (0) && is_leaf (cell)) {
           // point_periodic_boundary (point);
           int ig = point.i;
           int jg = point.j;
@@ -350,7 +281,7 @@ macro2 foreach_neighborhood_coord_level (coord c, size_t radius, int lvl) {
           point.j = iterpoint.j;
           point.k = iterpoint.k;
           point.level = centre_point.level;
-          if (allocated (0) && is_local (cell) && is_leaf (cell)) {
+          if (allocated (0) && is_leaf (cell)) {
             // point_periodic_boundary (point);
             int ig = point.i;
             int jg = point.j;

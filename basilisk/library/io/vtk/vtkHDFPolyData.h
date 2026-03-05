@@ -34,6 +34,9 @@ void vtk_HDF_polydata_close (vtkHDFPolyData* vtk_hdf_pd) {
   if (vtk_hdf_pd->grp_celldata_id >= 0)
     H5Gclose (vtk_hdf_pd->grp_celldata_id);
 
+  if (vtk_hdf_pd->grp_pointdata_id >= 0)
+    H5Gclose (vtk_hdf_pd->grp_pointdata_id);
+
   if (vtk_hdf_pd->grp_vertices_id >= 0)
     H5Gclose (vtk_hdf_pd->grp_vertices_id);
 
@@ -66,6 +69,7 @@ void vtk_HDF_polydata_close (vtkHDFPolyData* vtk_hdf_pd) {
 vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                                              bool overwrite,
                                              vtkPolyData* vtk_pd) {
+
   vtkHDFPolyData vtk_hdf_pd = {
     .grp_vertices_id = H5I_INVALID_HID,         /*!< Vertices group */
     .grp_lines_id = H5I_INVALID_HID,            /*!< Lines group */
@@ -91,7 +95,11 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
     hid_t grp_pointdata_offsets_id; /*!< /VTKHDF/Steps/PointDataOffsets group */
   } vtkHDFPolyData;
 
+#if _MPI
+  vtk_hdf_pd.vtk_hdf = vtk_HDF_init_MPIIO (fname, overwrite);
+#else
   vtk_hdf_pd.vtk_hdf = vtk_HDF_init (fname, overwrite);
+#endif
 
   vtk_hdf_pd.grp_celldata_id = H5Gcreate2 (vtk_hdf_pd.vtk_hdf.file_id,
                                            "/VTKHDF/CellData",
@@ -172,11 +180,52 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
    * Dataset: /VTKHDF/Points
    */
   {
+#if _MPI
+    float* dataset_data = vtk_pd->points;
+
+    hsize_t dataset_local_dims[] = {0, 3};
+    dataset_local_dims[0] = vtk_polydata_number_of_points (vtk_pd);
+
+    hsize_t dataset_global_dims[] = {0, 3};
+    MPI_Allreduce (&dataset_local_dims[0],
+                   &dataset_global_dims[0],
+                   1,
+                   MPI_UNSIGNED_LONG_LONG,
+                   MPI_SUM,
+                   MPI_COMM_WORLD);
+
+    hsize_t dataset_offset[] = {0, 0};
+    MPI_Exscan (&dataset_local_dims[0],
+                &dataset_offset[0],
+                1,
+                MPI_UNSIGNED_LONG_LONG,
+                MPI_SUM,
+                MPI_COMM_WORLD);
+    if (pid () == 0)
+      dataset_offset[0] = 0;
+
+    const char* dataset_name = "Points";
+    const int dataset_rank = 2;
+    hid_t dataset_datatype = H5T_IEEE_F32LE;
+    hid_t dataset_group = vtk_hdf_pd.vtk_hdf.grp_vtkhdf_id;
+
+    vtk_HDF_collective_write_dataset (dataset_name,
+                                      dataset_data,
+                                      dataset_datatype,
+                                      dataset_group,
+                                      dataset_rank,
+                                      dataset_global_dims,
+                                      dataset_local_dims,
+                                      dataset_offset,
+                                      &vtk_hdf_pd.vtk_hdf);
+
+#else
     float* dataset_data = vtk_pd->points;
     hsize_t dataset_dims[] = {0, 3};
     dataset_dims[0] = vtk_polydata_number_of_points (vtk_pd);
 
     const char* dataset_name = "Points";
+    const int dataset_rank = 2;
     hid_t dataset_datatype = H5T_IEEE_F32LE;
     hid_t dataset_group = vtk_hdf_pd.vtk_hdf.grp_vtkhdf_id;
 
@@ -184,17 +233,41 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                            dataset_data,
                            dataset_datatype,
                            dataset_group,
-                           2,
+                           dataset_rank,
                            dataset_dims,
                            &vtk_hdf_pd.vtk_hdf);
+#endif
   }
 
   /*
    * Dataset: /VTKHDF/NumberOfPoints
    */
   {
+#if _MPI
     int64_t dataset_data[] = {0};
-    dataset_data[0] = vtk_polydata_number_of_points (vtk_pd);
+    dataset_data[0] = (vtk_polydata_number_of_points (vtk_pd));
+
+    hsize_t dataset_local_dims[] = {1};
+    hsize_t dataset_global_dims[] = {npe()};
+    hsize_t dataset_offset[] = {pid()};
+    const char* dataset_name = "NumberOfPoints";
+    hid_t dataset_datatype = H5T_STD_I64LE;
+    hid_t dataset_group = vtk_hdf_pd.vtk_hdf.grp_vtkhdf_id;
+
+    vtk_HDF_collective_write_dataset (dataset_name,
+                                      &dataset_data,
+                                      dataset_datatype,
+                                      dataset_group,
+                                      1,
+                                      dataset_global_dims,
+                                      dataset_local_dims,
+                                      dataset_offset,
+                                      &vtk_hdf_pd.vtk_hdf);
+
+#else
+    int64_t dataset_data[] = {0};
+    dataset_data[0] = (vtk_polydata_number_of_points (vtk_pd));
+    const int dataset_rank = 1;
     hsize_t dataset_dims[] = {1};
     const char* dataset_name = "NumberOfPoints";
     hid_t dataset_datatype = H5T_STD_I64LE;
@@ -204,16 +277,65 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                            dataset_data,
                            dataset_datatype,
                            dataset_group,
-                           1,
+                           dataset_rank,
                            dataset_dims,
                            &vtk_hdf_pd.vtk_hdf);
+#endif
   }
 
+  /*
+   * Group: /VTKHDF/Lines
+   */
   {
+#if _MPI
+    int64_t connBase = 0;
+    MPI_Exscan (&vtk_pd->n_lines_connectivity,
+                &connBase,
+                1,
+                MPI_INT64_T,
+                MPI_SUM,
+                MPI_COMM_WORLD);
+    if (pid () == 0)
+      connBase = 0;
+#endif
+
     /*
      * Dataset: /VTKHDF/Lines/Connectivity
      */
     {
+#if _MPI
+      int64_t* dataset_data = vtk_pd->lines_connectivity;
+
+      // Get local and global data size
+      hsize_t dataset_local_dims[] = {vtk_pd->n_lines_connectivity};
+      hsize_t dataset_global_dims[] = {0};
+      MPI_Allreduce (dataset_local_dims,
+                     dataset_global_dims,
+                     1,
+                     MPI_UNSIGNED_LONG_LONG,
+                     MPI_SUM,
+                     MPI_COMM_WORLD);
+
+      // Find local offset
+      hsize_t dataset_offset[] = {(hsize_t) connBase};
+
+      const char* dataset_name = "Connectivity";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_lines_id;
+
+      const int dataset_rank = 1;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+#else
       int64_t* dataset_data = vtk_pd->lines_connectivity;
       hsize_t dataset_dims[] = {vtk_pd->n_lines_connectivity};
 
@@ -228,12 +350,35 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Lines/NumberOfCells
      */
     {
+#if _MPI
+      int64_t dataset_data[] = {0};
+      dataset_data[0] = vtk_polydata_number_of_lines (vtk_pd);
+
+      hsize_t dataset_local_dims[] = {1};
+      hsize_t dataset_global_dims[] = {npe ()};
+      const char* dataset_name = "NumberOfCells";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_lines_id;
+      const int dataset_rank = 1;
+      hid_t dataset_offset[] = {pid ()};
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+#else
       int64_t dataset_data[] = {0};
       dataset_data[0] = vtk_polydata_number_of_lines (vtk_pd);
       hsize_t dataset_dims[] = {1};
@@ -248,12 +393,34 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Lines/NumberOfConnectivityIds
      */
     {
+#if _MPI
+      int64_t dataset_data[] = {(int64_t) vtk_pd->n_lines_connectivity};
+
+      hsize_t dataset_local_dims[] = {1};
+      hsize_t dataset_global_dims[] = {npe ()};
+      const char* dataset_name = "NumberOfConnectivityIds";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_lines_id;
+      const int dataset_rank = 1;
+      hid_t dataset_offset[] = {pid ()};
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+#else
       int64_t dataset_data[] = {(int64_t) vtk_pd->n_lines_connectivity};
       hsize_t dataset_dims[] = {1};
       const char* dataset_name = "NumberOfConnectivityIds";
@@ -267,12 +434,54 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Lines/Offsets
      */
     {
+#if _MPI
+      int64_t* dataset_data = vtk_pd->lines_offsets;
+
+      hsize_t dataset_local_dims[] = {vtk_pd->n_lines_offsets};
+      hsize_t dataset_global_dims[] = {0};
+      MPI_Allreduce (dataset_local_dims,
+                     dataset_global_dims,
+                     1,
+                     MPI_UNSIGNED_LONG_LONG,
+                     MPI_SUM,
+                     MPI_COMM_WORLD);
+
+      int64_t offwriteBase = 0;
+      MPI_Exscan (&vtk_pd->n_lines_offsets,
+                  &offwriteBase,
+                  1,
+                  MPI_INT64_T,
+                  MPI_SUM,
+                  MPI_COMM_WORLD);
+      if (pid () == 0)
+        offwriteBase = 0;
+      hsize_t dataset_offset[] = {(hsize_t) offwriteBase};
+
+      const char* dataset_name = "Offsets";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_lines_id;
+
+      const int dataset_rank = 1;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+      
+#else
       int64_t* dataset_data = vtk_pd->lines_offsets;
       hsize_t dataset_dims[] = {vtk_pd->n_lines_offsets};
       const char* dataset_name = "Offsets";
@@ -286,13 +495,64 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
   }
+
+  /*
+   * Group: /VTKHDF/Polygons
+   */
   {
+#if _MPI
+    int64_t connBase = 0;
+    MPI_Exscan (&vtk_pd->n_polygons_connectivity,
+                &connBase,
+                1,
+                MPI_INT64_T,
+                MPI_SUM,
+                MPI_COMM_WORLD);
+    if (pid () == 0)
+      connBase = 0;
+#endif
+
     /*
      * Dataset: /VTKHDF/Polygons/Connectivity
      */
     {
+#if _MPI
+      int64_t* dataset_data = vtk_pd->polygons_connectivity;
+
+      // Get local and global data size
+      hsize_t dataset_local_dims[] = {vtk_pd->n_polygons_connectivity};
+      hsize_t dataset_global_dims[] = {0};
+      MPI_Allreduce (dataset_local_dims,
+                     dataset_global_dims,
+                     1,
+                     MPI_UNSIGNED_LONG_LONG,
+                     MPI_SUM,
+                     MPI_COMM_WORLD);
+
+      // Find local offset
+      hsize_t dataset_offset[] = {(hsize_t) connBase};
+
+      const char* dataset_name = "Connectivity";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_polygons_id;
+
+      const int dataset_rank = 1;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+      
+#else
       int64_t* dataset_data = vtk_pd->polygons_connectivity;
       hsize_t dataset_dims[] = {vtk_pd->n_polygons_connectivity};
       const char* dataset_name = "Connectivity";
@@ -306,12 +566,35 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Polygons/NumberOfCells
      */
     {
+#if _MPI
+      int64_t dataset_data[] = {0};
+      dataset_data[0] = vtk_polydata_number_of_polygons (vtk_pd);
+
+      hsize_t dataset_local_dims[] = {1};
+      hsize_t dataset_global_dims[] = {npe ()};
+      const char* dataset_name = "NumberOfCells";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_polygons_id;
+      const int dataset_rank = 1;
+      hid_t dataset_offset[] = {pid ()};
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+#else
       int64_t dataset_data[] = {0};
       dataset_data[0] = vtk_polydata_number_of_polygons (vtk_pd);
       hsize_t dataset_dims[] = {1};
@@ -326,12 +609,34 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Polygons/NumberOfConnectivityIds
      */
     {
+#if _MPI
+      int64_t dataset_data[] = {(int64_t) vtk_pd->n_polygons_connectivity};
+
+      hsize_t dataset_local_dims[] = {1};
+      hsize_t dataset_global_dims[] = {npe ()};
+      const char* dataset_name = "NumberOfConnectivityIds";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_polygons_id;
+      const int dataset_rank = 1;
+      hid_t dataset_offset[] = {pid ()};
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+#else
       int64_t dataset_data[] = {(int64_t) vtk_pd->n_polygons_connectivity};
       hsize_t dataset_dims[] = {1};
       const char* dataset_name = "NumberOfConnectivityIds";
@@ -345,12 +650,55 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Polygons/Offsets
      */
     {
+#if _MPI
+      int64_t* dataset_data = vtk_pd->polygons_offsets;
+      
+
+      hsize_t dataset_local_dims[] = {vtk_pd->n_polygons_offsets};
+      hsize_t dataset_global_dims[] = {0};
+      MPI_Allreduce (dataset_local_dims,
+                     dataset_global_dims,
+                     1,
+                     MPI_UNSIGNED_LONG_LONG,
+                     MPI_SUM,
+                     MPI_COMM_WORLD);
+
+      int64_t offwriteBase = 0;
+      MPI_Exscan (&vtk_pd->n_polygons_offsets,
+                  &offwriteBase,
+                  1,
+                  MPI_INT64_T,
+                  MPI_SUM,
+                  MPI_COMM_WORLD);
+      if (pid () == 0)
+        offwriteBase = 0;
+      hsize_t dataset_offset[] = {(hsize_t) offwriteBase};
+
+      const char* dataset_name = "Offsets";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_polygons_id;
+
+      const int dataset_rank = 1;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+      
+#else
       int64_t* dataset_data = vtk_pd->polygons_offsets;
       hsize_t dataset_dims[] = {vtk_pd->n_polygons_offsets};
       const char* dataset_name = "Offsets";
@@ -364,14 +712,64 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
   }
 
+  /*
+   * Group: /VTKHDF/Strips
+   */
   {
+
+#if _MPI
+    int64_t connBase = 0;
+    MPI_Exscan (&vtk_pd->n_strips_connectivity,
+                &connBase,
+                1,
+                MPI_INT64_T,
+                MPI_SUM,
+                MPI_COMM_WORLD);
+    if (pid () == 0)
+      connBase = 0;
+#endif
     /*
      * Dataset: /VTKHDF/Strips/Connectivity
      */
     {
+#if _MPI
+      int64_t* dataset_data = vtk_pd->strips_connectivity;
+
+      // Get local and global data size
+      hsize_t dataset_local_dims[] = {vtk_pd->n_strips_connectivity};
+      hsize_t dataset_global_dims[] = {0};
+      MPI_Allreduce (dataset_local_dims,
+                     dataset_global_dims,
+                     1,
+                     MPI_UNSIGNED_LONG_LONG,
+                     MPI_SUM,
+                     MPI_COMM_WORLD);
+
+      // Find local offset
+      hsize_t dataset_offset[] = {(hsize_t) connBase};
+
+      const char* dataset_name = "Connectivity";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_strips_id;
+
+      const int dataset_rank = 1;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+      
+#else
       int64_t* dataset_data = vtk_pd->strips_connectivity;
       hsize_t dataset_dims[] = {vtk_pd->n_strips_connectivity};
       const char* dataset_name = "Connectivity";
@@ -385,12 +783,35 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Strips/NumberOfCells
      */
     {
+#if _MPI
+      int64_t dataset_data[] = {0};
+      dataset_data[0] = vtk_polydata_number_of_strips (vtk_pd);
+
+      hsize_t dataset_local_dims[] = {1};
+      hsize_t dataset_global_dims[] = {npe ()};
+      const char* dataset_name = "NumberOfCells";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_strips_id;
+      const int dataset_rank = 1;
+      hid_t dataset_offset[] = {pid ()};
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+#else
       int64_t dataset_data[] = {0};
       dataset_data[0] = vtk_polydata_number_of_strips (vtk_pd);
       hsize_t dataset_dims[] = {1};
@@ -405,12 +826,34 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Strips/NumberOfConnectivityIds
      */
     {
+#if _MPI
+      int64_t dataset_data[] = {(int64_t) vtk_pd->n_strips_connectivity};
+
+      hsize_t dataset_local_dims[] = {1};
+      hsize_t dataset_global_dims[] = {npe ()};
+      const char* dataset_name = "NumberOfConnectivityIds";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_strips_id;
+      const int dataset_rank = 1;
+      hid_t dataset_offset[] = {pid ()};
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+#else
       int64_t dataset_data[] = {(int64_t) vtk_pd->n_strips_connectivity};
       hsize_t dataset_dims[] = {1};
       const char* dataset_name = "NumberOfConnectivityIds";
@@ -424,12 +867,54 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Strips/Offsets
      */
     {
+#if _MPI
+      int64_t* dataset_data = vtk_pd->strips_offsets;
+
+      hsize_t dataset_local_dims[] = {vtk_pd->n_strips_offsets};
+      hsize_t dataset_global_dims[] = {0};
+      MPI_Allreduce (dataset_local_dims,
+                     dataset_global_dims,
+                     1,
+                     MPI_UNSIGNED_LONG_LONG,
+                     MPI_SUM,
+                     MPI_COMM_WORLD);
+
+      int64_t offwriteBase = 0;
+      MPI_Exscan (&vtk_pd->n_strips_offsets,
+                  &offwriteBase,
+                  1,
+                  MPI_INT64_T,
+                  MPI_SUM,
+                  MPI_COMM_WORLD);
+      if (pid () == 0)
+        offwriteBase = 0;
+      hsize_t dataset_offset[] = {(hsize_t) offwriteBase};
+
+      const char* dataset_name = "Offsets";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_strips_id;
+
+      const int dataset_rank = 1;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+      
+#else
       int64_t* dataset_data = vtk_pd->strips_offsets;
       hsize_t dataset_dims[] = {1};
       const char* dataset_name = "Offsets";
@@ -443,14 +928,64 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
   }
 
+  /*
+   * Group: /VTKHDF/Vertices
+   */
   {
+#if _MPI
+    int64_t connBase = 0;
+    MPI_Exscan (&vtk_pd->n_vertices_connectivity,
+                &connBase,
+                1,
+                MPI_INT64_T,
+                MPI_SUM,
+                MPI_COMM_WORLD);
+    if (pid () == 0)
+      connBase = 0;
+#endif
+
     /*
      * Dataset: /VTKHDF/Vertices/Connectivity
      */
     {
+#if _MPI
+      int64_t* dataset_data = vtk_pd->vertices_connectivity;
+
+      // Get local and global data size
+      hsize_t dataset_local_dims[] = {vtk_pd->n_vertices_connectivity};
+      hsize_t dataset_global_dims[] = {0};
+      MPI_Allreduce (dataset_local_dims,
+                     dataset_global_dims,
+                     1,
+                     MPI_UNSIGNED_LONG_LONG,
+                     MPI_SUM,
+                     MPI_COMM_WORLD);
+
+      // Find local offset
+      hsize_t dataset_offset[] = {(hsize_t) connBase};
+
+      const char* dataset_name = "Connectivity";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_vertices_id;
+
+      const int dataset_rank = 1;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+      
+#else
       int64_t* dataset_data = vtk_pd->vertices_connectivity;
       hsize_t dataset_dims[] = {vtk_pd->n_vertices_connectivity};
       const char* dataset_name = "Connectivity";
@@ -464,12 +999,35 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Vertices/NumberOfCells
      */
     {
+#if _MPI
+      int64_t dataset_data[] = {0};
+      dataset_data[0] = vtk_polydata_number_of_vertices (vtk_pd);
+
+      hsize_t dataset_local_dims[] = {1};
+      hsize_t dataset_global_dims[] = {npe ()};
+      const char* dataset_name = "NumberOfCells";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_vertices_id;
+      const int dataset_rank = 1;
+      hid_t dataset_offset[] = {pid ()};
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+#else
       int64_t dataset_data[] = {0};
       dataset_data[0] = vtk_polydata_number_of_vertices (vtk_pd);
       hsize_t dataset_dims[] = {1};
@@ -484,12 +1042,34 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Vertices/NumberOfConnectivityIds
      */
     {
+#if _MPI
+      int64_t dataset_data[] = {(int64_t) vtk_pd->n_vertices_connectivity};
+
+      hsize_t dataset_local_dims[] = {1};
+      hsize_t dataset_global_dims[] = {npe ()};
+      const char* dataset_name = "NumberOfConnectivityIds";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_vertices_id;
+      const int dataset_rank = 1;
+      hid_t dataset_offset[] = {pid ()};
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+#else
       int64_t dataset_data[] = {(int64_t) vtk_pd->n_vertices_connectivity};
       hsize_t dataset_dims[] = {1};
       const char* dataset_name = "NumberOfConnectivityIds";
@@ -503,12 +1083,54 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
 
     /*
      * Dataset: /VTKHDF/Vertices/Offsets
      */
     {
+#if _MPI
+      int64_t* dataset_data = vtk_pd->vertices_offsets;
+
+      hsize_t dataset_local_dims[] = {vtk_pd->n_vertices_offsets};
+      hsize_t dataset_global_dims[] = {0};
+      MPI_Allreduce (dataset_local_dims,
+                     dataset_global_dims,
+                     1,
+                     MPI_UNSIGNED_LONG_LONG,
+                     MPI_SUM,
+                     MPI_COMM_WORLD);
+
+      int64_t offwriteBase = 0;
+      MPI_Exscan (&vtk_pd->n_vertices_offsets,
+                  &offwriteBase,
+                  1,
+                  MPI_INT64_T,
+                  MPI_SUM,
+                  MPI_COMM_WORLD);
+      if (pid () == 0)
+        offwriteBase = 0;
+      hsize_t dataset_offset[] = {(hsize_t) offwriteBase};
+
+      const char* dataset_name = "Offsets";
+      hid_t dataset_datatype = H5T_STD_I64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_vertices_id;
+
+      const int dataset_rank = 1;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+      
+#else
       int64_t* dataset_data = vtk_pd->vertices_offsets;
       hsize_t dataset_dims[] = {vtk_pd->n_vertices_offsets};
       const char* dataset_name = "Offsets";
@@ -522,8 +1144,84 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
                              1,
                              dataset_dims,
                              &vtk_hdf_pd.vtk_hdf);
+#endif
     }
   }
+
+  {
+    /*
+     * Dataset: /VTKHDF/PointData
+     */
+#if _MPI
+    for (int64_t i = 0; i < vtk_pd->n_pointdata; i++) {
+      double* dataset_data = vtk_polydata_get_pointdata_data (vtk_pd, i);
+      int dataset_rank = (vtk_pd->pointdata_ncomp[i] == 1) ? 1 : 2;
+      hsize_t* dataset_local_dims = (hsize_t*) malloc (dataset_rank * sizeof (hsize_t));
+      hsize_t* dataset_global_dims = (hsize_t*) calloc (dataset_rank, sizeof (hsize_t));
+
+      if (dataset_rank == 1) {
+        dataset_local_dims[0] = vtk_polydata_number_of_points (vtk_pd);
+      } else {
+        dataset_local_dims[0] = vtk_polydata_number_of_points (vtk_pd);
+        dataset_local_dims[1] = vtk_pd->pointdata_ncomp[i];
+        dataset_global_dims[1] = vtk_pd->pointdata_ncomp[i];
+      }
+
+      MPI_Allreduce(dataset_local_dims, dataset_global_dims, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+
+      hsize_t* dataset_offset = (hsize_t*) calloc (dataset_rank, sizeof(hsize_t));
+      MPI_Exscan(&dataset_local_dims[0], &dataset_offset[0], 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+      if (pid() == 0) dataset_offset[0] = 0;
+
+      char* dataset_name = vtk_pd->pointdata_names[i];
+      hid_t dataset_datatype = H5T_IEEE_F64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_pointdata_id;
+
+      vtk_HDF_collective_write_dataset (dataset_name,
+                                        dataset_data,
+                                        dataset_datatype,
+                                        dataset_group,
+                                        dataset_rank,
+                                        dataset_global_dims,
+                                        dataset_local_dims,
+                                        dataset_offset,
+                                        &vtk_hdf_pd.vtk_hdf);
+
+      free (dataset_local_dims);
+      free (dataset_global_dims);
+      free (dataset_offset);
+    }
+#else
+    for (int64_t i = 0; i < vtk_pd->n_pointdata; i++) {
+      double* dataset_data = vtk_polydata_get_pointdata_data (vtk_pd, i);
+      int dataset_rank = (vtk_pd->pointdata_ncomp[i] == 1) ? 1 : 2;
+      hsize_t* dataset_dims =
+        (hsize_t*) malloc (dataset_rank * sizeof (hsize_t));
+
+      if (dataset_rank == 1) {
+        dataset_dims[0] = vtk_polydata_number_of_points (vtk_pd);
+      } else {
+        dataset_dims[0] = vtk_polydata_number_of_points (vtk_pd);
+        dataset_dims[1] = vtk_pd->pointdata_ncomp[i];
+      }
+
+      char* dataset_name = vtk_pd->pointdata_names[i];
+      hid_t dataset_datatype = H5T_IEEE_F64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_pointdata_id;
+
+      vtk_HDF_write_dataset (dataset_name,
+                             dataset_data,
+                             dataset_datatype,
+                             dataset_group,
+                             dataset_rank,
+                             dataset_dims,
+                             &vtk_hdf_pd.vtk_hdf);
+
+      free (dataset_dims);
+    }
+#endif
+  }
+
   return vtk_hdf_pd;
 }
 
@@ -1395,8 +2093,9 @@ vtkHDFPolyData vtk_HDF_polydata_append_transient (const char* fname,
     /*
      * Dataset: /VTKHDF/Steps/NumberOfParts
      *
-     * Description: This is the number of parts at each timestep. This appending
-     * function is not set up for MPI so we assume there is only 1 part
+     * Description: This is the number of parts at each timestep. This
+     * appending function is not set up for MPI so we assume there is only 1
+     * part
      */
     {
       const char* dataset_name = "NumberOfParts";

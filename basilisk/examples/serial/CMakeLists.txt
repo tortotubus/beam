@@ -9,3 +9,4 @@ elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/taylor-green-centered.
 elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/karman.c")
 elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/kernels.c")
 elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/uhllman_cylinder.c")
+elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/vtkhdfpolydata.c")

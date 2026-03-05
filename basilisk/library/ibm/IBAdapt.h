@@ -1,5 +1,6 @@
 #include "library/ibm/IBMeshManager.h"
 #include "library/ibm/IBMacros.h"
+ 
 
 astats adapt_wavelet_ibm (scalar* slist,      // list of scalars
                           double* max,        // tolerance for each scalar
@@ -58,52 +59,52 @@ astats adapt_wavelet_ibm (scalar* slist,      // list of scalars
           r = (PESKIN_SUPPORT_RADIUS + (1 << d) - 1) >> d; // ceil((R+1)/2^d)
           foreach_neighborhood_coord_nonlocal (c, r) {
             if (is_local (cell)) {
-            refine_cell (point, listc, refined, &tree->refined);
-            st.nf++;
-            nrf++;
+              refine_cell (point, listc, refined, &tree->refined);
+              st.nf++;
+              nrf++;
             }
           }
         } else if (d < 0) { // Too fine
           r = (PESKIN_SUPPORT_RADIUS) << (-d);
           foreach_neighborhood_coord_nonlocal (c, r) {
             if (is_local (cell)) {
-            coarsen_cell (point, listc);
-            st.nc++;
-            nrc++;
+              coarsen_cell (point, listc);
+              st.nc++;
+              nrc++;
             }
           }
         } else { // Juuust right
           r = PESKIN_SUPPORT_RADIUS;
           foreach_neighborhood_coord_nonlocal (c, r) {
             if (is_local (cell)) {
-            if ((aparent (0).flags & leaf)) {
-              point.level--;
+              if ((aparent (0).flags & leaf)) {
+                point.level--;
 #if dimension == 1
-              point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
+                point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
 #elif dimension == 2
-              point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
-              point.j = ((point.j - GHOSTS) >> 1) + GHOSTS;
+                point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
+                point.j = ((point.j - GHOSTS) >> 1) + GHOSTS;
 #else
-              point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
-              point.j = ((point.j - GHOSTS) >> 1) + GHOSTS;
-              point.k = ((point.k - GHOSTS) >> 1) + GHOSTS;
+                point.i = ((point.i - GHOSTS) >> 1) + GHOSTS;
+                point.j = ((point.j - GHOSTS) >> 1) + GHOSTS;
+                point.k = ((point.k - GHOSTS) >> 1) + GHOSTS;
 #endif
-              refine_cell (point, listc, refined, &tree->refined);
-              st.nf++;
-              nrf++;
-            } else {
-              cell.flags |= just_fine_ibm;
-            }
+                refine_cell (point, listc, refined, &tree->refined);
+                st.nf++;
+                nrf++;
+              } else {
+                cell.flags |= just_fine_ibm;
+              }
             }
           }
         }
       }
-      // mpi_boundary_refine (listc);  
+      // mpi_boundary_refine (listc);
     }
     mpi_boundary_refine (listc);
-    mpi_boundary_update(listc);
-    mpi_all_reduce(nrf, MPI_INT, MPI_SUM);
-    mpi_all_reduce(nrc, MPI_INT, MPI_SUM);
+    mpi_boundary_update (listc);
+    mpi_all_reduce (nrf, MPI_INT, MPI_SUM);
+    mpi_all_reduce (nrc, MPI_INT, MPI_SUM);
     if (!nrf && !nrc)
       break; // reached target everywhere
   }
