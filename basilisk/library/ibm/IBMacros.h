@@ -221,10 +221,9 @@ macro2 foreach_neighborhood_coord_nonlocal (coord c, size_t radius) {
  */
 macro2 foreach_neighborhood_coord_level (coord c, size_t radius, int lvl) {
 
-  coord centre_coord = c;
-  coord_periodic_boundary (centre_coord);
-  Point centre_point =
-    locate_level (centre_coord.x, centre_coord.y, centre_coord.z, lvl);
+  coord d = c;
+  coord_periodic_boundary (d);
+  Point centre_point = locate_level (d.x, d.y, d.z, lvl);
 
   Point point = {0};
   Point iterpoint = {0};
@@ -294,5 +293,55 @@ macro2 foreach_neighborhood_coord_level (coord c, size_t radius, int lvl) {
       }
     }
 #endif
+  }
+}
+
+macro2 foreach_neighbor_coord(int r, coord c) {
+  int ig = 0, jg = 0, kg = 0;
+  NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  coord d = c;
+  coord_periodic_boundary(d);
+  Point point = locate(d.x,d.y,d.z);
+  if (point.level >= 0) {
+    foreach_neighbor(r) {
+      if (allocated(0) && is_leaf(cell)) {
+        // clang-format off
+        {...}
+        // clang-format on
+      }
+    }
+  }
+}
+
+macro2 foreach_neighbor_coord_nonlocal(int r, coord c) {
+  int ig = 0, jg = 0, kg = 0;
+  NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  coord d = c;
+  coord_periodic_boundary(d);
+  Point point = locate_nonlocal(d.x,d.y,d.z);
+  if (point.level >= 0) {
+    foreach_neighbor(r) {
+      if (allocated (0) && is_leaf (cell)) {
+        // clang-format off
+        {...}
+        // clang-format on
+      }
+    }
+  }
+}
+
+macro2 foreach_neighbor_coord_level(int r, int l, coord c) {
+  int ig = 0, jg = 0, kg = 0;
+  NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  coord d = c;
+  coord_periodic_boundary(d);
+  Point point = locate_level(d.x,d.y,d.z,l);
+  if (point.level >= 0) {
+    foreach_neighbor(r) {
+      if (allocated(0) && is_leaf(cell))
+      // clang-format off
+      {...}
+      // clang-format on
+    }
   }
 }

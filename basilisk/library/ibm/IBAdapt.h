@@ -1,5 +1,6 @@
 #include "library/ibm/IBMeshManager.h"
 #include "library/ibm/IBMacros.h"
+#include "library/ibm/IBLocate.h"
  
 
 astats adapt_wavelet_ibm (scalar* slist,      // list of scalars
@@ -46,10 +47,10 @@ astats adapt_wavelet_ibm (scalar* slist,      // list of scalars
   // ibm refinement
   for (int it = 0; it < 20; it++) {
     int nrf = 0, nrc = 0;
-    foreach_ibnode_per_ibmesh () {
-      coord c = node->lagpos;
+    foreach_ibnode() {
+      coord c = node->pos;
       coord_periodic_boundary (c);
-      int L = mesh->refinement_level;
+      int L = node->depth;
       int l = locate_nonlocal (c.x, c.y, c.z).level;
       if (l >= 0) {
         int d = L - l;
@@ -57,25 +58,30 @@ astats adapt_wavelet_ibm (scalar* slist,      // list of scalars
         int r;
         if (d > 0) {                                       // Too coarse
           r = (PESKIN_SUPPORT_RADIUS + (1 << d) - 1) >> d; // ceil((R+1)/2^d)
-          foreach_neighborhood_coord_nonlocal (c, r) {
+          // foreach_neighbor_coord_nonlocal (r, c) {
+          foreach_neighborhood_coord_nonlocal(c,r) {
             if (is_local (cell)) {
               refine_cell (point, listc, refined, &tree->refined);
               st.nf++;
               nrf++;
             }
           }
+
         } else if (d < 0) { // Too fine
           r = (PESKIN_SUPPORT_RADIUS) << (-d);
-          foreach_neighborhood_coord_nonlocal (c, r) {
+          // foreach_neighbor_coord_nonlocal (r, c) {
+          foreach_neighborhood_coord_nonlocal(c,r) {
             if (is_local (cell)) {
               coarsen_cell (point, listc);
               st.nc++;
               nrc++;
             }
           }
+
         } else { // Juuust right
           r = PESKIN_SUPPORT_RADIUS;
-          foreach_neighborhood_coord_nonlocal (c, r) {
+          // foreach_neighbor_coord_nonlocal (r, c) {
+          foreach_neighborhood_coord_nonlocal(c,r) {
             if (is_local (cell)) {
               if ((aparent (0).flags & leaf)) {
                 point.level--;
@@ -95,6 +101,7 @@ astats adapt_wavelet_ibm (scalar* slist,      // list of scalars
               } else {
                 cell.flags |= just_fine_ibm;
               }
+
             }
           }
         }
@@ -236,6 +243,8 @@ astats adapt_wavelet_ibm (scalar* slist,      // list of scalars
 
   if (list != ilist)
     free (list);
+
+  ibmm.dirty = true;
 
   return st;
 }

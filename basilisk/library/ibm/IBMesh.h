@@ -124,7 +124,7 @@ void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool) {
 //   for (size_t node_id = 0; node_id < mesh->nodes.size; node_id++) {
 //     IBNode* node = mesh->nodes.ptrs[node_id];
 //     foreach_neighborhood_coord_level (
-//       node->lagpos, PESKIN_SUPPORT_RADIUS, mesh->refinement_level) {
+//       node->pos, PESKIN_SUPPORT_RADIUS, node->depth) {
 //       cache_append (&node->stencil, point, 0);
 //     }
 //   }

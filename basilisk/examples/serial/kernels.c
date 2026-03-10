@@ -1,16 +1,17 @@
 #include "grid/quadtree.h"
+// #include "grid/multigrid.h"
 
-#include "library/ibm/IBAdapt.h"
-#include "library/ibm/IBKernels.h"
 #include "library/ibm/IBMeshManager.h"
+#include "library/ibm/IBKernels.h"
 
-// #include "library/ibm/IBOutput.h"
-// #include "library/io/vtk/vtkHDFHyperTreeGrid.h"
+#if TREE
+  #include "library/ibm/IBAdapt.h"
+#endif 
 
 #include "library/io/output-vtk.h"
 
 const int maxlevel = 6;
-const int minlevel = 5;
+const int minlevel = 3;
 const int ibmlevel = 10;
 
 scalar suppf[];
@@ -18,7 +19,10 @@ scalar weightf[];
 scalar levelf[];
 scalar pidf[];
 scalar gradientf[];
-scalar testf[];
+
+IBscalar ibgradientf;
+IBscalar iblevelf;
+IBscalar ibnodeidf;
 
 coord
 circle(int n, int N, coord centre, double radius)
@@ -33,7 +37,16 @@ circle(int n, int N, coord centre, double radius)
 int
 main()
 {
+  new_ibscalar(ibgradientf);
+  new_ibscalar(iblevelf);
+  new_ibscalar(ibnodeidf);
+
+#if TREE
   init_grid(1 << minlevel);
+#else 
+  init_grid(1 << ibmlevel);
+#endif
+
   X0 = -4, Y0 = -4, L0 = 8;
 
   periodic(right);
@@ -46,85 +59,74 @@ main()
   int new_id = ibmeshmanager_add_mesh();
 
   // Add a single node to the first mesh
-  const int N_circ = 101;
-  const double r_circ = 0.15;
+  const int N_circ = 100;
+  const double r_circ = .15;
   const coord cen_circ = { 0.0 };
 
   ibmeshmanager_add_nodes(new_id, N_circ);
 
   foreach_ibmesh()
   {
-    mesh->refinement_level = ibmlevel;
+    node->depth = ibmlevel;
   }
 
   foreach_ibnode_per_ibmesh()
   {
-    node->lagpos = circle(node_id, N_circ, cen_circ, r_circ);
+    node->pos = circle(node_id, N_circ, cen_circ, r_circ);
   }
 
-  // Refine and coarsen around nodes
+
+  // Refine and coarsen around nodes 
+#if TREE
   adapt_wavelet_ibm(NULL, NULL, maxlevel, minlevel);
-
-  ibmeshmanager_init_stencil_caches();
-
-  foreach () {
+#endif
+ 
+  foreach() {
     levelf[] = point.level;
     suppf[] = 0.;
     weightf[] = 0.;
     pidf[] = pid();
-    gradientf[] = 0.;
-    foreach_dimension()
-    {
-      gradientf[] += x;
-    }
+  #if dimension == 1
+    gradientf[] = x;
+  #elif dimension == 2 
+    gradientf[] = x+y;
+  #else
+    gradientf[] = x+y+z;
+  #endif
   }
 
-  // foreach_ibnode() {
-  //   peskin_cosine_kernel_gather_dimensionless(node) {
-  //     node->force.x = 
-  //   }
-  // }
+  foreach_ibnode() {
+    ibnode_update_pid(node);
+    ibval(ibnodeidf) = node_id;
+  }
 
-  foreach_ibnode()
-  {
-    peskin_cosine_kernel_spread_dimensionless(node)
-    {
-      suppf[] = pid();
+  foreach_ibnode() {
+    peskin_cosine_kernel_spread_dimensionless(node) {
+      suppf[] = pid() + 1;
       weightf[] += weight;
     }
   }
 
-  // Output
-  // vtkHDFHyperTreeGrid vtkhdf = vtk_HDF_hypertreegrid_init_static(
-  //   { levelf, weightf, suppf, gradientf, pidf }, NULL, "kernels_test.vtkhdf",
-  //   true);
-  // vtk_HDF_hypertreegrid_close(&vtkhdf);
+#if _MPI
+  gradientf.dirty = true;
+  levelf.dirty = true;
+  boundary((scalar*){gradientf, levelf});
+#endif
 
-  // foreach_ibnode() {
-  //   foreach_point(0.,0.) {
-  //     foreach_neighbor(2) {
-  //       testf[] = 2.;
-  //     }
-  //   }
-  // }
-  {
-  int ig = 0, jg = 0, kg = 0; NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = locate(0., 0., 0.);
-  if (point.level >= 0)
-    foreach_neighbor (2)
-      testf[] = 2.;
-    testf[] = 1.;
+  foreach_ibnode() {
+    peskin_cosine_kernel_gather_dimensionless(node) {
+      ibval(ibgradientf) += weight * gradientf[];
+      ibval(iblevelf) += weight * levelf[];
+    }
   }
 
+  // Output
   {
     int i = 0;
     double t = 0;
     output_hdf_htg();
     output_hdf_pd();
   }
-  // output_ibnodes("kernels_test.vtk", 0, 0);
-
-
 
   ibmeshmanager_free();
 

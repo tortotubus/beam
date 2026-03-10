@@ -54,12 +54,12 @@ main()
 
   foreach_ibmesh()
   {
-    mesh->refinement_level = ibmlevel;
+    node->depth = ibmlevel;
   }
 
   foreach_ibnode_per_ibmesh()
   {
-    node->lagpos = circle(node_id, N_circ, cen_circ, r_circ);
+    node->pos = circle(node_id, N_circ, cen_circ, r_circ);
   }
 
   //
@@ -71,11 +71,11 @@ main()
 //   foreach_ibnode()
 //   {
 // #if dimension == 1
-//     vtk_polydata_add_point(&pd, node->lagpos.x, 0., 0.);
+//     vtk_polydata_add_point(&pd, node->pos.x, 0., 0.);
 // #elif dimension == 2
-//     vtk_polydata_add_point(&pd, node->lagpos.x, node->lagpos.y, 0.);
+//     vtk_polydata_add_point(&pd, node->pos.x, node->pos.y, 0.);
 // #else
-//     vtk_polydata_add_point(&pd, node->lagpos.x, node->lagpos.y, node->lagpos.z);
+//     vtk_polydata_add_point(&pd, node->pos.x, node->pos.y, node->pos.z);
 // #endif
 //   }
 

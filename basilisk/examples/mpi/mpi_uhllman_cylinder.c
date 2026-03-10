@@ -1,11 +1,11 @@
 // #include "grid/multigrid.h"
+#include "grid/quadtree.h"
 
 #include "library/ibm/IBMeshManager.h"
 
 #include "library/ibm/navier-stokes/centered-split.h"
 #include "tracer.h"
 
-#include "library/ibm/IBOutput.h"
 #include "library/io/output-vtk.h"
 
 coord
@@ -38,12 +38,18 @@ main()
 {
   L0 = 16;
   origin(-1.85, -L0/2.);
+
+#if TREE
   N = 1 << 5;
+#else
+  N = 1 << L_circ;
+#endif 
+
   mu = muv;
 
   display_control(Reynolds, 10, 1000);
 
-  // DT = 0.003;
+  DT = 0.000625;
 
   run();
 }
@@ -64,45 +70,53 @@ p[right] = dirichlet(0.);
 pf[right] = dirichlet(0.);
 
 event
-init(t = 0)
-{
+init_ib(i = 0) {
   int new_id = ibmeshmanager_add_mesh();
   ibmeshmanager_add_nodes(new_id, N_circ);
 
   double ds = (2 * pi * R_circ) / N_circ;
 
-  foreach_ibmesh()
+  foreach_ibnode()
   {
-    mesh->refinement_level = L_circ;
+    node->depth = L_circ;
   }
 
   foreach_ibnode_per_ibmesh()
   {
-    node->lagpos = circle(node_id, N_circ, c_circ, R_circ);
+    node->pos = circle(node_id, N_circ, c_circ, R_circ);
     // node->dV = L0 / (1 << L_circ) * ds;
   }
+}
 
+event
+init(t = 0)
+{
   foreach ()
     u.x[] = U0;
 }
 
 event logfile(i++) { 
-  if (pid() == 0)
-    fprintf(stdout, "%d %g %d %d %d\n", i, t, mgp.i, mgu_a.i, mgu_b.i); 
+  fprintf(stderr, "%d %g %d %d %d\n", i, t, mgp.i, mgu_a.i, mgu_b.i); 
 }
 
 event
-output(i++; t <= 30.)
-// output(i += 1; t <= 30.)
+output(t += .1; t <= 5.)
+// output(i += 1; i <= 5.)
 {
   scalar omega[];
   vorticity(u, omega);
-  // output_hdf_htg({ p, omega, f }, { u, ibmf });
-  // output_ibnodes("uhllman_cylinder", i, t);
+#if TREE
+  output_hdf_htg();
+#else
+  output_hdf_imagedata();
+#endif 
+  output_hdf_pd();
 }
 
+#if TREE
 event
 adapt(i++)
 {
   adapt_wavelet_ibm({ u, f }, (double[]){ 3e-2, 3e-2, 3e-2 }, maxlevel, minlevel);
 }
+#endif 

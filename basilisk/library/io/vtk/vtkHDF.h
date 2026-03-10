@@ -59,23 +59,35 @@ typedef struct {
  * @memberof vtkHDF
  */
 void vtk_HDF_close (vtkHDF* vtk_hdf) {
-  if (vtk_hdf->grp_vtkhdf_id >= 0)
+  if (vtk_hdf->grp_vtkhdf_id >= 0 && H5Iis_valid (vtk_hdf->grp_vtkhdf_id) > 0) {
     H5Gclose (vtk_hdf->grp_vtkhdf_id);
+    vtk_hdf->grp_vtkhdf_id = H5I_INVALID_HID;
+  }
 
-  if (vtk_hdf->xfer_plist >= 0)
+  if (vtk_hdf->xfer_plist >= 0 && H5Iis_valid (vtk_hdf->xfer_plist) > 0) {
     H5Pclose (vtk_hdf->xfer_plist);
+    vtk_hdf->xfer_plist = H5I_INVALID_HID;
+  }
 
-  if (vtk_hdf->mem_space >= 0)
+  if (vtk_hdf->mem_space >= 0 && H5Iis_valid (vtk_hdf->mem_space) > 0) {
     H5Sclose (vtk_hdf->mem_space);
+    vtk_hdf->mem_space = H5I_INVALID_HID;
+  }
 
-  if (vtk_hdf->file_space >= 0)
+  if (vtk_hdf->file_space >= 0 && H5Iis_valid (vtk_hdf->file_space) > 0) {
     H5Sclose (vtk_hdf->file_space);
+    vtk_hdf->file_space = H5I_INVALID_HID;
+  }
 
-  if (vtk_hdf->fapl >= 0)
+  if (vtk_hdf->fapl >= 0 && H5Iis_valid (vtk_hdf->fapl) > 0) {
     H5Pclose (vtk_hdf->fapl);
+    vtk_hdf->fapl = H5I_INVALID_HID;
+  }
 
-  if (vtk_hdf->file_id >= 0)
+  if (vtk_hdf->file_id >= 0 && H5Iis_valid (vtk_hdf->file_id) > 0) {
     H5Fclose (vtk_hdf->file_id);
+    vtk_hdf->file_id = H5I_INVALID_HID;
+  }
 }
 
 /**

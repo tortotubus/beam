@@ -1,3 +1,5 @@
+#define MPI_AUTO_BOUNDARY 0
+
 #include "grid/quadtree.h"
 // #include "grid/multigrid.h"
 
@@ -20,6 +22,12 @@ scalar levelf[];
 scalar pidf[];
 scalar gradientf[];
 
+scalar ibmf[];
+
+IBscalar ibgradientf;
+IBscalar iblevelf;
+IBscalar ibnodeidf;
+
 coord
 circle(int n, int N, coord centre, double radius)
 {
@@ -30,44 +38,66 @@ circle(int n, int N, coord centre, double radius)
   return c;
 }
 
-
-static void mpi_write_neighbors (const char * basename)
+#if _MPI
+static void
+print_exchange_summary (void)
 {
-  if (npe() <= 1)
-    return;
+  for (int rank = 0; rank < npe(); rank++) {
+    MPI_Barrier (MPI_COMM_WORLD);
+    if (rank == pid()) {
+      printf ("[recv %d] {", pid());
+      bool first = true;
+      for (int peer = 0; peer < npe(); peer++) {
+        if (peer == pid())
+          continue;
+        int size = ibmm.rcv_boundary[peer].nodes.size;
+        if (size > 0) {
+          for (int i = 0; i < size; i++) {
+            if (first) {
+              printf ("%d", peer);
+              first = false;
+            } else {
+              printf(" %d", peer);
+            }
+              
+          }
+        }
+      }
+      printf ("}\n");
 
-  // Ensure the lists are up-to-date (recomputed in mpi_boundary_update_buffers()) :contentReference[oaicite:1]{index=1}
-  mpi_boundary_update_buffers();
-
-  MpiBoundary * m = (MpiBoundary *) mpi_boundary;
-  if (!m || !m->send || !m->receive)
-    return;
-
-  char fname[256];
-  snprintf(fname, sizeof(fname), "%s-%d.txt", basename, pid());
-  FILE * fp = fopen(fname, "w");
-  if (!fp) return;
-
-  int ns = m->send->len/sizeof(int);
-  int nr = m->receive->len/sizeof(int);
-  int * snd = (int *) m->send->p;
-  int * rcv = (int *) m->receive->p;
-
-  fprintf(fp, "pid %d / %d\n", pid(), npe());
-  fprintf(fp, "send neighbors (%d):", ns);
-  for (int i = 0; i < ns; i++) fprintf(fp, " %d", snd[i]);
-  fprintf(fp, "\n");
-
-  fprintf(fp, "recv neighbors (%d):", nr);
-  for (int i = 0; i < nr; i++) fprintf(fp, " %d", rcv[i]);
-  fprintf(fp, "\n");
-
-  fclose(fp);
+      printf ("[snd %d] {", pid());
+      first = true;
+      for (int peer = 0; peer < npe(); peer++) {
+        if (peer == pid())
+          continue;
+        int size = ibmm.snd_boundary[peer].nodes.size;
+        if (size > 0) {
+          for (int i = 0; i < size; i++) {
+            if (first) {
+              printf ("%d", peer);
+              first = false;
+            } else {
+              printf(" %d", peer);
+            }
+              
+          }
+        }
+      }
+      printf ("}\n");
+      fflush (stdout);
+    }
+  }
+  MPI_Barrier (MPI_COMM_WORLD);
 }
+#endif
 
 int
 main()
 {
+  new_ibscalar(ibgradientf);
+  new_ibscalar(iblevelf);
+  new_ibscalar(ibnodeidf);
+
 #if TREE
   init_grid(1 << minlevel);
 #else 
@@ -92,14 +122,14 @@ main()
 
   ibmeshmanager_add_nodes(new_id, N_circ);
 
-  foreach_ibmesh()
+  foreach_ibnode()
   {
-    mesh->refinement_level = ibmlevel;
+    node->depth = ibmlevel;
   }
 
   foreach_ibnode_per_ibmesh()
   {
-    node->lagpos = circle(node_id, N_circ, cen_circ, r_circ);
+    node->pos = circle(node_id, N_circ, cen_circ, r_circ);
   }
 
 
@@ -108,8 +138,10 @@ main()
   adapt_wavelet_ibm(NULL, NULL, maxlevel, minlevel);
 #endif
 
-  ibmeshmanager_init_stencil_caches();
-
+#if _MPI
+  ibmeshmanager_update_pid();
+#endif
+ 
   foreach() {
     levelf[] = point.level;
     suppf[] = 0.;
@@ -124,27 +156,48 @@ main()
   #endif
   }
 
-  foreach_ibnode() {
-    ibnode_update_pid(node);
+  foreach_ibnode() { 
+    ibval(ibnodeidf) = node_id;
   }
 
-  foreach_ibnode() {
+
+  foreach_ibnode_per_ibmesh() {
     peskin_cosine_kernel_spread_dimensionless(node) {
       suppf[] = pid() + 1;
       weightf[] += weight;
     }
   }
 
+
+
 #if _MPI
   gradientf.dirty = true;
   levelf.dirty = true;
   boundary((scalar*){gradientf, levelf});
+  
 #endif
+
 
   foreach_ibnode() {
     peskin_cosine_kernel_gather_dimensionless(node) {
-      node->force.x += weight * gradientf[];
-      node->force.y += weight * levelf[];
+      ibval(ibgradientf) += weight * gradientf[];
+      ibval(iblevelf) += weight * levelf[];
+    }
+  }
+
+
+#if _MPI
+  print_exchange_summary();
+  ibmeshmanager_boundary();
+#endif 
+ 
+  
+
+  foreach_ibnode() {
+    int cell_count = 0;
+    peskin_cosine_kernel_spread_dimensionless(node) {
+      ibmf[] += ibval(ibgradientf) * weight;
+      cell_count++;
     }
   }
 
@@ -155,13 +208,7 @@ main()
     output_hdf_htg();
     output_hdf_pd();
   }
-
-  if (pid() == 5) {
-    foreach_ibnode() {
-      printf("node pid: %d\n", node->pid);
-    }
-  }
-
+ 
   ibmeshmanager_free();
 
   return 0;
