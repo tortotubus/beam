@@ -46,7 +46,8 @@ macro2 foreach_cell_root_BFS(Point root) {
         size_t QMAX = 0;
         foreach_cell() { QMAX++; }
 
-        queue_t queue[QMAX];
+        // queue_t queue[QMAX];
+        queue_t * queue = calloc(QMAX, sizeof(queue_t));
         size_t front = 0, rear = 0;
 
 #if dimension == 1
@@ -108,6 +109,8 @@ macro2 foreach_cell_root_BFS(Point root) {
             }
 #endif
         } // End of loop over the current level
+
+        free(queue);
     }
 }
 
