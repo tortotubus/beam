@@ -318,6 +318,7 @@ macro2 foreach_neighbor_coord_nonlocal(int r, coord c) {
   NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   coord d = c;
   coord_periodic_boundary(d);
+#if TREE
   Point point = locate_nonlocal(d.x,d.y,d.z);
   if (point.level >= 0) {
     foreach_neighbor(r) {
@@ -328,6 +329,35 @@ macro2 foreach_neighbor_coord_nonlocal(int r, coord c) {
       }
     }
   }
+#else // !TREE
+  Point point = locate_nonlocal(d.x,d.y,d.z);
+  if (point.level >= 0) {
+    foreach_neighbor(r) {
+#if dimension == 1
+      if (point.i >= GHOSTS && point.i <= point.n.x + GHOSTS) {
+        // clang-format off
+       {...}
+       // clang-format on
+      }
+#elif dimension == 2
+      if (point.i >= GHOSTS && point.i <= point.n.x + GHOSTS) {
+      if (point.j >= GHOSTS && point.j <= point.n.y + GHOSTS) {
+        // clang-format off
+        {...}
+        // clang-format on
+      }}
+#else // dimension == 3
+      if (point.i >= GHOSTS && point.i <= point.n.x + GHOSTS) {
+      if (point.j >= GHOSTS && point.j <= point.n.y + GHOSTS) {
+      if (point.k >= GHOSTS && point.k <= point.n.z + GHOSTS) {
+        // clang-format off
+        {...}
+        // clang-format on
+      }}}
+#endif
+    }
+  }
+#endif // !TREE
 }
 
 macro2 foreach_neighbor_coord_level(int r, int l, coord c) {
@@ -335,6 +365,7 @@ macro2 foreach_neighbor_coord_level(int r, int l, coord c) {
   NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   coord d = c;
   coord_periodic_boundary(d);
+#if TREE
   Point point = locate_level(d.x,d.y,d.z,l);
   if (point.level >= 0) {
     foreach_neighbor(r) {
@@ -344,4 +375,15 @@ macro2 foreach_neighbor_coord_level(int r, int l, coord c) {
       // clang-format on
     }
   }
+#else 
+  Point point = locate_level(d.x,d.y,d.z,l);
+  if (point.level >= 0) {
+    foreach_neighbor(r) {
+      // clang-format off
+      {...}
+      // clang-format on
+    }
+  }
+#endif 
+
 }

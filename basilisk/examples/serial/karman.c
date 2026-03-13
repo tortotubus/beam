@@ -13,6 +13,8 @@ the inlet.
 We use the centered Navier-Stokes solver, with embedded boundaries and
 advect the passive tracer *f*. */
 
+#include "grid/multigrid.h"
+
 #include "embed.h"
 #include "navier-stokes/centered.h"
 #include "tracer.h"
@@ -110,20 +112,22 @@ event movies (i += 4; t <= 15.)
   vorticity (u, omega);
   foreach()
     m[] = cs[] - 0.5;
-  // output_ppm (omega, file = "vort.mp4", box = {{-0.5,-0.5},{7.5,0.5}},
-	//       min = -10, max = 10, linear = true, mask = m);
-  // output_ppm (f, file = "f.mp4", box = {{-0.5,-0.5},{7.5,0.5}},
-	//       linear = false, min = 0, max = 1, mask = m);
+#if TREE
   output_hdf_htg({p, omega, f},{u});
+#else
+  output_hdf_imagedata({p,omega,f},{u});
+#endif 
 }
 
 /**
 We adapt according to the error on the embedded geometry, velocity and
 tracer fields. */
 
+#if TREE
 event adapt (i++) {
   adapt_wavelet ({cs,u,f}, (double[]){1e-2,3e-2,3e-2,3e-2}, maxlevel, 4);
 }
+#endif
 
 /**
 ## See also

@@ -22,6 +22,9 @@ typedef struct {
   IBExchangeList* rcv_migrate;
   IBExchangeList* snd_boundary;
   IBExchangeList* rcv_boundary;
+#if !TREE
+  MPI_Comm cartcomm;
+#endif
 #endif
 } IBMeshManager;
 
@@ -40,6 +43,7 @@ void ibmeshmanager_add_nodes (int mesh_id, int count);
 void ibmeshmanager_delete_all_nodes (int mesh_id);
 
 #if _MPI
+int _ibmeshmanager_get_pid (Point p);
 void ibmeshmanager_update_pid ();
 void ibmeshmanager_boundary (IBscalar* list = iball);
 #endif
@@ -120,7 +124,7 @@ macro foreach_ibnode_per_ibmesh (bool boundary = MPI_AUTO_BOUNDARY) {
   }
 #if _MPI
   // if (MPI_AUTO_BOUNDARY)
-    // ibmeshmanager_boundary ();
+  // ibmeshmanager_boundary ();
 #endif
 }
 
@@ -151,8 +155,10 @@ void ibmeshmanager_init (int mesh_count) {
 #if _MPI
   ibmm.dirty = true;
   ibnodelist_init (&ibmm.local, 0);
-  ibmm.snd_boundary = (IBExchangeList*) calloc (npe (), sizeof (IBExchangeList));
-  ibmm.rcv_boundary = (IBExchangeList*) calloc (npe (), sizeof (IBExchangeList));
+  ibmm.snd_boundary =
+    (IBExchangeList*) calloc (npe (), sizeof (IBExchangeList));
+  ibmm.rcv_boundary =
+    (IBExchangeList*) calloc (npe (), sizeof (IBExchangeList));
   ibmm.snd_migrate = (IBExchangeList*) calloc (npe (), sizeof (IBExchangeList));
   ibmm.rcv_migrate = (IBExchangeList*) calloc (npe (), sizeof (IBExchangeList));
   for (int i = 0; i < npe (); i++) {
@@ -163,8 +169,26 @@ void ibmeshmanager_init (int mesh_count) {
     ibexchangelist_init (&ibmm.snd_migrate[i], 0);
     ibexchangelist_set_pid (&ibmm.snd_migrate[i], i);
     ibexchangelist_init (&ibmm.rcv_migrate[i], 0);
-    ibexchangelist_set_pid (&ibmm.rcv_migrate[i], i);  
+    ibexchangelist_set_pid (&ibmm.rcv_migrate[i], i);
   }
+
+#if !TREE
+
+  int dims[dimension];
+  int periods[dimension];
+  dims[0] = Dimensions.x;
+  periods[0] = Period.x;
+#if dimension >= 2
+  dims[1] = Dimensions.y;
+  periods[1] = Period.y;
+#endif
+#if dimension >= 3
+  dims[2] = Dimensions.z;
+  periods[2] = Period.z;
+#endif
+  MPI_Cart_create (MPI_COMM_WORLD, dimension, dims, periods, 0, &ibmm.cartcomm);
+
+#endif
 #endif
 
   foreach_ibmesh () {
@@ -280,6 +304,97 @@ void ibmeshmanager_delete_all_nodes (int mesh_id) {
 }
 
 #if _MPI
+
+trace inline int _ibmeshmanager_get_pid (Point p) {
+#if TREE
+  {
+    Point point = p;
+    int ig = 0, jg = 0, kg = 0;
+    NOT_UNUSED (ig);
+    NOT_UNUSED (jg);
+    NOT_UNUSED (kg);
+    POINT_VARIABLES ();
+
+    if (allocated (0))
+      return cell.pid;
+    else
+      return -1;
+  }
+#else
+  /**
+   * Here since we:
+   *  - cell.pid is not defined
+   *  - is_local returns true always
+   *  - Domain info is handled by MPI_Cart
+   *  - MPI_Comm cartcomm is not easily accessible
+   * we instead recreate our own MPI_Cart usign the same parameters and keep it
+   * static so that we may query about MPI/Phyiscal domain neighbors.
+   */
+  {
+    Point point = p;
+
+    // if (!is_boundary (point))
+    //   return pid ();
+
+    int coords[dimension];
+    coords[0] = mpi_coords[0];
+    if (point.i < GHOSTS)
+      coords[0]--;
+    else if (point.i >= point.n.x + GHOSTS)
+      coords[0]++;
+
+#if dimension > 1
+    coords[1] = mpi_coords[1];
+    if (point.j < GHOSTS)
+      coords[1]--;
+    else if (point.j >= point.n.y + GHOSTS)
+      coords[1]++;
+#endif
+
+#if dimension > 2
+    coords[2] = mpi_coords[2];
+    if (point.k < GHOSTS)
+      coords[2]--;
+    else if (point.k >= point.n.z + GHOSTS)
+      coords[2]++;
+#endif
+
+    if (!Period.x && (coords[0] < 0 || coords[0] >= Dimensions.x))
+      return -1;
+    if (Period.x) {
+      if (coords[0] < 0)
+        coords[0] += Dimensions.x;
+      else if (coords[0] >= Dimensions.x)
+        coords[0] -= Dimensions.x;
+    }
+#if dimension > 1
+    if (!Period.y && (coords[1] < 0 || coords[1] >= Dimensions.y))
+      return -1;
+    if (Period.y) {
+      if (coords[1] < 0)
+        coords[1] += Dimensions.y;
+      else if (coords[1] >= Dimensions.y)
+        coords[1] -= Dimensions.y;
+    }
+#endif
+#if dimension > 2
+    if (!Period.z && (coords[2] < 0 || coords[2] >= Dimensions.z))
+      return -1;
+    if (Period.z) {
+      if (coords[2] < 0)
+        coords[2] += Dimensions.z;
+      else if (coords[2] >= Dimensions.z)
+        coords[2] -= Dimensions.z;
+    }
+#endif
+
+    int owner = -1;
+    MPI_Cart_rank (ibmm.cartcomm, coords, &owner);
+    return owner;
+  }
+#endif
+}
+
 /**
  * @brief Update all IBNode pids
  *
@@ -310,14 +425,16 @@ trace void ibmeshmanager_update_pid () {
 
   /* Pass 1: local owner candidates only. */
   foreach_ibnode () {
+    coord d = node->pos;
+    coord_periodic_boundary (d);
+#if TREE
+    Point point = locate_level (d.x, d.y, d.z, node->depth);
     int ig = 0, jg = 0, kg = 0;
     NOT_UNUSED (ig);
     NOT_UNUSED (jg);
     NOT_UNUSED (kg);
-    coord d = node->pos;
-    coord_periodic_boundary (d);
-    Point point = locate_level (d.x, d.y, d.z, node->depth);
     POINT_VARIABLES ();
+
     if (point.level >= 0) {
       if (allocated (0)) {
         if (is_local (cell)) {
@@ -326,10 +443,23 @@ trace void ibmeshmanager_update_pid () {
         }
       }
     }
+#else
+    Point point = locate (d.x, d.y, d.z);
+    if (point.level >= 0) {
+      if (!is_boundary (point)) {
+        node_pids[node_id] = pid ();
+        node_is_local[node_id] = 1;
+      }
+    }
+#endif
   }
+
+  // return;
 
   /* Synchronize globally: each node gets one agreed owner pid. */
   mpi_all_reduce_array (node_pids, MPI_INT, MPI_MAX, nnode);
+
+  // return;
 
   /* Pass 2: build local/snd_boundary/rcv_boundary from resolved owners. */
   foreach_ibnode () {
@@ -341,15 +471,15 @@ trace void ibmeshmanager_update_pid () {
 
     // If the new or old owner was us, we must exchange
     if (old_pid != -1 && old_pid != new_pid) {
-      if (old_pid == pid()) {
-        ibexchangelist_push(&ibmm.snd_migrate[new_pid], node);
+      if (old_pid == pid ()) {
+        ibexchangelist_push (&ibmm.snd_migrate[new_pid], node);
       }
-      
-      if (new_pid == pid()) {
-        ibexchangelist_push(&ibmm.rcv_migrate[old_pid], node);
+      if (new_pid == pid ()) {
+        ibexchangelist_push (&ibmm.rcv_migrate[old_pid], node);
       }
     }
 
+#if TREE
     int ig = 0, jg = 0, kg = 0;
     NOT_UNUSED (ig);
     NOT_UNUSED (jg);
@@ -359,16 +489,16 @@ trace void ibmeshmanager_update_pid () {
     Point point = locate_level (d.x, d.y, d.z, node->depth);
     POINT_VARIABLES ();
 
-    if (node->pid == pid ()) {
+    if (node->pid == pid ()) { // local node
       ibnodelist_push (&ibmm.local, node);
-
       if (point.level >= 0 && allocated (0)) {
         foreach_neighbor (PESKIN_SUPPORT_RADIUS) {
           if (allocated (0) && !is_local (cell))
             ibexchangelist_push_unique (&ibmm.snd_boundary[cell.pid], node);
         }
       }
-    } else {
+    } // local node
+    else { // remote node
       bool has_local_support = false;
       if (point.level >= 0 && allocated (0)) {
         foreach_neighbor (PESKIN_SUPPORT_RADIUS) {
@@ -379,20 +509,44 @@ trace void ibmeshmanager_update_pid () {
       }
       if (has_local_support)
         ibexchangelist_push_unique (&ibmm.rcv_boundary[node->pid], node);
-    }
+    } // remote node
+#else // !TREE
+    coord d = node->pos;
+    coord_periodic_boundary (d);
+    Point point = locate_nonlocal (d.x, d.y, d.z);
+
+
+    int ig = 0, jg = 0, kg = 0;
+    NOT_UNUSED (ig); NOT_UNUSED (jg); NOT_UNUSED (kg);
+
+    if (point.level >= 0) {
+      if (node->pid == pid ()) { // local node
+        foreach_neighbor(PESKIN_SUPPORT_RADIUS) {
+          if (is_boundary (point)) {
+            int point_pid = _ibmeshmanager_get_pid (point);
+            // printf("%d\n", point_pid);
+            if (point_pid >= 0) // MPI boundary, not domain boundary
+              ibexchangelist_push_unique (&ibmm.snd_boundary[point_pid], node);
+          }
+        }
+      } else { // remote node
+        ibexchangelist_push_unique (&ibmm.rcv_boundary[node->pid], node);
+      }
+    } // remote node
+#endif
   }
 
   free (node_is_local);
   free (node_pids);
 
-  // Migrate nodes 
-  IBscalar * slist = iball;
-  size_t nscalars = iblist_len(slist);
+  // Migrate nodes
+  IBscalar* slist = iball;
+  size_t nscalars = iblist_len (slist);
 
-  for (int peer = 0; peer < npe(); peer++) {
-    if (peer != pid()) {
-      ibexchangelist_init_buffer(&ibmm.snd_migrate[peer], nscalars);
-      ibexchangelist_init_buffer(&ibmm.rcv_migrate[peer], nscalars);
+  for (int peer = 0; peer < npe (); peer++) {
+    if (peer != pid ()) {
+      ibexchangelist_init_buffer (&ibmm.snd_migrate[peer], nscalars);
+      ibexchangelist_init_buffer (&ibmm.rcv_migrate[peer], nscalars);
     }
   }
 
@@ -439,7 +593,6 @@ trace void ibmeshmanager_update_pid () {
   if (nreq > 0)
     MPI_Waitall (nreq, requests, MPI_STATUSES_IGNORE);
   free (requests);
-
 
   // Unpacking
   for (int peer = 0; peer < npe (); peer++) {
@@ -562,4 +715,4 @@ void ibmeshmanager_boundary (IBscalar* slist = iball) {
   }
 }
 
-#endif
+#endif // _MPI

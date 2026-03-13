@@ -71,8 +71,7 @@ scalar pf[];
 face vector uf[];
 
 vector ibmf[];
-
-scalar gradientf[]; // test
+ 
 
 IBvector eulvel;
 IBvector lagvel;
@@ -168,10 +167,7 @@ event defaults (i = 0) {
   new_ibscalar (sumw2);
 
   ibmeshmanager_init (0);
-
-  foreach () {
-    gradientf[] = -x + y;
-  }
+ 
 
   /**
   We reset the multigrid parameters to their default values. */
@@ -472,12 +468,8 @@ event interface_spread_force (i++, last) {
   foreach_ibnode () {
     peskin_cosine_kernel_spread_dimensionless (node) {
       foreach_dimension () {
-        // double dV = dv();
-        // fprintf(stdout, "dv %f\n", dv());
-        // ibmf.x[] += (dt / (rho[] * node->weight)) * weight * node->force.x;;
-        // ibmf.x[] += (weight * dt * node->force.x ) / (node->weight);
-        assert (ibval (sumw2) != 0);
-        ibmf.x[] += (weight * dt * ibval (force.x)) / ibval (sumw2);
+        // double dV = dv();  
+        ibmf.x[] += (weight * ibval (force.x)) / ibval (sumw2);
       }
     }
   }
@@ -487,13 +479,9 @@ event interface_spread_force (i++, last) {
 
   foreach () {
     foreach_dimension () {
-      u.x[] += ibmf.x[];
+      u.x[] += ibmf.x[] * dt;
     }
   }
-
-  // foreach_dimension()
-  //   u.x.dirty = true;
-  // boundary((scalar*){u});
 }
 
 event beta_viscous_term (i++, last) {
@@ -596,8 +584,7 @@ fluxes need to be checked for inconsistencies. */
 #if TREE
 event adapt (i++, last) {
 #if _MPI
-  ibmeshmanager_update_pid ();
-  // ibmeshmanager_boundary();
+  ibmeshmanager_update_pid (); 
 #endif
 
 #if EMBED

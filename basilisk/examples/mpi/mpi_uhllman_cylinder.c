@@ -1,11 +1,9 @@
-// #include "grid/multigrid.h"
 #include "grid/quadtree.h"
+// #include "grid/multigrid.h"
 
 #include "library/ibm/IBMeshManager.h"
-
 #include "library/ibm/navier-stokes/centered-split.h"
 #include "tracer.h"
-
 #include "library/io/output-vtk.h"
 
 coord
@@ -25,31 +23,36 @@ face vector muv[];
 double Reynolds = 100.;
 double U0 = 1.;
 
-const int maxlevel = 9;
-const int minlevel = 4;
+const int maxlevel = 10;
+const int minlevel = 6;
 
-const int N_circ = 90;
+const double L_fluid = 8;
+const int lvl_circ = 10;
 const double R_circ = 0.15;
-const int L_circ = 11;
 const coord c_circ = { 0 };
+const double h_fluid = L_fluid / (1 << lvl_circ);
+const int N_circ = (int)(1.5 * pi * R_circ / h_fluid);
+const double ds_circ = (double)(2 * pi * R_circ) / (N_circ);
+double dV_circ = 0;
 
 int
 main()
 {
-  L0 = 16;
-  origin(-1.85, -L0/2.);
+  L0 = L_fluid;
+  origin(-1.85, -L0 / 2.);
 
 #if TREE
-  N = 1 << 5;
+  N = 1 << minlevel;
 #else
-  N = 1 << L_circ;
-#endif 
+  N = 1 << lvl_circ;
+#endif
 
+  dV_circ = L_fluid / (1 << lvl_circ) * ds_circ;
   mu = muv;
 
   display_control(Reynolds, 10, 1000);
 
-  DT = 0.000625;
+  DT = 0.00125;
 
   run();
 }
@@ -70,37 +73,59 @@ p[right] = dirichlet(0.);
 pf[right] = dirichlet(0.);
 
 event
-init_ib(i = 0) {
+init_ib(i = 0)
+{
   int new_id = ibmeshmanager_add_mesh();
   ibmeshmanager_add_nodes(new_id, N_circ);
-
-  double ds = (2 * pi * R_circ) / N_circ;
-
-  foreach_ibnode()
-  {
-    node->depth = L_circ;
-  }
-
-  foreach_ibnode_per_ibmesh()
-  {
-    node->pos = circle(node_id, N_circ, c_circ, R_circ);
-    // node->dV = L0 / (1 << L_circ) * ds;
-  }
+  foreach_ibnode() node->depth = lvl_circ;
+  foreach_ibnode_per_ibmesh() node->pos =
+    circle(node_id, N_circ, c_circ, R_circ);
 }
 
+event init(t = 0) foreach () u.x[] = U0;
+
 event
-init(t = 0)
+logfile(i++)
 {
-  foreach ()
-    u.x[] = U0;
-}
-
-event logfile(i++) { 
-  fprintf(stderr, "%d %g %d %d %d\n", i, t, mgp.i, mgu_a.i, mgu_b.i); 
+  fprintf(stderr, "%d %g %d %d %d\n", i, t, mgp.i, mgu_a.i, mgu_b.i);
 }
 
 event
-output(t += .1; t <= 5.)
+statsfile(i++)
+{
+
+  coord f = { 0 };
+  double Cd = 0., Cl = 0.;
+  double fx = 0., fy = 0.;
+  foreach (reduction(+:fx) reduction(+:fy)) {
+    fx += -ibmf.x[] * dv();
+    fy += -ibmf.y[] * dv();
+  }
+
+// #if _MPI
+//   MPI_Allreduce(&fx, &fx, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+//   MPI_Allreduce(&fx, &fy, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+// #endif
+
+  Cd = fx / (0.5 * sq(U0) * 2 * R_circ);
+  Cl = fy / (0.5 * sq(U0) * 2 * R_circ);
+
+  if (pid() == 0) {
+    if (i == 0) {
+      FILE* fp = fopen("cylinderstats.txt", "w");
+      fprintf(fp, "");
+      fclose(fp);
+    }
+
+    FILE* fp = fopen("cylinderstats.txt", "a");
+
+    fprintf(fp, "%f %f %f %f %f\n", t, fx, fy, Cd, Cl);
+    fclose(fp);
+  }
+}
+
+event
+output(i += 1000; t <= 60.)
 // output(i += 1; i <= 5.)
 {
   scalar omega[];
@@ -109,7 +134,7 @@ output(t += .1; t <= 5.)
   output_hdf_htg();
 #else
   output_hdf_imagedata();
-#endif 
+#endif
   output_hdf_pd();
 }
 
@@ -117,6 +142,7 @@ output(t += .1; t <= 5.)
 event
 adapt(i++)
 {
-  adapt_wavelet_ibm({ u, f }, (double[]){ 3e-2, 3e-2, 3e-2 }, maxlevel, minlevel);
+  adapt_wavelet_ibm(
+    { u, f }, (double[]){ 3e-2, 3e-2, 3e-2 }, maxlevel, minlevel);
 }
-#endif 
+#endif

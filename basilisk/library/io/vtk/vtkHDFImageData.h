@@ -1,5 +1,13 @@
 #include "vtkHDF.h"
 
+#ifndef COMPRESSION
+#define COMPRESSION 1
+#endif
+
+#ifndef COMPRESSION_LEVEL
+#define COMPRESSION_LEVEL 7
+#endif
+
 typedef struct {
   vtkHDF vtk_hdf;
   hid_t grp_fielddata_id;
@@ -33,6 +41,13 @@ vtkHDFImageData vtk_HDF_imagedata_init_static (scalar* scalar_list,
                                                vector* vector_list,
                                                const char* fname,
                                                bool overwrite) {
+
+#if TREE
+  fprintf (stderr,
+           "error: vtk_HDF_imagedata should not be used with TREE grids\n");
+  abort ();
+#endif
+
 #if _MPI
   vtkHDF vtk_hdf = vtk_HDF_init_MPIIO (fname, overwrite);
 #else
@@ -216,22 +231,70 @@ vtkHDFImageData vtk_HDF_imagedata_init_static (scalar* scalar_list,
     for (scalar s in scalar_list) {
 
 #if dimension == 1
-      const size_t nx = (size_t) ((1 << depth ()) * Dimensions.x);
-      const size_t n = nx;
+      const hsize_t global_nx = (hsize_t) ((1 << depth ()) * Dimensions.x);
+      const hsize_t local_nx = (hsize_t) (1 << depth ());
+
+      const hsize_t global_dims[] = {global_nx};
+      const hsize_t local_dims[] = {local_nx};
+#if _MPI && !TREE
+      const hsize_t local_offset[] = {(hsize_t) mpi_coords[0] * local_nx};
+#else 
+      const hsize_t local_offset[] = {0};
+#endif
+      const hsize_t max_dims[] = {global_nx};
+      const hsize_t chunk_dims[] = {local_nx};
+
+      const size_t local_n = (size_t) local_nx;
+      const int rank = 1;
 
 #elif dimension == 2
-      const size_t nx = (size_t) ((1 << depth ()) * Dimensions.x);
-      const size_t ny = (size_t) ((1 << depth ()) * Dimensions.y);
-      const size_t n = nx * ny;
+      const hsize_t global_nx = (hsize_t) ((1 << depth ()) * Dimensions.x);
+      const hsize_t global_ny = (hsize_t) ((1 << depth ()) * Dimensions.y);
 
-#else // dimension == 3
-      const size_t nx = (size_t) ((1 << depth ()) * Dimensions.x);
-      const size_t ny = (size_t) ((1 << depth ()) * Dimensions.y);
-      const size_t nz = (size_t) ((1 << depth ()) * Dimensions.z);
-      const size_t n = nx * ny * nz;
+      const hsize_t local_nx = (hsize_t) (1 << depth ());
+      const hsize_t local_ny = (hsize_t) (1 << depth ());
+
+      const hsize_t global_dims[] = {global_ny, global_nx};
+      const hsize_t local_dims[] = {local_ny, local_nx};
+#if _MPI && !TREE
+      const hsize_t local_offset[] = {(hsize_t) mpi_coords[1] * local_ny,
+                                      (hsize_t) mpi_coords[0] * local_nx};
+#else 
+      const hsize_t local_offset[] = {0,0};
+#endif 
+      const hsize_t max_dims[] = {global_ny, global_nx};
+      const hsize_t chunk_dims[] = {local_ny, local_nx};
+
+      const size_t local_n = (size_t) (local_nx * local_ny);
+      const int rank = 2;
+
+#else
+      const hsize_t global_nx = (hsize_t) ((1 << depth ()) * Dimensions.x);
+      const hsize_t global_ny = (hsize_t) ((1 << depth ()) * Dimensions.y);
+      const hsize_t global_nz = (hsize_t) ((1 << depth ()) * Dimensions.z);
+
+      const hsize_t local_nx = (hsize_t) (1 << depth ());
+      const hsize_t local_ny = (hsize_t) (1 << depth ());
+      const hsize_t local_nz = (hsize_t) (1 << depth ());
+
+      const hsize_t global_dims[] = {global_nz, global_ny, global_nx};
+      const hsize_t local_dims[] = {local_nz, local_ny, local_nx};
+#if _MPI && !TREE
+      const hsize_t local_offset[] = {(hsize_t) mpi_coords[2] * local_nz,
+                                      (hsize_t) mpi_coords[1] * local_ny,
+                                      (hsize_t) mpi_coords[0] * local_nx};
+#else 
+      const hsize_t local_offset[] = {0,0,0};
+#endif 
+      const hsize_t max_dims[] = {global_nz, global_ny, global_nx};
+      const hsize_t chunk_dims[] = {local_nz, local_ny, local_nx};
+
+      const size_t local_n = (size_t) (local_nx * local_ny * local_nz);
+      const int rank = 3;
 #endif
 
-      float* s_data = malloc (n * sizeof (float));
+      // allocate the array to copy data into
+      float* s_data = malloc (local_n * sizeof (float));
       if (!s_data) {
         perror ("malloc(s_data)");
         exit (1);
@@ -240,48 +303,73 @@ vtkHDFImageData vtk_HDF_imagedata_init_static (scalar* scalar_list,
       foreach (serial) {
 #if dimension == 1
         int i = point.i - GHOSTS;
-
         size_t vtk_idx = (size_t) i;
-
 #elif dimension == 2
         int i = point.i - GHOSTS;
         int j = point.j - GHOSTS;
-        size_t vtk_idx = (size_t) i + (size_t) nx * (size_t) j;
-
+        size_t vtk_idx = (size_t) i + (size_t) local_nx * (size_t) j;
 #else
         int i = point.i - GHOSTS;
         int j = point.j - GHOSTS;
         int k = point.k - GHOSTS;
         size_t vtk_idx =
-          (size_t) i + (size_t) nx * ((size_t) j + (size_t) ny * (size_t) k);
+          (size_t) i +
+          (size_t) local_nx * ((size_t) j + (size_t) local_ny * (size_t) k);
 #endif
-
         s_data[vtk_idx] = (float) val (s);
       }
 
-#if dimension == 1
-      hsize_t dims[] = {nx};
-      int rank = 1;
-#elif dimension == 2
-      hsize_t dims[] = {ny, nx};
-      int rank = 2;
-#else
-      hsize_t dims[] = {nz, ny, nx};
-      int rank = 3;
-#endif
-
+#if COMPRESSION && _MPI
+      vtk_HDF_collective_write_compressed_dataset (
+        s.name,
+        s_data,
+        H5T_IEEE_F32LE,
+        vtk_hdf_imagedata.grp_celldata_id,
+        rank,
+        global_dims,
+        max_dims,
+        chunk_dims,
+        local_dims,
+        local_offset,
+        COMPRESSION_LEVEL,
+        &vtk_hdf_imagedata.vtk_hdf);
+#elif COMPRESSION && !_MPI
+      vtk_HDF_write_compressed_dataset (s.name,
+                                        s_data,
+                                        H5T_IEEE_F32LE,
+                                        vtk_hdf_imagedata.grp_celldata_id,
+                                        rank,
+                                        global_dims,
+                                        max_dims,
+                                        chunk_dims,
+                                        COMPRESSION_LEVEL,
+                                        &vtk_hdf_imagedata.vtk_hdf);
+#elif !COMPRESSION && _MPI
+      vtk_HDF_collective_write_chunked_dataset (
+        s.name,
+        s_data,
+        H5T_IEEE_F32LE,
+        vtk_hdf_imagedata.grp_celldata_id,
+        rank,
+        global_dims,
+        max_dims,
+        chunk_dims,
+        local_dims,
+        local_offset,
+        &vtk_hdf_imagedata.vtk_hdf);
+#else // !COMPRESSION && !_MPI
       vtk_HDF_write_dataset (s.name,
                              s_data,
                              H5T_IEEE_F32LE,
                              vtk_hdf_imagedata.grp_celldata_id,
                              rank,
-                             dims,
+                             local_dims,
                              &vtk_hdf_imagedata.vtk_hdf);
+#endif
 
       free (s_data);
     }
   }
-
   // {
   //   // Create the new PointData group inside group VTKHDF
   //   vtk_hdf_imagedata.grp_pointdata_id =

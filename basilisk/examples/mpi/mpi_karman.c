@@ -13,6 +13,8 @@ the inlet.
 We use the centered Navier-Stokes solver, with embedded boundaries and
 advect the passive tracer *f*. */
 
+#include "grid/multigrid.h"
+
 #include "embed.h"
 #include "navier-stokes/centered.h"
 #include "tracer.h"
@@ -37,15 +39,9 @@ int main()
   When using bview we can interactively control the Reynolds number
   and maximum level of refinement. */
   
-  // display_control (Reynolds, 10, 1000);
-  // display_control (maxlevel, 6, 12);
+  display_control (Reynolds, 10, 1000);
+  display_control (maxlevel, 6, 12);
   
-#if _MPI
-#else
-  printf("Not compiled with MPI...!\n");
-  abort();
-#endif
-
   run(); 
 }
 
@@ -102,40 +98,36 @@ event init (t = 0)
 We check the number of iterations of the Poisson and viscous
 problems. */
 
-event logfile (i++) {
-  if (pid() == 0) {
-    fprintf (stderr, "%d %g %d %d\n", i, t, mgp.i, mgu.i);
-  }
-}
+event logfile (i++)
+  fprintf (stderr, "%d %g %d %d\n", i, t, mgp.i, mgu.i);
 
 /**
 We produce animations of the vorticity and tracer fields... */
 
 #include "library/io/output-vtk.h"
 
-event movies (i += 4; t <= 5.)
+event movies (i += 4; t <= 15.)
 {
   scalar omega[], m[];
-  scalar pid[];
   vorticity (u, omega);
-  foreach() {
+  foreach()
     m[] = cs[] - 0.5;
-    pid[] = pid();
-  }
-  // output_ppm (omega, file = "vort.mp4", box = {{-0.5,-0.5},{7.5,0.5}},
-	//       min = -10, max = 10, linear = true, mask = m);
-  // output_ppm (f, file = "f.mp4", box = {{-0.5,-0.5},{7.5,0.5}},
-	//       linear = false, min = 0, max = 1, mask = m);
-  output_hdf_htg({p, omega, f, pid},{u});
+#if TREE
+  output_hdf_htg({p, omega, f},{u});
+#else
+  output_hdf_imagedata({p,omega,f},{u});
+#endif 
 }
 
 /**
 We adapt according to the error on the embedded geometry, velocity and
 tracer fields. */
 
+#if TREE
 event adapt (i++) {
   adapt_wavelet ({cs,u,f}, (double[]){1e-2,3e-2,3e-2,3e-2}, maxlevel, 4);
 }
+#endif
 
 /**
 ## See also

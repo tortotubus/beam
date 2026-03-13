@@ -171,8 +171,9 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   size_t n_points_local = 0;
   foreach_ibnode () {
     ibnode_update_pid (node);
-    if (node->pid == pid ())
+    if (node->pid == pid ()) {
       n_points_local++;
+    }
   }
 #else
   size_t n_points_local = 0;
