@@ -1,7 +1,7 @@
 #include "c/models/beam/IBEulerBeam.h"
 
-#include "models/beam/IBEulerBeam.hpp"
 #include "config/config.hpp"
+#include "models/beam/IBEulerBeam.hpp"
 
 using namespace ELFF::Models;
 using namespace ELFF;
@@ -16,8 +16,10 @@ extern "C"
                         double r_penalty)
   {
 
-    EulerBeam::EulerBeamBCs bcs = { .end = { EulerBeam::left, EulerBeam::right },
-                         .type = { EulerBeam::simple_bc, EulerBeam::free_bc } };
+    EulerBeam::EulerBeamBCs bcs = {
+      .end = { EulerBeam::left, EulerBeam::right },
+      .type = { EulerBeam::simple_bc, EulerBeam::free_bc }
+    };
 
     return new IBEulerBeam(static_cast<real_t>(length),
                            static_cast<real_t>(EI),
@@ -63,12 +65,14 @@ extern "C"
       ic_velocity[ni][2] = 0.;
     }
 
-    EulerBeam::EulerBeamBCs boundary_conditions = { .end = { EulerBeam::left, EulerBeam::right },
-                                         .type = { EulerBeam::free_bc, EulerBeam::simple_bc },
-                                         .vals = { {
-                                                     .position = { 0, 0, 0 },
-                                                   },
-                                                   {} } };
+    EulerBeam::EulerBeamBCs boundary_conditions = {
+      .end = { EulerBeam::left, EulerBeam::right },
+      .type = { EulerBeam::free_bc, EulerBeam::simple_bc },
+      .vals = { {
+                  .position = { 0, 0, 0 },
+                },
+                {} }
+    };
 
     IBEulerBeam* beam = new IBEulerBeam(static_cast<real_t>(length),
                                         static_cast<real_t>(EI),

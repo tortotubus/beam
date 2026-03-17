@@ -35,7 +35,7 @@ public:
   {
     ELFF_ASSERT(load.size() == nodes,
                 "Size of load vector must equal number of nodes.");
-    const real_t alpha = 0;
+    const real_t alpha = 0.;
     const real_t gamma = 0.5 - alpha;
     const real_t beta = 0.25 * (1 - alpha) * (1 - alpha);
     solve_newmark(dt, load, beta, gamma);

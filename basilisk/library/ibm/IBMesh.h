@@ -1,7 +1,6 @@
 #pragma once
 
-// #include "interface/ibm/immersedboundary.h"
-
+#include "library/ibm/IBMeshModel.h"
 #include "library/ibm/IBMempool.h"
 #include "library/ibm/IBNodeList.h"
 #include "library/ibm/IBNode.h"
@@ -9,10 +8,10 @@
 /*
  * Type Definitions
  */
-
 typedef struct {
+  int pid;
   IBNodeList nodes;
-  int refinement_level;
+  IBMeshModel model;
 } IBMesh;
 
 /**
@@ -60,6 +59,7 @@ void ibmesh_free (IBMesh* mesh) {
     return;
 
   ibnodelist_free (&mesh->nodes);
+  ibmeshmodel_destroy (&mesh->model);
 }
 
 /**
@@ -120,12 +120,22 @@ void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool) {
   }
 }
 
-// void ibmesh_fill_stencil_cache (IBMesh* mesh) {
-//   for (size_t node_id = 0; node_id < mesh->nodes.size; node_id++) {
-//     IBNode* node = mesh->nodes.ptrs[node_id];
-//     foreach_neighborhood_coord_level (
-//       node->pos, PESKIN_SUPPORT_RADIUS, node->depth) {
-//       cache_append (&node->stencil, point, 0);
-//     }
-//   }
-// }
+/**
+ * @brief Set the mesh model
+ */
+void ibmesh_set_model (IBMesh* mesh, IBMempool* pool, IBMeshModel model) {
+  switch (model.type) {
+  case IB_MODEL_VELOCITY_COUPLED: {
+    // TODO
+  }
+  case IB_MODEL_FORCE_COUPLED: {
+    mesh->model = model;
+    ibmesh_delete_all_nodes (mesh, pool);
+    int node_count = mesh->model.force_ops->node_count (model.ctx);
+    ibmesh_add_nodes (mesh, pool, node_count);
+    mesh->model.force_ops->sync (model.ctx, mesh);
+  }
+  default:
+    break;
+  }
+}

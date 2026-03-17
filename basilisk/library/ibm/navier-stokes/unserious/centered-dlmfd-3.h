@@ -1,22 +1,3 @@
-
-static inline bool fp_weird (double x) {
-  // true if NaN or +/-Inf or subnormal (very tiny) or outside finite range
-  // (NaN/Inf covers most "weird" cases; subnormal is optional but useful)
-  if (isnan (x) || isinf (x)) {
-    printf ("fp_weird: %f\n", x);
-    return true;
-  }
-
-  // Subnormal: nonzero but magnitude smaller than DBL_MIN
-  // (can indicate underflow / loss of significance)
-  if (x != 0.0 && fabs (x) < DBL_MIN) {
-    printf ("fp_weird: %f\n", x);
-    return true;
-  }
-
-  return false;
-}
-
 /**
 # Incompressible Navier--Stokes solver (centered formulation)
 
@@ -69,15 +50,27 @@ scalar p[];
 vector u[], g[];
 scalar pf[];
 face vector uf[];
+face vector ibma[];
 
 vector ibmf[];
-vector dibmf[];
-vector uib[];
- 
-IBvector eulvel;
-IBscalar sumw2; 
 
-// vector ibmf[]; // Interface force
+scalar tmp_p[];
+vector tmp_force[];
+vector tmp_vel[];
+vector tmp_g[];
+face vector tmp_a[], tmp_uf[];
+
+IBvector gravity;
+
+IBscalar nweight;
+IBvector eulvel;
+// IBvector lagvel;
+// IBvector force;
+IBvector rhs;
+IBvector res;
+IBvector w;
+IBvector Ay;
+ 
 
 /**
 In the case of variable density, the user will need to define both the
@@ -105,12 +98,31 @@ for which inertia is negligible compared to viscosity. */
 bool stokes = false;
 
 face vector mu_alpha[], mu_beta[];
-mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
+mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0}, mgibm = {0};
 
-double alpha_split = 0.5;
-double beta_split = 0.5;
-double ib_force_relaxation = 0.7;
-int ib_richardson_iters = 5;
+double alpha_split = 1.0;
+double beta_split = 0.0;
+
+static inline double ib_node_value (IBscalar s, IBNode * node) {
+  return *_ibval (s, node, false);
+}
+
+static inline void ib_node_addto (IBscalar s, IBNode * node, double value) {
+  *_ibval (s, node, false) += value;
+}
+
+static inline double ib_node_spacing (const IBNode * a, const IBNode * b) {
+  double ds = sq (a->pos.x - b->pos.x);
+#if dimension > 1
+  ds += sq (a->pos.y - b->pos.y);
+#endif
+#if dimension > 2
+  ds += sq (a->pos.z - b->pos.z);
+#endif
+  return max (sqrt (ds), 1e-30);
+}
+ 
+
 /**
 ## Boundary conditions
 
@@ -153,7 +165,9 @@ embedded boundaries. */
 
 #if TREE && EMBED
 void pressure_embed_gradient (Point point, scalar p, coord* g) {
-  foreach_dimension () g->x = rho[] / (cm[] + SEPS) * (a.x[] + a.x[1]) / 2.;
+  foreach_dimension ()
+    g->x = rho[] / (cm[] + SEPS) *
+           ((a.x[] + ibma.x[]) + (a.x[1] + ibma.x[1])) / 2.;
 }
 #endif // TREE && EMBED
 
@@ -161,10 +175,20 @@ void pressure_embed_gradient (Point point, scalar p, coord* g) {
 ## Initial conditions */
 
 event defaults (i = 0) {
-  new_ibvector (eulvel); 
-  new_ibscalar (sumw2); 
+  new_ibscalar (nweight);
+  new_ibvector (eulvel);
+  new_ibvector (gravity);
+  new_ibvector (rhs);
+  new_ibvector (res);
+  new_ibvector (w);
+  new_ibvector (Ay);
 
   ibmeshmanager_init (0);
+
+  if (is_constant (a.x)) {
+    a = new face vector;
+    foreach_face () a.x[] = 0.;
+  }
 
   /**
   We reset the multigrid parameters to their default values. */
@@ -179,7 +203,7 @@ event defaults (i = 0) {
   /**
   The pressures are never dumped. */
 
-  p.nodump = pf.nodump = true;
+  p.nodump = pf.nodump = tmp_p.nodump = true;
 
   /**
   The default density field is set to unity (times the metric and the
@@ -222,9 +246,6 @@ event defaults (i = 0) {
 
   foreach ()
     foreach_dimension () dimensional (u.x[] == Delta / t);
-
-  foreach ()
-    foreach_dimension () ibmf.x[] = 0.;
 }
 
 /**
@@ -250,6 +271,8 @@ event init_ib (i = 0) {
 }
 
 event init (i = 0) {
+  trash ({ibma});
+  foreach_face () ibma.x[] = 0.;
 
   trash ({uf});
   foreach_face () uf.x[] = fm.x[] * face_value (u.x, 0);
@@ -297,8 +320,6 @@ $t+\Delta t/2$ -- can be defined by overloading this event. */
 
 event properties (i++, last) {
   if (!is_constant (mu.x)) {
-    // mu_alpha = new face vector;
-    // mu_beta = new face vector;
     foreach_face () {
       mu_alpha.x[] = mu.x[] * alpha_split;
       mu_beta.x[] = mu.x[] * beta_split;
@@ -411,89 +432,6 @@ event alpha_viscous_term (i++, last) {
   }
 }
 
-// #include "library/ibm/IBEvents.h"
-#include "library/ibm/IBKernels.h"
-
-event advance_interface (i++, last) { 
-  // ibmeshmanager_advance_positions (dt);
- 
-}
-
-
-event interface_compute_constraint (i++, last) {
-  trash ({ibmf});
-
-  // gradientf.dirty = true;
-  foreach_dimension () {
-    u.x.dirty = true;
-  }
-  boundary ((scalar*) {u});
-
-  foreach ()
-    foreach_dimension () ibmf.x[] = 0.;
-
-  foreach_ibnode () {
-    foreach_dimension () {
-      ibval (eulvel.x) = 0;
-    }
-    double lsumw2 = 0.;
-    peskin_cosine_kernel_gather_dimensionless (node) {
-      lsumw2 += weight * weight;
-      foreach_dimension () {
-        ibval (eulvel.x) += weight * u.x[];
-      }
-    }
-    ibval (sumw2) = lsumw2;
-  }
-
-#if _MPI
-  {
-    IBscalar* list = NULL;
-    foreach_dimension () {
-      list = iblist_add (list, eulvel.x);
-    }
-    list = iblist_add (list, sumw2);
-    ibmeshmanager_boundary (list);
-  }
-#endif
-
-  // Compute forcing
-  foreach_ibnode () {
-    foreach_dimension () {
-      node->f.x = -(node->vel.x - ibval (eulvel.x)) /
-      dt;
-    }
-  }
-}
-
-event interface_spread_force (i++, last) {
-  foreach_ibnode () {
-    peskin_cosine_kernel_spread_dimensionless (node) {
-      foreach_dimension () {
-        // double dV = dv();
-        ibmf.x[] += -(weight * node->f.x) / ibval (sumw2);
-      }
-    }
-  }
-
-  foreach_dimension () ibmf.x.dirty = true;
-  boundary ((scalar*) {ibmf});
-
-  foreach () {
-    foreach_dimension () {
-      u.x[] += ibmf.x[] * dt;
-    }
-  }
-}
-
-event beta_viscous_term (i++, last) {
-  if (constant (mu.x) != 0. && beta_split != 0.) {
-    correction (dt);
-    mgu_b = viscosity (u, mu_beta, rho, dt, mgu_b.nrelax);
-    correction (-dt);
-  }
-}
-
 /**
 ### Acceleration term
 
@@ -511,23 +449,229 @@ The (provisionary) face velocity field at time $t+\Delta t$ is
 obtained by interpolation from the centered velocity field. The
 acceleration term is added. */
 
-event acceleration (i++, last) {
-  // face vector ae = a;
-  // foreach_face()
-  //   if (fm.x[] > 1.e-20)
-  //     a.x[] += .5 * alpha.x[] * (ibmf.x[] - ibmf.x[-1]);
+#include "library/ibm/IBKernels.h"
 
-  trash ({uf});
-  foreach_face () uf.x[] = fm.x[] * (face_value (u.x, 0) + dt * a.x[]);
+static void centered_gradient_with_accel (face vector af, scalar p, vector g) {
+  face vector gf[];
+  foreach_face () gf.x[] = fm.x[] * af.x[] - alpha.x[] * (p[] - p[-1]) / Delta;
 
-  /**
-  We reset the acceleration field (if it is not a constant). */
+  trash ({g});
+  foreach ()
+    foreach_dimension () g.x[] = (gf.x[] + gf.x[1]) / (fm.x[] + fm.x[1] + SEPS);
+}
 
-  if (!is_constant (a.x)) {
-    face vector af = a;
-    trash ({af});
-    foreach_face () af.x[] = 0.;
+static void ib_cell_force_to_face_accel (vector force, face vector af) {
+  foreach_face () {
+    if (fm.x[] > 1e-20)
+      af.x[] = 0.5 * alpha.x[] * (force.x[] + force.x[-1]);
+    else
+      af.x[] = 0.;
   }
+}
+
+// event advance_lagrangian_mesh (i++, last) {
+//   foreach_ibnode() 
+//     foreach_dimension()
+//       node->f.x += ibval(gravity.x);
+
+//   ibmeshmanager_advance_positions (dt);
+
+//   foreach_ibnode() 
+//     foreach_dimension()
+//       node->f.x -= ibval(gravity.x);
+// }
+
+event interpolate_eulerian_velocities (i++, last) {
+  foreach_ibnode () {
+    foreach_dimension () {
+      ibval (eulvel.x) = 0;
+    }
+    peskin_cosine_kernel_gather_dimensionless (node) {
+      foreach_dimension () {
+        ibval (eulvel.x) += weight * u.x[];
+      }
+    }
+  }
+}
+
+event compute_constraint_rhs (i++, last) {
+  foreach_ibnode () {
+    foreach_dimension () {
+      ibval (rhs.x) =  ibval (eulvel.x) - node->vel.x;
+    }
+  }
+}
+
+
+void ib_matvec_Aw (double dt) {
+
+  foreach () {
+    foreach_dimension () {
+      tmp_force.x[] = 0.;
+      tmp_vel.x[] = 0.;
+    }
+  }
+
+  // 1. g = J^T w on grid
+  foreach_ibnode () {
+    peskin_cosine_kernel_spread_dimensionless (node) {
+      foreach_dimension () {
+        tmp_force.x[] += (weight / dv()) * ibval (w.x) * ibval(nweight);
+      }
+    }
+  }
+
+  // 2. c = M_f^{-1} g ~ g / rho_f
+  foreach () {
+    foreach_dimension () {
+      tmp_vel.x[] = tmp_force.x[] / rho[]; // should be rho_f here
+    }
+  }
+
+  // 3. d = J c, then scale by dt
+  foreach_ibnode () {
+    foreach_dimension () 
+      ibval (Ay.x) = 0.;
+    
+    peskin_cosine_kernel_gather_dimensionless (node) 
+      foreach_dimension()
+        ibval (Ay.x) += weight * tmp_vel.x[];
+    
+    foreach_dimension () 
+      ibval (Ay.x) *= dt;
+  }
+}
+void ib_matvec_Aw_proj (double dt) {
+  foreach () {
+    foreach_dimension () {
+      tmp_force.x[] = 0.;
+      tmp_g.x[] = 0.;
+      tmp_vel.x[] = 0.;
+    }
+    tmp_p[] = 0.;
+  }
+
+  foreach_face () {
+    tmp_a.x[] = 0.;
+    tmp_uf.x[] = 0.;
+  }
+
+  foreach_ibnode ()
+    peskin_cosine_kernel_spread_dimensionless (node)
+      foreach_dimension ()
+        tmp_force.x[] += (weight / dv()) * ibval (w.x) * ibval (nweight);
+
+  ib_cell_force_to_face_accel (tmp_force, tmp_a);
+
+  foreach_face ()
+    tmp_uf.x[] = fm.x[] * dt * tmp_a.x[];
+
+  mgibm = project (tmp_uf, tmp_p, alpha, dt, mgibm.nrelax);
+  centered_gradient_with_accel (tmp_a, tmp_p, tmp_g);
+
+  foreach ()
+    foreach_dimension ()
+      tmp_vel.x[] = dt * tmp_g.x[];
+
+  foreach_ibnode () {
+    foreach_dimension ()
+      ibval (Ay.x) = 0.;
+    peskin_cosine_kernel_gather_dimensionless (node)
+      foreach_dimension ()
+        ibval (Ay.x) += weight * tmp_vel.x[];
+  }
+}
+
+
+int cgiter = 0;
+int cgiter_max = 5;
+double cgtol = 1e-5;
+
+void ib_solve_lambda_CG (double dt) {
+  foreach_ibnode () {
+    foreach_dimension () {
+      node->f.x = 0.;
+      ibval (res.x) = ibval (rhs.x);
+      ibval (w.x) = ibval (res.x);
+    }
+  }
+
+  double rr_old = 0.;
+
+  foreach_ibnode () {
+    foreach_dimension () {
+      rr_old += sq (ibval (res.x)) * ibval(nweight);
+    }
+  }
+
+  if (sqrt (rr_old) < cgtol)
+    return;
+
+  for (cgiter = 0; cgiter < cgiter_max; cgiter++) {
+    ib_matvec_Aw_proj (dt);
+    double wy = 0.;
+
+    foreach_ibnode () {
+      foreach_dimension () {
+        wy += ibval (w.x) * ibval (Ay.x) * ibval(nweight);
+      }
+    }
+
+    if (fabs (wy) < 1e-30) {
+      break;
+    }
+
+    double alpha = rr_old / wy;
+    double rr_new = 0.;
+
+    // \lambda_{k+1} = \lambda_{k} + \alpha w_{k}\f), and \f(r_{k+1} = r_{k}
+    // - \alpha y_k
+    foreach_ibnode () {
+      foreach_dimension () {
+        node->f.x += alpha * ibval (w.x); // lambda update
+        ibval (res.x) -= alpha * ibval (Ay.x);  // residual update
+        rr_new += sq (ibval (res.x)) * ibval(nweight);
+      }
+    }
+
+    if (sqrt (rr_new) < cgtol) {
+      break;
+    }
+
+    double beta = rr_new / rr_old;
+    rr_old = rr_new;
+
+    // w_{k+1} = r_{k+1} + \beta w_{k}
+    foreach_ibnode () {
+      foreach_dimension () {
+        ibval (w.x) = ibval (res.x) + beta * ibval (w.x);
+      }
+    }
+  }
+}
+
+event solve_lambda_CG (i++, last) {
+  ib_solve_lambda_CG (dt);
+}
+
+event spread_eulerian_forcing (i++, last) {
+  foreach()
+    foreach_dimension()
+      ibmf.x[] = 0.;
+    
+  foreach_ibnode () 
+    peskin_cosine_kernel_spread_dimensionless (node) 
+      foreach_dimension()
+        ibmf.x[] -= weight / dv() * node->f.x * ibval(nweight);
+
+  ib_cell_force_to_face_accel (ibmf, ibma);
+
+}
+
+event acceleration (i++, last) {
+  trash ({uf});
+  foreach_face ()
+    uf.x[] = fm.x[] * (face_value (u.x, 0) + dt * (a.x[] + ibma.x[]));
 }
 
 /**
@@ -544,7 +688,8 @@ void centered_gradient (scalar p, vector g) {
   acceleration and pressure gradient. */
 
   face vector gf[];
-  foreach_face () gf.x[] = fm.x[] * a.x[] - alpha.x[] * (p[] - p[-1]) / Delta;
+  foreach_face ()
+    gf.x[] = fm.x[] * (a.x[] + ibma.x[]) - alpha.x[] * (p[] - p[-1]) / Delta;
 
   /**
   We average these face values to obtain the centered, combined
@@ -568,27 +713,13 @@ event projection (i++, last) {
   We add the gradient field *g* to the centered velocity field. */
 
   correction (dt);
-
-  foreach_ibnode () {
-    foreach_dimension () {
-      ibval (eulvel.x) = 0;
-    }
-    double lsumw2 = 0.;
-    peskin_cosine_kernel_gather_dimensionless (node) {
-      lsumw2 += weight * weight;
-      foreach_dimension () {
-        ibval (eulvel.x) += weight * u.x[];
-      }
-    }
-    ibval (sumw2) = lsumw2;
-  }
 }
 
 /**
 Some derived solvers need to hook themselves at the end of the
 timestep. */
 
-event end_timestep (i++, last);
+event end_timestep (i++, last) {}
 
 /**
 ## Adaptivity
@@ -602,7 +733,6 @@ event adapt (i++, last) {
 #if _MPI
   ibmeshmanager_update_pid ();
 #endif
-
 #if EMBED
   fractions_cleanup (cs, fs);
   foreach_face () if (uf.x[] && !fs.x[]) uf.x[] = 0.;

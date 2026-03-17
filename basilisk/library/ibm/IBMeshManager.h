@@ -41,6 +41,7 @@ int ibmeshmanager_add_mesh ();
 void ibmeshmanager_delete_mesh (int mesh_id);
 void ibmeshmanager_add_nodes (int mesh_id, int count);
 void ibmeshmanager_delete_all_nodes (int mesh_id);
+void ibmeshmanager_set_model (int mesh_id, IBMeshModel model);
 
 #if _MPI
 int _ibmeshmanager_get_pid (Point p);
@@ -303,6 +304,41 @@ void ibmeshmanager_delete_all_nodes (int mesh_id) {
   ibmesh_delete_all_nodes (mesh, pool);
 }
 
+/**
+ * @brief Set the mesh model
+ *
+ * @relates IBMeshManager
+ */
+void ibmeshmanager_set_model (int mesh_id, IBMeshModel model) {
+  IBMesh* mesh = &ibmm.meshes[mesh_id];
+  IBMempool* pool = &ibmm.pool;
+  ibmesh_set_model (mesh, pool, model);
+}
+
+/** 
+ * @brief
+ *
+ * @relates IBMeshManager
+ */
+void ibmeshmanager_advance_positions (double dt) {
+  foreach_ibmesh () {
+    if (mesh->pid == pid ()) {
+      switch (mesh->model.type) {
+      case IB_MODEL_VELOCITY_COUPLED: {
+        // TODO
+      }
+      case IB_MODEL_FORCE_COUPLED: {
+        IBForceCoupledModelOps *ops = mesh->model.force_ops;
+        void *ctx = mesh->model.ctx;
+        ops->advance(ctx, mesh, dt);
+      }
+      default:
+        break;
+      }
+    }
+  }
+}
+
 #if _MPI
 
 trace inline int _ibmeshmanager_get_pid (Point p) {
@@ -515,13 +551,14 @@ trace void ibmeshmanager_update_pid () {
     coord_periodic_boundary (d);
     Point point = locate_nonlocal (d.x, d.y, d.z);
 
-
     int ig = 0, jg = 0, kg = 0;
-    NOT_UNUSED (ig); NOT_UNUSED (jg); NOT_UNUSED (kg);
+    NOT_UNUSED (ig);
+    NOT_UNUSED (jg);
+    NOT_UNUSED (kg);
 
     if (point.level >= 0) {
       if (node->pid == pid ()) { // local node
-        foreach_neighbor(PESKIN_SUPPORT_RADIUS) {
+        foreach_neighbor (PESKIN_SUPPORT_RADIUS) {
           if (is_boundary (point)) {
             int point_pid = _ibmeshmanager_get_pid (point);
             // printf("%d\n", point_pid);

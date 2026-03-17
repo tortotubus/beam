@@ -73,9 +73,12 @@ face vector uf[];
 vector ibmf[];
 vector dibmf[];
 vector uib[];
- 
+
+IBvector gravity;
+IBscalar nweight;
 IBvector eulvel;
-IBscalar sumw2; 
+IBscalar sumw2;
+IBvector dforce;
 
 // vector ibmf[]; // Interface force
 
@@ -161,8 +164,11 @@ void pressure_embed_gradient (Point point, scalar p, coord* g) {
 ## Initial conditions */
 
 event defaults (i = 0) {
-  new_ibvector (eulvel); 
-  new_ibscalar (sumw2); 
+  new_ibvector (eulvel);
+  new_ibvector (gravity);
+  new_ibvector (dforce);
+  new_ibscalar (sumw2);
+  new_ibscalar (nweight);
 
   ibmeshmanager_init (0);
 
@@ -413,77 +419,143 @@ event alpha_viscous_term (i++, last) {
 
 // #include "library/ibm/IBEvents.h"
 #include "library/ibm/IBKernels.h"
+// #include "library/ibm/IBEvents.h"
+#include "library/ibm/IBKernels.h"
 
-event advance_interface (i++, last) { 
-  // ibmeshmanager_advance_positions (dt);
- 
+event advance_interface (i++) {
+  if (i >= 50) {
+    // If gravity is stored as a force density contribution on the body,
+    // temporarily remove it before advancing, then restore it.
+    foreach_ibnode () foreach_dimension () node->f.x =
+      node->f.x * ibval (nweight) - ibval (gravity.x);
+
+    ibmeshmanager_advance_positions (dt);
+
+    foreach_ibnode () foreach_dimension () node->f.x += ibval (gravity.x);
+  }
 }
 
-
-event interface_compute_constraint (i++, last) {
+event interface_force_richardson (i++, last) {
   trash ({ibmf});
 
-  // gradientf.dirty = true;
-  foreach_dimension () {
-    u.x.dirty = true;
-  }
-  boundary ((scalar*) {u});
-
-  foreach ()
-    foreach_dimension () ibmf.x[] = 0.;
-
-  foreach_ibnode () {
-    foreach_dimension () {
-      ibval (eulvel.x) = 0;
-    }
-    double lsumw2 = 0.;
-    peskin_cosine_kernel_gather_dimensionless (node) {
-      lsumw2 += weight * weight;
-      foreach_dimension () {
-        ibval (eulvel.x) += weight * u.x[];
-      }
-    }
-    ibval (sumw2) = lsumw2;
-  }
-
-#if _MPI
-  {
-    IBscalar* list = NULL;
-    foreach_dimension () {
-      list = iblist_add (list, eulvel.x);
-    }
-    list = iblist_add (list, sumw2);
-    ibmeshmanager_boundary (list);
-  }
-#endif
-
-  // Compute forcing
-  foreach_ibnode () {
-    foreach_dimension () {
-      node->f.x = -(node->vel.x - ibval (eulvel.x)) /
-      dt;
-    }
-  }
-}
-
-event interface_spread_force (i++, last) {
-  foreach_ibnode () {
-    peskin_cosine_kernel_spread_dimensionless (node) {
-      foreach_dimension () {
-        // double dV = dv();
-        ibmf.x[] += -(weight * node->f.x) / ibval (sumw2);
-      }
-    }
-  }
-
-  foreach_dimension () ibmf.x.dirty = true;
-  boundary ((scalar*) {ibmf});
-
+  // Working Eulerian velocity and current Eulerian IBM increment
   foreach () {
     foreach_dimension () {
-      u.x[] += ibmf.x[] * dt;
+      uib.x[] = u.x[];
+      ibmf.x[] = 0.;  // accumulated Eulerian IBM forcing (acceleration-like)
+      dibmf.x[] = 0.; // current Richardson Eulerian increment
     }
   }
+
+  // node->f is the accumulated Lagrangian force density
+  foreach_ibnode () {
+    foreach_dimension () {
+      node->f.x = 0.;
+    }
+  }
+
+  for (int k = 0; k < ib_richardson_iters; k++) {
+
+    // Reset current Eulerian increment
+    foreach () {
+      foreach_dimension () {
+        dibmf.x[] = 0.;
+      }
+    }
+
+    // Refresh working field for gathers
+    foreach_dimension () uib.x.dirty = true;
+    boundary ((scalar*) {uib});
+
+    // Gather current interpolated velocity and diagonal self-mobility proxy
+    foreach_ibnode () {
+      foreach_dimension () {
+        ibval (eulvel.x) = 0.;
+        ibval (dforce.x) = 0.; // current density increment
+      }
+
+      double lsumw2 = 0.;
+      peskin_cosine_kernel_gather_dimensionless (node) {
+        lsumw2 += sq (weight);
+        foreach_dimension () {
+          ibval (eulvel.x) += weight * uib.x[];
+        }
+      }
+      ibval (sumw2) = lsumw2;
+    }
+
+#if _MPI
+    {
+      IBscalar* list = NULL;
+      foreach_dimension () list = iblist_add (list, eulvel.x);
+      list = iblist_add (list, sumw2);
+      list = iblist_add (list, nweight);
+      ibmeshmanager_boundary (list);
+    }
+#endif
+
+    // Compute Richardson increment in LAGRANGIAN FORCE DENSITY
+    //
+    // delta f_density = -omega * slip / (dt * q * sumw2)
+    //
+    // where q = nodal quadrature measure.
+    foreach_ibnode () {
+      double q = max (ibval (nweight), 1e-30);
+      double denom = max (ibval (sumw2), 1e-30);
+
+      foreach_dimension () {
+        double slip = node->vel.x - ibval (eulvel.x);
+
+        // Current Richardson increment: force density on the object
+        ibval (dforce.x) = -ib_force_relaxation * slip / (dt * q * denom);
+
+        // Accumulate total force density
+        node->f.x += ibval (dforce.x);
+      }
+    }
+
+#if _MPI
+    {
+      IBscalar* list = NULL;
+      foreach_dimension () list = iblist_add (list, dforce.x);
+      ibmeshmanager_boundary (list);
+    }
+#endif
+
+    // Spread force density -> Eulerian correction using nodal measure q
+    //
+    // nodal force = force_density * q
+    foreach_ibnode () {
+      double q = max (ibval (nweight), 0.);
+
+      peskin_cosine_kernel_spread_dimensionless (node) {
+        foreach_dimension () {
+          dibmf.x[] += -weight * ibval (dforce.x) * q;
+        }
+      }
+    }
+
+    foreach_dimension () dibmf.x.dirty = true;
+    boundary ((scalar*) {dibmf});
+
+    // Apply current Eulerian increment and accumulate total Eulerian forcing
+    foreach () {
+      foreach_dimension () {
+        uib.x[] += dt * dibmf.x[];
+        ibmf.x[] += dibmf.x[];
+      }
+    }
+  }
+
+  // Commit corrected velocity back to main field
+  foreach () {
+    foreach_dimension () {
+      u.x[] = uib.x[];
+    }
+  }
+
+  foreach_dimension () u.x.dirty = true;
+  boundary ((scalar*) {u});
 }
 
 event beta_viscous_term (i++, last) {

@@ -21,7 +21,7 @@ trace void output_hdf_htg_series (scalar* scalar_list,
   sprintf (fname, "%s-vtkhdf-series/%s_%d.vtkhdf", basename, basename, iter);
 
   static int timeseries_len = 0;
-  static char timeseries[1 << 16]; // 64 MB buffer
+  static char timeseries[1 << 24]; // 64 MB buffer
 
   // Tail that always lives *after* the last entry
   static const char timeseries_tail[] = ",\n\t]}";
@@ -120,7 +120,7 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
     create_path (pname);
 
     static int timeseries_len = 0;
-    static char timeseries[1 << 16]; // 64 MB buffer
+    static char timeseries[1 << 24]; // 64 MB buffer
 
     // Tail that always lives *after* the last entry
     static const char timeseries_tail[] = ",\n\t]}";
@@ -190,9 +190,13 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   size_t n_polygons = 0;
 
   int n_scalars = 0, n_vectors = 0;
-  foreach_ibscalar (slist) { n_scalars++; }
-  foreach_ibvector (vlist) { n_vectors++; }
-  size_t n_pointdata = n_scalars + n_vectors + 1;
+  foreach_ibscalar (slist) {
+    n_scalars++;
+  }
+  foreach_ibvector (vlist) {
+    n_vectors++;
+  }
+  size_t n_pointdata = n_scalars + n_vectors + 3;
 
   vtkPolyData vtk_pd = vtk_polydata_init (
     n_points, n_vertices, n_lines, n_strips, n_polygons, n_pointdata);
@@ -211,14 +215,16 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
 
   size_t ncomp = dimension;
 
-
   double** scalar_data = NULL;
   double** vector_data = NULL;
   int64_t* scalar_ids = NULL;
   int64_t* vector_ids = NULL;
   int64_t pid_id = vtk_polydata_add_pointdata_scalar (&vtk_pd, "pid");
   double* pid_data = vtk_polydata_get_pointdata_data (&vtk_pd, pid_id);
-
+  int64_t vel_id = vtk_polydata_add_pointdata_vector (&vtk_pd, "vel", dimension);
+  double* vel_data = vtk_polydata_get_pointdata_data (&vtk_pd, vel_id);
+  int64_t f_id = vtk_polydata_add_pointdata_vector (&vtk_pd, "f", dimension);
+  double* f_data = vtk_polydata_get_pointdata_data (&vtk_pd, f_id);
 
   scalar_ids = malloc (sizeof (int64_t) * n_scalars);
   scalar_data = malloc (sizeof (double*) * n_scalars);
@@ -251,11 +257,15 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
     i = 0;
     foreach_ibnode () {
       if (node->pid == pid ()) {
+
+        // scalar ibfields
         size_t si = 0;
         foreach_ibscalar (slist) {
           scalar_data[si][i] = ibval (s);
           si++;
         }
+
+        // vector ibfields
         size_t vi = 0;
         foreach_ibvector (vlist) {
           vector_data[vi][i * dimension + 0] = ibval (v.x);
@@ -267,7 +277,21 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
 #endif
           vi++;
         }
+
+        // ib nodal values
+
         pid_data[i] = node->pid;
+        vel_data[i * dimension + 0] = node->vel.x;
+        f_data[i * dimension + 0] = node->f.x;
+#if dimension >= 2
+        vel_data[i * dimension + 1] = node->vel.y;
+        f_data[i * dimension + 1] = node->f.y;
+#endif
+#if dimension >= 3
+        vel_data[i * dimension + 2] = node->vel.z;
+        f_data[i * dimension + 2] = node->f.z;
+#endif
+
         i++;
       }
     }
@@ -305,11 +329,11 @@ trace void output_hdf_pd (IBscalar* slist = iball,
 #include "library/io/vtk/vtkHDFImageData.h"
 
 trace void output_hdf_imagedata_series (scalar* scalar_list,
-                                  vector* vector_list,
-                                  const char* basename,
-                                  int iter,
-                                  double time,
-                                  bool overwrite) {
+                                        vector* vector_list,
+                                        const char* basename,
+                                        int iter,
+                                        double time,
+                                        bool overwrite) {
   char pname[128];
   sprintf (pname, "%s-vtkhdf-series", basename);
   create_path (pname);
@@ -318,7 +342,7 @@ trace void output_hdf_imagedata_series (scalar* scalar_list,
   sprintf (fname, "%s-vtkhdf-series/%s_%d.vtkhdf", basename, basename, iter);
 
   static int timeseries_len = 0;
-  static char timeseries[1 << 16]; // 64 MB buffer
+  static char timeseries[1 << 24]; // 64 MB buffer
 
   // Tail that always lives *after* the last entry
   static const char timeseries_tail[] = ",\n\t]}";
@@ -385,7 +409,8 @@ trace void output_hdf_imagedata (scalar* slist = all,
     snprintf (basename_buff, sizeof (basename_buff), "%s-id", basename);
   }
 
-  output_hdf_imagedata_series(slist, vlist, basename_buff, iter, time, overwrite);
+  output_hdf_imagedata_series (
+    slist, vlist, basename_buff, iter, time, overwrite);
 
   // char fname[128];
   // sprintf (fname, "%s-id_%i.vtkhdf", basename_buff, iter);

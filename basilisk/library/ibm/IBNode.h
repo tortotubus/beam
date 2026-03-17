@@ -8,6 +8,8 @@
  */
 typedef struct {
   coord pos;     /**< Lagrangian nodal position */
+  coord vel;     /**< Lagrangian nodal velocity */
+  coord f;       /**< Lagrangian nodal force    */
   int depth; /**< Desired depth of the cell for TREE */
   int pid; /**< MPI rank that owns this node: -1 if unknown */
 } IBNode;

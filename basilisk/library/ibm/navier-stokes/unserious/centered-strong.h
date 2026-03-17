@@ -1,22 +1,3 @@
-
-static inline bool fp_weird (double x) {
-  // true if NaN or +/-Inf or subnormal (very tiny) or outside finite range
-  // (NaN/Inf covers most "weird" cases; subnormal is optional but useful)
-  if (isnan (x) || isinf (x)) {
-    printf ("fp_weird: %f\n", x);
-    return true;
-  }
-
-  // Subnormal: nonzero but magnitude smaller than DBL_MIN
-  // (can indicate underflow / loss of significance)
-  if (x != 0.0 && fabs (x) < DBL_MIN) {
-    printf ("fp_weird: %f\n", x);
-    return true;
-  }
-
-  return false;
-}
-
 /**
 # Incompressible Navier--Stokes solver (centered formulation)
 
@@ -70,14 +51,20 @@ vector u[], g[];
 scalar pf[];
 face vector uf[];
 
-vector ibmf[];
-vector dibmf[];
-vector uib[];
- 
-IBvector eulvel;
-IBscalar sumw2; 
+scalar pi[];
+vector ui[], gi[];
+scalar pfi[];
+face vector ufi[];
 
-// vector ibmf[]; // Interface force
+
+IBvector gravity;
+
+IBscalar nweight;
+IBvector eulvel;
+IBvector rhs;
+IBvector res;
+IBvector w;
+IBvector Ay;
 
 /**
 In the case of variable density, the user will need to define both the
@@ -105,12 +92,8 @@ for which inertia is negligible compared to viscosity. */
 bool stokes = false;
 
 face vector mu_alpha[], mu_beta[];
-mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
+mgstats mgp = {0}, mgpf = {0}, mgu = {0};
 
-double alpha_split = 0.5;
-double beta_split = 0.5;
-double ib_force_relaxation = 0.7;
-int ib_richardson_iters = 5;
 /**
 ## Boundary conditions
 
@@ -161,18 +144,27 @@ void pressure_embed_gradient (Point point, scalar p, coord* g) {
 ## Initial conditions */
 
 event defaults (i = 0) {
-  new_ibvector (eulvel); 
-  new_ibscalar (sumw2); 
+  new_ibscalar (nweight);
+  new_ibvector (eulvel);
+  new_ibvector (gravity);
+  new_ibvector (rhs);
+  new_ibvector (res);
+  new_ibvector (w);
+  new_ibvector (Ay);
 
   ibmeshmanager_init (0);
+
+  if (is_constant (a.x)) {
+    a = new face vector;
+    foreach_face () a.x[] = 0.;
+  }
 
   /**
   We reset the multigrid parameters to their default values. */
 
   mgp = (mgstats) {0};
   mgpf = (mgstats) {0};
-  mgu_a = (mgstats) {0};
-  mgu_b = (mgstats) {0};
+  mgu = (mgstats) {0};
 
   CFL = 0.8;
 
@@ -222,19 +214,8 @@ event defaults (i = 0) {
 
   foreach ()
     foreach_dimension () dimensional (u.x[] == Delta / t);
-
-  foreach ()
-    foreach_dimension () ibmf.x[] = 0.;
 }
-
-/**
-We had some objects to display by default. */
-
-event default_display (i = 0) display ("squares (color = 'u.x', spread = -1);");
-
-/**
-After user initialisation, we initialise the face velocity and fluid
-properties. */
+ 
 
 double dtmax;
 
@@ -250,29 +231,12 @@ event init_ib (i = 0) {
 }
 
 event init (i = 0) {
-
   trash ({uf});
   foreach_face () uf.x[] = fm.x[] * face_value (u.x, 0);
-
-  /**
-  We update fluid properties. */
-
   event ("properties");
-
-  /**
-  We set the initial timestep (this is useful only when restoring from
-  a previous run). */
-
   dtmax = DT;
   event ("stability");
 }
-
-/**
-## Time integration
-
-The timestep for this iteration is controlled by the CFL condition,
-applied to the face centered velocity field $\mathbf{u}_f$; and the
-timing of upcoming events. */
 
 event set_dtmax (i++, last) dtmax = DT;
 
@@ -280,50 +244,16 @@ event stability (i++, last) {
   dt = dtnext (stokes ? dtmax : timestep (uf, dtmax));
 }
 
-/**
-If we are using VOF or diffuse tracers, we need to advance them (to
-time $t+\Delta t/2$) here. Note that this assumes that tracer fields
-are defined at time $t-\Delta t/2$ i.e. are lagging the
-velocity/pressure fields by half a timestep. */
+event properties (i++, last);
 
-event vof (i++, last);
-event tracer_advection (i++, last);
-event tracer_diffusion (i++, last);
-
-/**
-The fluid properties such as specific volume (fields $\alpha$ and
-$\alpha_c$) or dynamic viscosity (face field $\mu_f$) -- at time
-$t+\Delta t/2$ -- can be defined by overloading this event. */
-
-event properties (i++, last) {
-  if (!is_constant (mu.x)) {
-    // mu_alpha = new face vector;
-    // mu_beta = new face vector;
-    foreach_face () {
-      mu_alpha.x[] = mu.x[] * alpha_split;
-      mu_beta.x[] = mu.x[] * beta_split;
-    }
-  }
-}
-
-/**
-### Predicted face velocity field
-
-For second-order in time integration of the velocity advection term
-$\nabla\cdot(\mathbf{u}\otimes\mathbf{u})$, we need to define the face
-velocity field $\mathbf{u}_f$ at time $t+\Delta t/2$. We use a version
-of the Bell-Collela-Glaz [advection scheme](/src/bcg.h) and the
-pressure gradient and acceleration terms at time $t$ (stored in vector
-$\mathbf{g}$). */
-
-void prediction () {
+void prediction (vector uu, vector gg, double dtt) {
   vector du;
   foreach_dimension () {
     scalar s = new scalar;
     du.x = s;
   }
 
-  if (u.x.gradient)
+  if (uu.x.gradient)
     foreach ()
       foreach_dimension () {
 #if EMBED
@@ -331,7 +261,7 @@ void prediction () {
           du.x[] = 0.;
         else
 #endif
-          du.x[] = u.x.gradient (u.x[-1], u.x[], u.x[1]) / Delta;
+          du.x[] = u.x.gradient (uu.x[-1], uu.x[], uu.x[1]) / Delta;
       }
   else
     foreach ()
@@ -341,25 +271,25 @@ void prediction () {
           du.x[] = 0.;
         else
 #endif
-          du.x[] = (u.x[1] - u.x[-1]) / (2. * Delta);
+          du.x[] = (uux[1] - uu.x[-1]) / (2. * Delta);
       }
 
   trash ({uf});
   foreach_face () {
-    double un = dt * (u.x[] + u.x[-1]) / (2. * Delta), s = sign (un);
+    double un = dtt * (uu.x[] + uu.x[-1]) / (2. * Delta), s = sign (un);
     int i = -(s + 1.) / 2.;
-    uf.x[] = u.x[i] + (g.x[] + g.x[-1]) * dt / 4. +
-             s * (1. - s * un) * du.x[i] * Delta / 2.;
+    uf.x[] = uu.x[i] + (gg.x[] + gg.x[-1]) * dtt / 4. +
+             s * (1. - s * un) * duu.x[i] * Delta / 2.;
 #if dimension > 1
     if (fm.y[i, 0] && fm.y[i, 1]) {
-      double fyy = u.y[i] < 0. ? u.x[i, 1] - u.x[i] : u.x[i] - u.x[i, -1];
-      uf.x[] -= dt * u.y[i] * fyy / (2. * Delta);
+      double fyy = uu.y[i] < 0. ? uu.x[i, 1] - uu.x[i] : uu.x[i] - uu.x[i, -1];
+      uf.x[] -= dtt * uu.y[i] * fyy / (2. * Delta);
     }
 #endif
 #if dimension > 2
     if (fm.z[i, 0, 0] && fm.z[i, 0, 1]) {
-      double fzz = u.z[i] < 0. ? u.x[i, 0, 1] - u.x[i] : u.x[i] - u.x[i, 0, -1];
-      uf.x[] -= dt * u.z[i] * fzz / (2. * Delta);
+      double fzz = uu.z[i] < 0. ? uu.x[i, 0, 1] - uu.x[i] : uu.x[i] - uu.x[i, 0, -1];
+      uf.x[] -= dtt * uu.z[i] * fzz / (2. * Delta);
     }
 #endif
     uf.x[] *= fm.x[];
@@ -368,14 +298,19 @@ void prediction () {
   delete ((scalar*) {du});
 }
 
-/**
-### Advection term
-
-We predict the face velocity field $\mathbf{u}_f$ at time $t+\Delta
-t/2$ then project it to make it divergence-free. We can then use it to
-compute the velocity advection term, using the standard
-Bell-Collela-Glaz advection scheme for each component of the velocity
-field. */
+event copy(i++, last) {
+  foreach() {
+    pi[] = p[];
+    pfi[] = pf[];
+    foreach_dimension() {
+      ui.x[] = u.x[];
+      gi.x[] = g.x[];
+    }
+  }
+  foreach_face() {
+    ufi.x[] = uf.x[];
+  }
+}
 
 event advection_term (i++, last) {
   if (!stokes) {
@@ -403,131 +338,22 @@ the implicit viscosity solver. We then remove the acceleration and
 pressure gradient terms as they will be replaced by their values at
 time $t+\Delta t$. */
 
-event alpha_viscous_term (i++, last) {
-  if (constant (mu.x) != 0. && alpha_split != 0.) {
-    correction (dt);
-    mgu_a = viscosity (u, mu_alpha, rho, dt, mgu_a.nrelax);
-    correction (-dt);
-  }
+event advance_lagrangian_mesh (i++, last) {
+  foreach_ibnode() 
+    foreach_dimension()
+      node->f.x += ibval(gravity.x);
+
+  ibmeshmanager_advance_positions (dt);
+
+  foreach_ibnode() 
+    foreach_dimension()
+      node->f.x -= ibval(gravity.x);
 }
 
-// #include "library/ibm/IBEvents.h"
-#include "library/ibm/IBKernels.h"
-
-event advance_interface (i++, last) { 
-  // ibmeshmanager_advance_positions (dt);
- 
-}
-
-
-event interface_compute_constraint (i++, last) {
-  trash ({ibmf});
-
-  // gradientf.dirty = true;
-  foreach_dimension () {
-    u.x.dirty = true;
-  }
-  boundary ((scalar*) {u});
-
-  foreach ()
-    foreach_dimension () ibmf.x[] = 0.;
-
-  foreach_ibnode () {
-    foreach_dimension () {
-      ibval (eulvel.x) = 0;
-    }
-    double lsumw2 = 0.;
-    peskin_cosine_kernel_gather_dimensionless (node) {
-      lsumw2 += weight * weight;
-      foreach_dimension () {
-        ibval (eulvel.x) += weight * u.x[];
-      }
-    }
-    ibval (sumw2) = lsumw2;
-  }
-
-#if _MPI
-  {
-    IBscalar* list = NULL;
-    foreach_dimension () {
-      list = iblist_add (list, eulvel.x);
-    }
-    list = iblist_add (list, sumw2);
-    ibmeshmanager_boundary (list);
-  }
-#endif
-
-  // Compute forcing
-  foreach_ibnode () {
-    foreach_dimension () {
-      node->f.x = -(node->vel.x - ibval (eulvel.x)) /
-      dt;
-    }
-  }
-}
-
-event interface_spread_force (i++, last) {
-  foreach_ibnode () {
-    peskin_cosine_kernel_spread_dimensionless (node) {
-      foreach_dimension () {
-        // double dV = dv();
-        ibmf.x[] += -(weight * node->f.x) / ibval (sumw2);
-      }
-    }
-  }
-
-  foreach_dimension () ibmf.x.dirty = true;
-  boundary ((scalar*) {ibmf});
-
-  foreach () {
-    foreach_dimension () {
-      u.x[] += ibmf.x[] * dt;
-    }
-  }
-}
-
-event beta_viscous_term (i++, last) {
-  if (constant (mu.x) != 0. && beta_split != 0.) {
-    correction (dt);
-    mgu_b = viscosity (u, mu_beta, rho, dt, mgu_b.nrelax);
-    correction (-dt);
-  }
-}
-
-/**
-### Acceleration term
-
-The acceleration term $\mathbf{a}$ needs careful treatment as many
-equilibrium solutions depend on exact balance between the acceleration
-term and the pressure gradient: for example Laplace's balance for
-surface tension or hydrostatic pressure in the presence of gravity.
-
-To ensure a consistent discretisation, the acceleration term is
-defined on faces as are pressure gradients and the centered combined
-acceleration and pressure gradient term $\mathbf{g}$ is obtained by
-averaging.
-
-The (provisionary) face velocity field at time $t+\Delta t$ is
-obtained by interpolation from the centered velocity field. The
-acceleration term is added. */
 
 event acceleration (i++, last) {
-  // face vector ae = a;
-  // foreach_face()
-  //   if (fm.x[] > 1.e-20)
-  //     a.x[] += .5 * alpha.x[] * (ibmf.x[] - ibmf.x[-1]);
-
   trash ({uf});
   foreach_face () uf.x[] = fm.x[] * (face_value (u.x, 0) + dt * a.x[]);
-
-  /**
-  We reset the acceleration field (if it is not a constant). */
-
-  if (!is_constant (a.x)) {
-    face vector af = a;
-    trash ({af});
-    foreach_face () af.x[] = 0.;
-  }
 }
 
 /**
@@ -568,27 +394,13 @@ event projection (i++, last) {
   We add the gradient field *g* to the centered velocity field. */
 
   correction (dt);
-
-  foreach_ibnode () {
-    foreach_dimension () {
-      ibval (eulvel.x) = 0;
-    }
-    double lsumw2 = 0.;
-    peskin_cosine_kernel_gather_dimensionless (node) {
-      lsumw2 += weight * weight;
-      foreach_dimension () {
-        ibval (eulvel.x) += weight * u.x[];
-      }
-    }
-    ibval (sumw2) = lsumw2;
-  }
 }
 
 /**
 Some derived solvers need to hook themselves at the end of the
 timestep. */
 
-event end_timestep (i++, last);
+event end_timestep (i++, last) {}
 
 /**
 ## Adaptivity
@@ -602,7 +414,6 @@ event adapt (i++, last) {
 #if _MPI
   ibmeshmanager_update_pid ();
 #endif
-
 #if EMBED
   fractions_cleanup (cs, fs);
   foreach_face () if (uf.x[] && !fs.x[]) uf.x[] = 0.;

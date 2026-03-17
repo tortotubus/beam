@@ -65,10 +65,12 @@ main()
 
   ibmeshmanager_add_nodes(new_id, N_circ);
 
-  foreach_ibmesh()
+#if TREE
+  foreach_ibnode()
   {
     node->depth = ibmlevel;
   }
+#endif
 
   foreach_ibnode_per_ibmesh()
   {

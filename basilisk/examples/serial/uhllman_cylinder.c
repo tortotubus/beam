@@ -1,10 +1,10 @@
-// #include "grid/quadtree.h"
-#include "grid/multigrid.h"
+#include "grid/quadtree.h"
+// #include "grid/multigrid.h"
 
 #include "library/ibm/IBMeshManager.h"
 #include "library/ibm/navier-stokes/centered-split.h"
-#include "tracer.h"
 #include "library/io/output-vtk.h"
+#include "tracer.h"
 
 coord
 circle(int n, int N, coord centre, double radius)
@@ -29,10 +29,11 @@ const int minlevel = 6;
 const double L_fluid = 8;
 const int lvl_circ = 10;
 const double R_circ = 0.15;
-const coord c_circ = { 0 };
+const coord c_circ = { 0. };
 const double h_fluid = L_fluid / (1 << lvl_circ);
-const int N_circ = (int)(1.3 * pi * R_circ / h_fluid);
-const double ds_circ = (double)(2 * pi * R_circ) / (N_circ);
+const double u_circ = 2. * pi * R_circ;
+const int N_circ = (int)((0.75) * (u_circ / h_fluid));
+const double ds_circ = (u_circ / (double)N_circ);
 double dV_circ = 0;
 
 int
@@ -53,6 +54,7 @@ main()
   display_control(Reynolds, 10, 1000);
 
   // DT = 0.00125;
+  DT = 0.001;
 
   run();
 }
@@ -78,8 +80,7 @@ init_ib(i = 0)
   int new_id = ibmeshmanager_add_mesh();
   ibmeshmanager_add_nodes(new_id, N_circ);
   foreach_ibnode() node->depth = lvl_circ;
-  foreach_ibnode_per_ibmesh() node->pos =
-    circle(node_id, N_circ, c_circ, R_circ);
+  foreach_ibnode_per_ibmesh() node->pos = circle(node_id, N_circ, c_circ, R_circ);
 }
 
 event init(t = 0) foreach () u.x[] = U0;
@@ -97,7 +98,7 @@ statsfile(i++)
   coord f = { 0 };
   double Cd = 0., Cl = 0.;
   double fx = 0., fy = 0.;
-  foreach (reduction(+:fx) reduction(+:fy)) {
+  foreach (reduction(+ : fx) reduction(+ : fy)) {
     fx += -ibmf.x[] * dv();
     fy += -ibmf.y[] * dv();
   }
@@ -125,8 +126,9 @@ statsfile(i++)
 }
 
 event
-output(i += 20; t <= 30.)
-// output(i += 1; i <= 5.)
+// output(i += 20; t <= 30.)
+output(i += 1; t <= 5.)
+// output(i += 25; t <= .1)
 {
   scalar omega[];
   vorticity(u, omega);

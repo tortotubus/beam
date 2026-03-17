@@ -1,6 +1,6 @@
 #pragma once
 
-#include "c/models/ibm/IBMesh.h"
+#include "IBMesh.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -18,21 +18,21 @@ extern "C"
   /**
    * @memberof ib_force_coupled_t
    */
-  int ib_force_structure_model_get_number_of_nodes(
+  int ib_force_coupled_get_number_of_nodes(
     ib_force_coupled_t handle);
 
   /**
    * @memberof ib_force_coupled_t
    */
-  ib_mesh_t ib_force_structure_model_get_current(
+  ib_mesh_t ib_force_coupled_get_current(
     ib_force_coupled_t handle);
 
   /**
    * @memberof ib_force_coupled_t
    */
-  ib_mesh_t ib_force_structure_model_get_next(
+  ib_mesh_t ib_force_coupled_get_next(
     ib_force_coupled_t handle,
-    vertex_t* velocity,
+    vertex_t* force,
     int n,
     double dt);
 
