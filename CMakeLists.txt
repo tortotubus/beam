@@ -40,6 +40,12 @@ set(CMAKE_MODULE_PATH ${ELFF_CMAKE_PATH}/cmake/modules)
 #
 include(ElffCmakeUtilities)
 
+#
+# Build and install third-party dependencies as part of CMake build
+#
+
+add_subdirectory(third_party)  
+
 # 
 # Floating point precision settings
 #
@@ -71,7 +77,8 @@ endforeach()
 #
 configure_file(
   "${PROJECT_SOURCE_DIR}/config/cmake/config.hpp.in"
-  "${PROJECT_BINARY_DIR}/config/_config.hpp")
+  "${PROJECT_BINARY_DIR}/config/_config.hpp"
+)
 
 
 #
@@ -96,12 +103,19 @@ if (ELFF_USE_MPI)
   target_link_libraries(elff PUBLIC MPI::MPI_CXX)
 endif()
 
+
+
 #
 # Eigen3
 #
 if (ELFF_USE_EIGEN3)
-  find_package(Eigen3 REQUIRED)
-  target_link_libraries(elff PUBLIC Eigen3::Eigen)
+  if (ELFF_BUILD_THIRD_PARTY_EIGEN3)
+    # add_dependencies(elff eigen_ep)
+    target_link_libraries(elff PUBLIC Eigen3::Eigen)
+  else()
+    find_package(Eigen3 REQUIRED)
+    target_link_libraries(elff PUBLIC Eigen3::Eigen)
+  endif()
 endif()
 
 #
@@ -111,11 +125,14 @@ if (ELFF_USE_HDF5)
   if (ELFF_USE_MPI)
     set(HDF5_PREFER_PARALLEL TRUE)
   endif()
-  find_package(HDF5 COMPONENTS C HL REQUIRED)
-  target_link_libraries(elff PUBLIC
-    hdf5::hdf5
-    hdf5::hdf5_hl
-  )
+  if (ELFF_BUILD_THIRD_PARTY_HDF5)
+  else()
+    find_package(HDF5 COMPONENTS C HL REQUIRED)
+    target_link_libraries(elff PUBLIC
+      hdf5::hdf5
+      hdf5::hdf5_hl
+    )
+  endif()
 endif()
 
 #
@@ -126,7 +143,6 @@ target_include_directories(elff
     ${CMAKE_CURRENT_BINARY_DIR}/config
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
-
 #
 # Basilisk
 #
@@ -158,3 +174,4 @@ if (ELFF_BUILD_DOC)
           VERBATIM)
   endif()
 endif()
+
