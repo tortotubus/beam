@@ -77,6 +77,7 @@ vector uib[];
 IBvector gravity;
 IBscalar nweight;
 IBvector eulvel;
+IBscalar eulrho;
 IBscalar sumw2;
 IBvector dforce;
 
@@ -112,7 +113,7 @@ mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
 
 double alpha_split = 0.5;
 double beta_split = 0.5;
-double ib_force_relaxation = 0.7;
+double ib_force_relaxation = 0.6;
 int ib_richardson_iters = 5;
 /**
 ## Boundary conditions
@@ -167,6 +168,7 @@ event defaults (i = 0) {
   new_ibvector (eulvel);
   new_ibvector (gravity);
   new_ibvector (dforce);
+  new_ibscalar (eulrho);
   new_ibscalar (sumw2);
   new_ibscalar (nweight);
 
@@ -417,22 +419,13 @@ event alpha_viscous_term (i++, last) {
   }
 }
 
-// #include "library/ibm/IBEvents.h"
-#include "library/ibm/IBKernels.h"
-// #include "library/ibm/IBEvents.h"
 #include "library/ibm/IBKernels.h"
 
 event advance_interface (i++) {
-  if (i >= 50) {
-    // If gravity is stored as a force density contribution on the body,
-    // temporarily remove it before advancing, then restore it.
-    foreach_ibnode () foreach_dimension () node->f.x =
-      node->f.x * ibval (nweight) - ibval (gravity.x);
-
+    foreach_ibnode () { 
+      foreach_dimension () node->f.x += ibval (gravity.x);
+    }
     ibmeshmanager_advance_positions (dt);
-
-    foreach_ibnode () foreach_dimension () node->f.x += ibval (gravity.x);
-  }
 }
 
 event interface_force_richardson (i++, last) {
@@ -442,8 +435,8 @@ event interface_force_richardson (i++, last) {
   foreach () {
     foreach_dimension () {
       uib.x[] = u.x[];
-      ibmf.x[] = 0.;  // accumulated Eulerian IBM forcing (acceleration-like)
-      dibmf.x[] = 0.; // current Richardson Eulerian increment
+      ibmf.x[] = 0.;  // accumulated Eulerian IBM force density
+      dibmf.x[] = 0.; // current Richardson Eulerian force-density increment
     }
   }
 
@@ -471,9 +464,8 @@ event interface_force_richardson (i++, last) {
     foreach_ibnode () {
       foreach_dimension () {
         ibval (eulvel.x) = 0.;
-        ibval (dforce.x) = 0.; // current density increment
+        ibval (dforce.x) = 0.; // current force-density increment
       }
-
       double lsumw2 = 0.;
       peskin_cosine_kernel_gather_dimensionless (node) {
         lsumw2 += sq (weight);
@@ -482,6 +474,7 @@ event interface_force_richardson (i++, last) {
         }
       }
       ibval (sumw2) = lsumw2;
+      ibval (eulrho) = 1.;
     }
 
 #if _MPI
@@ -490,25 +483,32 @@ event interface_force_richardson (i++, last) {
       foreach_dimension () list = iblist_add (list, eulvel.x);
       list = iblist_add (list, sumw2);
       list = iblist_add (list, nweight);
+      list = iblist_add (list, eulrho);
       ibmeshmanager_boundary (list);
     }
 #endif
 
-    // Compute Richardson increment in LAGRANGIAN FORCE DENSITY
+    // Compute Richardson increment in an approximate Lagrangian force density
     //
-    // delta f_density = -omega * slip / (dt * q * sumw2)
+    // delta f_density = -omega * rho_L * slip / (dt * q * sumw2 / dV)
     //
-    // where q = nodal quadrature measure.
+    // where q = nodal quadrature measure and rho_L is a gathered fluid density
+    // proxy near the marker. The extra dV factor keeps node->f in the same
+    // Lagrangian density units as the DLMFD implementation.
     foreach_ibnode () {
-      double q = max (ibval (nweight), 1e-30);
-      double denom = max (ibval (sumw2), 1e-30);
-
+#if dimension == 1
+      double dV = (L0/(1 << node->depth));
+#elif dimension == 2
+      double dV = sq(L0/(1 << node->depth));
+#else 
+      double dV = cube(L0/(1 << node->depth));
+#endif
       foreach_dimension () {
         double slip = node->vel.x - ibval (eulvel.x);
-
         // Current Richardson increment: force density on the object
-        ibval (dforce.x) = -ib_force_relaxation * slip / (dt * q * denom);
-
+        ibval (dforce.x) =
+          -ib_force_relaxation * (ibval (eulrho) * dV * slip) /
+          (dt * ibval (nweight) * ibval (sumw2));
         // Accumulate total force density
         node->f.x += ibval (dforce.x);
       }
@@ -524,13 +524,12 @@ event interface_force_richardson (i++, last) {
 
     // Spread force density -> Eulerian correction using nodal measure q
     //
-    // nodal force = force_density * q
+    // nodal force = force_density * q, then divide by cell measure to recover
+    // the Eulerian force density used in the fluid update.
     foreach_ibnode () {
-      double q = max (ibval (nweight), 0.);
-
       peskin_cosine_kernel_spread_dimensionless (node) {
         foreach_dimension () {
-          dibmf.x[] += -weight * ibval (dforce.x) * q;
+          dibmf.x[] += -weight * ibval (dforce.x) * ibval (nweight) / dv();
         }
       }
     }
@@ -541,7 +540,7 @@ event interface_force_richardson (i++, last) {
     // Apply current Eulerian increment and accumulate total Eulerian forcing
     foreach () {
       foreach_dimension () {
-        uib.x[] += dt * dibmf.x[];
+        uib.x[] += dt * dibmf.x[] / (rho[]);
         ibmf.x[] += dibmf.x[];
       }
     }

@@ -71,11 +71,11 @@ scalar pf[];
 face vector uf[];
 
 vector ibmf[];
-vector dibmf[];
-vector uib[];
- 
+
+IBvector gravity;
 IBvector eulvel;
 IBscalar sumw2; 
+IBscalar nweight;
 
 // vector ibmf[]; // Interface force
 
@@ -109,8 +109,7 @@ mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
 
 double alpha_split = 0.5;
 double beta_split = 0.5;
-double ib_force_relaxation = 0.7;
-int ib_richardson_iters = 5;
+
 /**
 ## Boundary conditions
 
@@ -159,10 +158,11 @@ void pressure_embed_gradient (Point point, scalar p, coord* g) {
 
 /**
 ## Initial conditions */
-
 event defaults (i = 0) {
   new_ibvector (eulvel); 
-  new_ibscalar (sumw2); 
+  new_ibvector (gravity); 
+  new_ibscalar (sumw2);
+  new_ibscalar (nweight);
 
   ibmeshmanager_init (0);
 
@@ -414,9 +414,12 @@ event alpha_viscous_term (i++, last) {
 // #include "library/ibm/IBEvents.h"
 #include "library/ibm/IBKernels.h"
 
-event advance_interface (i++, last) { 
-  // ibmeshmanager_advance_positions (dt);
- 
+event advance_lagrangian_mesh (i++, last) { 
+  foreach_ibnode() 
+    foreach_dimension()
+      node->f.x += ibval(gravity.x);
+
+  ibmeshmanager_advance_positions (dt);
 }
 
 
@@ -460,8 +463,8 @@ event interface_compute_constraint (i++, last) {
   // Compute forcing
   foreach_ibnode () {
     foreach_dimension () {
-      node->f.x = -(node->vel.x - ibval (eulvel.x)) /
-      dt;
+      node->f.x = (ibval (eulvel.x) - node->vel.x) /
+      (dt * ibval(nweight));
     }
   }
 }
@@ -471,7 +474,7 @@ event interface_spread_force (i++, last) {
     peskin_cosine_kernel_spread_dimensionless (node) {
       foreach_dimension () {
         // double dV = dv();
-        ibmf.x[] += -(weight * node->f.x) / ibval (sumw2);
+        ibmf.x[] += -(weight * node->f.x * ibval(nweight)) / ibval (sumw2);
       }
     }
   }

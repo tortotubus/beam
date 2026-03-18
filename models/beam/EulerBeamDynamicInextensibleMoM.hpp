@@ -2,6 +2,13 @@
 
 #include "EulerBeamStaticInextensibleMoM.hpp"
 
+#include <array>
+#include <vector>
+
+#include <Eigen/Dense>
+#include <Eigen/IterativeLinearSolvers>
+#include <unsupported/Eigen/AutoDiff>
+
 using namespace Eigen;
 
 namespace ELFF { 

@@ -80,6 +80,7 @@ IBvector gravity;
 IBvector xerr;
 IBvector velerr;
 IBscalar sumw2;
+IBscalar nweight;
 
 /**
 In the case of variable density, the user will need to define both the
@@ -124,8 +125,8 @@ The actual gains used each timestep are
 double ibm_kp = 0.;
 double ibm_kd = 0.;
 
-double ibm_kp_coeff = 1e-4;
-double ibm_kd_coeff = 4e-2;
+double ibm_kp_coeff = 0.4;
+double ibm_kd_coeff = 1.;
 
 /**
 ## Boundary conditions
@@ -184,6 +185,7 @@ event defaults (i = 0) {
   new_ibvector (gravity);
   new_ibvector (xerr);
   new_ibvector (velerr);
+  new_ibscalar (nweight);
   new_ibscalar (sumw2);
 
   ibmeshmanager_init (0);
@@ -479,17 +481,12 @@ inextensible EB update here if you already have one.
 event advance_lagrangian_mesh (i++, last) {
   foreach_ibnode () {
     foreach_dimension () {
-      node->f.x += ibval (gravity.x);
+      node->f.x = node->f.x + ibval (gravity.x);
     }
   }
 
   ibmeshmanager_advance_positions (dt);
-
-  foreach_ibnode () {
-    foreach_dimension () {
-      node->f.x -= ibval (gravity.x);
-    }
-  }
+ 
 }
 /**
 Compute the Huang-style explicit feedback force.
@@ -518,15 +515,20 @@ event interface_compute_constraint (i++, last) {
       list = iblist_add (list, velerr.x);
     }
     list = iblist_add (list, sumw2);
+    list = iblist_add (list, nweight);
     ibmeshmanager_boundary (list);
   }
 #endif
 
   foreach_ibnode () {
+    double q = max (ibval (nweight), 1e-30);
     foreach_dimension () {
       ibval (velerr.x) = node->vel.x - ibval (eulvel.x);
       ibval (xerr.x) += dt * ibval (velerr.x);
-      node->f.x = -(ibm_kp * ibval (xerr.x) + ibm_kd * ibval (velerr.x));
+      // node->f is interpreted as a Lagrangian force density; multiplying by
+      // q in the spread recovers the corresponding integrated nodal force.
+      node->f.x =
+        -(ibm_kp * ibval (xerr.x) + ibm_kd * ibval (velerr.x)) / q;
 
       if (fp_weird (node->f.x)) {
         fprintf (stderr,
@@ -554,9 +556,10 @@ event interface_spread_force (i++, last) {
 
   foreach_ibnode () {
     double denom = max (ibval (sumw2), 1e-30);
+    double q = max (ibval (nweight), 0.);
     peskin_cosine_kernel_spread_dimensionless (node) {
       foreach_dimension () {
-        ibmf.x[] -= (weight * node->f.x) / denom;
+        ibmf.x[] -= (weight * node->f.x * q) / denom;
       }
     }
   }

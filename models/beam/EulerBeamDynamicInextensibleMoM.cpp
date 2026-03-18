@@ -1,1 +1,1 @@
-#include "models/beam/EulerBeamDynamicInextensibleAugKKT.hpp"
+#include "models/beam/EulerBeamDynamicInextensibleMoM.hpp"

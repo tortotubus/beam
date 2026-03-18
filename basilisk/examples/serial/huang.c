@@ -3,9 +3,8 @@
 
 #include "library/ibm/IBMeshManager.h"
 
-// #include "library/ibm/navier-stokes/centered-df.h"
-#include "library/ibm/navier-stokes/centered-dlmfd.h"
-// #include "library/ibm/navier-stokes/centered-split.h"
+// #include "library/ibm/navier-stokes/centered-dlmfd.h"
+#include "library/ibm/navier-stokes/unserious/centered-split-rich.h"
 
 #include "library/elff/elff.h"
 
@@ -13,8 +12,6 @@
 
 face vector muv[];
 
-int Reynolds = 100.;
-double U0 = 1.;
 
 #define L_fluid 8.
 #define maxlevel 10
@@ -33,8 +30,12 @@ double U0 = 1.;
 #define b_nodes ((int) 64 ) //((b_length / b_ds) + 1.))
 #define b_ds (b_length / (b_nodes-1)) // (2. * h_fluid)
 #define b_r 1e2
+// #define b_r 1e4
 #define b_theta (0.1 * pi)
 #define b_gravity (b_mu * huang_Fr)
+
+int Reynolds = huang_Re;
+double U0 = 1.;
 
 int
 main()
@@ -56,8 +57,8 @@ main()
   display_control(Reynolds, 10, 1000);
   DT = 0.0003;
 
-  cgiter_max = 10000;
-  cgtol = 1e-7;
+  // cgiter_max = 10000;
+  // cgtol = 1e-7;
 
   run();
 }
@@ -95,7 +96,6 @@ init_ib(i = 0)
     node->depth = ibmlevel; 
     ibval(gravity.x) = b_gravity; 
     ibval(nweight) = b_ds;
-
     if (node_id == 0 || node_id == mesh->nodes.size - 1)
       ibval(nweight) *= 0.5;
   }
@@ -106,8 +106,8 @@ event init(t = 0) foreach () u.x[] = U0;
 event
 logfile(i++)
 {
-  fprintf(stderr, "%d %g %d\n", i, t, cgiter);
-  // fprintf(stderr, "%d %g\n", i, t);
+  // fprintf(stderr, "%d %g %d\n", i, t, cgiter);
+  fprintf(stderr, "%d %g\n", i, t);
 }
 
 event

@@ -1,8 +1,10 @@
+#include <time.h>
 // #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
 #include <sys/stat.h> // mkdir
 #include <sys/types.h>
+ 
 
 bool file_exists (const char* fname) {
   FILE* fp = fopen (fname, "rb");
@@ -73,6 +75,35 @@ const char* get_executable_name (void) {
     executable_name[n] = '\0';
   }
 
-  const char* slash = strrchr (executable_name, '/');
-  return slash ? slash + 1 : executable_name;
+  const char* basename = executable_name;
+  for (const char* p = executable_name; *p; ++p)
+    if (*p == '/')
+      basename = p + 1;
+
+  return basename;
+}
+
+const char* get_datetime_string (void) {
+  static char datetime[15] = "";
+
+  time_t now = time (NULL);
+  struct tm* tm_now = localtime (&now);
+
+  if (tm_now == NULL)
+    return "";
+
+  if (strftime (datetime, sizeof (datetime), "%Y%m%d%H%M%S", tm_now) == 0)
+    return "";
+
+  return datetime;
+}
+
+static char unique_basename[4096] = "";
+
+const char* get_unique_basename (void) {
+  if (unique_basename[0] == '\0')
+    snprintf (unique_basename, sizeof (unique_basename), "%s-%s",
+              get_executable_name(), get_datetime_string());
+
+  return unique_basename;
 }
