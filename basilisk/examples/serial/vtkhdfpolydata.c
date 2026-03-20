@@ -57,7 +57,10 @@ main()
 
   foreach_ibnode_per_ibmesh()
   {
-    node->pos = circle(node_id, N_circ, cen_circ, r_circ);
+    coord cpos = circle(node_id, N_circ, cen_circ, r_circ);
+    foreach_dimension() {
+      ibval(npos.x) = cpos.x;
+    }
   }
 
   //

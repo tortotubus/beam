@@ -72,9 +72,10 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   // Init polydata
 
 #if _MPI
+  ibmeshmanager_update_pid();
   size_t n_points_local = 0;
   foreach_ibnode () {
-    ibnode_update_pid (node);
+    // ibnode_update_pid (node);
     if (node->pid == pid ()) {
       n_points_local++;
     }
@@ -100,7 +101,7 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   foreach_ibvector (vlist) {
     n_vectors++;
   }
-  size_t n_pointdata = n_scalars + n_vectors + 3;
+  size_t n_pointdata = n_scalars + n_vectors;
 
   vtkPolyData vtk_pd = vtk_polydata_init (
     n_points, n_vertices, n_lines, n_strips, n_polygons, n_pointdata);
@@ -108,7 +109,6 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   // Populate polydata
   foreach_ibnode () {
     if (node->pid == pid ()) {
-      coord pos = node->pos;
       vtk_polydata_add_point (&vtk_pd, pos.x, pos.y, pos.z);
     }
   }
@@ -123,12 +123,12 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   double** vector_data = NULL;
   int64_t* scalar_ids = NULL;
   int64_t* vector_ids = NULL;
-  int64_t pid_id = vtk_polydata_add_pointdata_scalar (&vtk_pd, "pid");
-  double* pid_data = vtk_polydata_get_pointdata_data (&vtk_pd, pid_id);
-  int64_t vel_id = vtk_polydata_add_pointdata_vector (&vtk_pd, "vel", dimension);
-  double* vel_data = vtk_polydata_get_pointdata_data (&vtk_pd, vel_id);
-  int64_t f_id = vtk_polydata_add_pointdata_vector (&vtk_pd, "f", dimension);
-  double* f_data = vtk_polydata_get_pointdata_data (&vtk_pd, f_id);
+  // int64_t pid_id = vtk_polydata_add_pointdata_scalar (&vtk_pd, "pid");
+  // double* pid_data = vtk_polydata_get_pointdata_data (&vtk_pd, pid_id);
+  // int64_t vel_id = vtk_polydata_add_pointdata_vector (&vtk_pd, "vel", dimension);
+  // double* vel_data = vtk_polydata_get_pointdata_data (&vtk_pd, vel_id);
+  // int64_t f_id = vtk_polydata_add_pointdata_vector (&vtk_pd, "f", dimension);
+  // double* f_data = vtk_polydata_get_pointdata_data (&vtk_pd, f_id);
 
   scalar_ids = malloc (sizeof (int64_t) * n_scalars);
   scalar_data = malloc (sizeof (double*) * n_scalars);
@@ -184,17 +184,17 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
 
         // ib nodal values
 
-        pid_data[i] = node->pid;
-        vel_data[i * dimension + 0] = node->vel.x;
-        f_data[i * dimension + 0] = node->f.x;
-#if dimension >= 2
-        vel_data[i * dimension + 1] = node->vel.y;
-        f_data[i * dimension + 1] = node->f.y;
-#endif
-#if dimension >= 3
-        vel_data[i * dimension + 2] = node->vel.z;
-        f_data[i * dimension + 2] = node->f.z;
-#endif
+//         pid_data[i] = node->pid;
+//         vel_data[i * dimension + 0] = ibval(vel.x;
+//         f_data[i * dimension + 0] = node->f.x;
+// #if dimension >= 2
+//         vel_data[i * dimension + 1] = node->vel.y;
+//         f_data[i * dimension + 1] = node->f.y;
+// #endif
+// #if dimension >= 3
+//         vel_data[i * dimension + 2] = node->vel.z;
+//         f_data[i * dimension + 2] = node->f.z;
+// #endif
 
         i++;
       }

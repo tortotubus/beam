@@ -71,8 +71,6 @@ scalar pf[];
 face vector uf[];
 
 vector ibmf[];
-vector dibmf[];
-vector uib[];
 
 IBvector gravity;
 IBscalar nweight;
@@ -113,8 +111,8 @@ mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
 
 double alpha_split = 0.5;
 double beta_split = 0.5;
-double ib_force_relaxation = 0.6;
-int ib_richardson_iters = 5;
+double ib_force_relaxation = 0.7;
+int ib_richardson_iters = 4;
 /**
 ## Boundary conditions
 
@@ -422,13 +420,43 @@ event alpha_viscous_term (i++, last) {
 #include "library/ibm/IBKernels.h"
 
 event advance_interface (i++) {
-    foreach_ibnode () { 
-      foreach_dimension () node->f.x += ibval (gravity.x);
+  foreach_ibnode () {
+    if (fp_weird (ibval (sumw2)) || fp_weird (ibval (nweight)) ||
+        fp_weird (ibval (nvel.x)) || fp_weird (ibval (eulvel.x))) {
+      printf ("[pid %d] bad inputs node=%zu sumw2=%g nweight=%g vel=%g "
+              "eulvel=%g dt=%g\n",
+              pid (),
+              node_id,
+              ibval (sumw2),
+              ibval (nweight),
+              ibval (nvel.x),
+              ibval (eulvel.x),
+              dt);
     }
-    ibmeshmanager_advance_positions (dt);
+    foreach_dimension () ibval (nforce.x) += ibval (gravity.x);
+  }
+  ibmeshmanager_advance_positions (dt);
+
+  foreach_ibnode () {
+    if (fp_weird (ibval (sumw2)) || fp_weird (ibval (nweight)) ||
+        fp_weird (ibval (nvel.x)) || fp_weird (ibval (eulvel.x))) {
+      printf ("[pid %d] bad inputs node=%zu sumw2=%g nweight=%g vel=%g "
+              "eulvel=%g dt=%g\n",
+              pid (),
+              node_id,
+              ibval (sumw2),
+              ibval (nweight),
+              ibval (nvel.x),
+              ibval (eulvel.x),
+              dt);
+    }
+  }
 }
 
 event interface_force_richardson (i++, last) {
+  vector dibmf[];
+  vector uib[];
+
   trash ({ibmf});
 
   // Working Eulerian velocity and current Eulerian IBM increment
@@ -443,7 +471,7 @@ event interface_force_richardson (i++, last) {
   // node->f is the accumulated Lagrangian force density
   foreach_ibnode () {
     foreach_dimension () {
-      node->f.x = 0.;
+      ibval (nforce.x) = 0.;
     }
   }
 
@@ -480,7 +508,9 @@ event interface_force_richardson (i++, last) {
 #if _MPI
     {
       IBscalar* list = NULL;
-      foreach_dimension () list = iblist_add (list, eulvel.x);
+      foreach_dimension () {
+        list = iblist_add (list, eulvel.x);
+      }
       list = iblist_add (list, sumw2);
       list = iblist_add (list, nweight);
       list = iblist_add (list, eulrho);
@@ -496,21 +526,21 @@ event interface_force_richardson (i++, last) {
     // proxy near the marker. The extra dV factor keeps node->f in the same
     // Lagrangian density units as the DLMFD implementation.
     foreach_ibnode () {
+
 #if dimension == 1
-      double dV = (L0/(1 << node->depth));
+      double dV = (L0 / (1 << node->depth));
 #elif dimension == 2
-      double dV = sq(L0/(1 << node->depth));
-#else 
-      double dV = cube(L0/(1 << node->depth));
+      double dV = sq (L0 / (1 << node->depth));
+#else
+      double dV = cube (L0 / (1 << node->depth));
 #endif
       foreach_dimension () {
-        double slip = node->vel.x - ibval (eulvel.x);
+        double slip = ibval (nvel.x) - ibval (eulvel.x);
         // Current Richardson increment: force density on the object
-        ibval (dforce.x) =
-          -ib_force_relaxation * (ibval (eulrho) * dV * slip) /
-          (dt * ibval (nweight) * ibval (sumw2));
+        ibval (dforce.x) = -ib_force_relaxation * (ibval (eulrho) * dV * slip) /
+                           (dt * ibval (nweight) * ibval (sumw2) + SEPS);
         // Accumulate total force density
-        node->f.x += ibval (dforce.x);
+        ibval (nforce.x) += ibval (dforce.x);
       }
     }
 
@@ -529,7 +559,7 @@ event interface_force_richardson (i++, last) {
     foreach_ibnode () {
       peskin_cosine_kernel_spread_dimensionless (node) {
         foreach_dimension () {
-          dibmf.x[] += -weight * ibval (dforce.x) * ibval (nweight) / dv();
+          dibmf.x[] += -weight * ibval (dforce.x) * ibval (nweight) / dv ();
         }
       }
     }
@@ -540,7 +570,7 @@ event interface_force_richardson (i++, last) {
     // Apply current Eulerian increment and accumulate total Eulerian forcing
     foreach () {
       foreach_dimension () {
-        uib.x[] += dt * dibmf.x[] / (rho[]);
+        uib.x[] += dt * dibmf.x[] / (rho[] + SEPS);
         ibmf.x[] += dibmf.x[];
       }
     }

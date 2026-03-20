@@ -33,9 +33,10 @@ void elff_fc_sync (void* ctx, void* mesh) {
   ib_mesh_t elff_mesh = ib_force_coupled_get_current (fc_ptr);
 
   for (int ni = 0; ni < ib_nodes_count; ni++) {
+    IBNode *node = ib_nodes[ni];
     foreach_dimension () {
-      ib_nodes[ni]->pos.x = elff_mesh.position[ni].x;
-      ib_nodes[ni]->vel.x = elff_mesh.velocity[ni].x;
+      ibval(npos.x) = elff_mesh.position[ni].x;
+      ibval(nvel.x) = elff_mesh.velocity[ni].x;
     }
   }
 
@@ -54,8 +55,9 @@ void elff_fc_advance (void* ctx, void* mesh, double dt) {
   // Pack nodal forces into vertex_t array
   vertex_t* forces = calloc (ib_nodes_count, sizeof (vertex_t));
   for (int ni = 0; ni < ib_nodes_count; ni++) {
+    IBNode *node = ib_nodes[ni];
     foreach_dimension () {
-      forces[ni].x = ib_nodes[ni]->f.x;
+      forces[ni].x = ibval(nforce.x);
     }
   }
 
@@ -65,9 +67,10 @@ void elff_fc_advance (void* ctx, void* mesh, double dt) {
     ib_force_coupled_get_next (fc_ptr, forces, ib_nodes_count, dt);
 
   for (int ni = 0; ni < ib_nodes_count; ni++) {
+    IBNode *node = ib_nodes[ni];
     foreach_dimension () {
-      ib_nodes[ni]->pos.x = elff_mesh.position[ni].x;
-      ib_nodes[ni]->vel.x = elff_mesh.velocity[ni].x;
+      ibval(npos.x) = elff_mesh.position[ni].x;
+      ibval(nvel.x) = elff_mesh.velocity[ni].x;
     }
   }
 

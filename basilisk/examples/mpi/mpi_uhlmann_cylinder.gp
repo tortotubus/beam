@@ -2,7 +2,7 @@
 #   gnuplot -e "file='forces.txt'" plot_forces.gp
 # or edit the filename below directly.
 
-if (!exists("file")) file = "/home/colive/Git/gitlab-math/colive/beam/build/release/basilisk/examples/serial/cylinderstats.txt"
+if (!exists("file")) file = "/home/colive/Git/gitlab-math/colive/beam/build/debug/basilisk/examples/serial/cylinderstats.txt"
 
 set datafile separator whitespace
 set key outside

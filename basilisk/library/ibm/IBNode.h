@@ -1,18 +1,32 @@
 #include "library/ibm/IBConfig.h"
 #include "library/ibm/IBMacros.h"
 
+
 /**
  * @struct IBNode
  *
  * @brief Immersed-boundary node state.
  */
 typedef struct {
-  coord pos;     /**< Lagrangian nodal position */
-  coord vel;     /**< Lagrangian nodal velocity */
-  coord f;       /**< Lagrangian nodal force    */
+  // coord pos;     /**< Lagrangian nodal position */
+  // coord vel;     /**< Lagrangian nodal velocity */
+  // coord f;       /**< Lagrangian nodal force    */
   int depth; /**< Desired depth of the cell for TREE */
   int pid; /**< MPI rank that owns this node: -1 if unknown */
 } IBNode;
+
+#include "library/ibm/IBFields.h"
+
+// IBvector npos;
+// IBvector nvel;
+// IBvector nforce;
+
+macro IBNODE_VARIABLES(IBNode *node = node) {
+  coord pos = {0}; NOT_UNUSED(pos);
+  foreach_dimension() {
+    pos.x = ibval(npos.x);
+  }
+}
 
 /**
  * @brief Compute the stencil storage length for the current Basilisk dimension.
@@ -42,9 +56,13 @@ int ibnode_init (IBNode* node) {
   if (!node)
     return -1;
 
-  node->pos.x = 0.;
-  node->pos.y = 0.;
-  node->pos.z = 0.;
+  foreach_dimension() {
+    bool ib_set_dirty = false;
+    ibval(npos.x) = 0.;
+    ibval(nvel.x) = 0.;
+    ibval(nforce.x) = 0.;
+  }
+ 
   node->depth = 0; 
 
 #if _MPI
@@ -125,28 +143,28 @@ void ibnode_swap (IBNode* a, IBNode* b) {
   *b = tmp;
 }
 
-void ibnode_update_pid (IBNode* node) {
+// void ibnode_update_pid (IBNode* node) {
 
-  coord centre_coord = node->pos;
-  coord_periodic_boundary (centre_coord);
-  Point centre_point = locate (centre_coord.x, centre_coord.y, centre_coord.z);
+//   coord centre_coord = node->pos;
+//   coord_periodic_boundary (centre_coord);
+//   Point centre_point = locate (centre_coord.x, centre_coord.y, centre_coord.z);
 
-#if TREE
-  if (centre_point.level > 0) {
-    Point point = {0};
-    point = centre_point;
-#if dimension == 1
-    int ig = point.i;
-#elif dimension == 2
-    int ig = point.i;
-    int jg = point.j;
-#else
-    int ig = point.i;
-    int jg = point.j;
-    int kg = point.j;
-#endif
-    POINT_VARIABLES ();
-    node->pid = cell.pid;
-  }
-#endif
-}
+// #if TREE
+//   if (centre_point.level > 0) {
+//     Point point = {0};
+//     point = centre_point;
+// #if dimension == 1
+//     int ig = point.i;
+// #elif dimension == 2
+//     int ig = point.i;
+//     int jg = point.j;
+// #else
+//     int ig = point.i;
+//     int jg = point.j;
+//     int kg = point.j;
+// #endif
+//     POINT_VARIABLES ();
+//     node->pid = cell.pid;
+//   }
+// #endif
+// }

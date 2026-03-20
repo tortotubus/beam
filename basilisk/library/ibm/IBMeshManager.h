@@ -7,6 +7,10 @@
 #define MPI_AUTO_BOUNDARY 0
 #endif
 
+#ifndef MPI_DEBUG
+#define MPI_DEBUG 0
+#endif
+
 /**
  * Type definitions
  */
@@ -82,21 +86,33 @@ macro foreach_ibnode (bool local_only = false) {
     for (size_t node_id = 0; node_id < nlist.size; node_id++) {
       IBNode* node = nlist.ptrs[node_id];
       NOT_UNUSED (node);
-      bool ib_set_dirty = false;
-      NOT_UNUSED (ib_set_dirty);
+
+      coord pos = {0};
+      foreach_dimension () pos.x = ibval (npos.x);
+      coord_periodic_boundary (pos);
+      NOT_UNUSED (pos);
+
+      // bool ib_set_dirty = false;
+      // NOT_UNUSED (ib_set_dirty);
+
       // clang-format off
       {...}
       // clang-format on
-    }
-    if (MPI_AUTO_BOUNDARY)
-      ibmeshmanager_boundary ();
+    } 
   }
 #else
   for (size_t node_id = 0; node_id < ibmm.pool.active.size; node_id++) {
     IBNode* node = ibmm.pool.active.ptrs[node_id];
     NOT_UNUSED (node);
-    bool ib_set_dirty = false;
-    NOT_UNUSED (ib_set_dirty);
+
+    coord pos = {0};
+    foreach_dimension () pos.x = ibval (npos.x);
+    coord_periodic_boundary (pos);
+    NOT_UNUSED (pos);
+
+    // bool ib_set_dirty = false;
+    // NOT_UNUSED (ib_set_dirty);
+
     // clang-format off
     {...}
     // clang-format on
@@ -109,24 +125,27 @@ macro foreach_ibnode (bool local_only = false) {
  *
  * @relates IBMeshManager
  */
-macro foreach_ibnode_per_ibmesh (bool boundary = MPI_AUTO_BOUNDARY) {
+macro foreach_ibnode_per_ibmesh () {
   for (size_t mesh_id = 0; mesh_id < ibmm.nm; mesh_id++) {
     IBMesh* mesh = &ibmm.meshes[mesh_id];
     NOT_UNUSED (mesh);
     for (size_t node_id = 0; node_id < mesh->nodes.size; node_id++) {
       IBNode* node = mesh->nodes.ptrs[node_id];
+
       NOT_UNUSED (node);
-      bool ib_set_dirty = false;
-      NOT_UNUSED (ib_set_dirty);
+      coord pos = {0};
+      foreach_dimension()
+        pos.x = ibval(npos.x);
+      coord_periodic_boundary(pos);      
+      NOT_UNUSED (pos);
+
+      // bool ib_set_dirty = false;
+      // NOT_UNUSED (ib_set_dirty);
       // clang-format off
       {...}
       // clang-format on
     }
   }
-#if _MPI
-  // if (MPI_AUTO_BOUNDARY)
-  // ibmeshmanager_boundary ();
-#endif
 }
 
 /* Function definitions */
@@ -174,7 +193,6 @@ void ibmeshmanager_init (int mesh_count) {
   }
 
 #if !TREE
-
   int dims[dimension];
   int periods[dimension];
   dims[0] = Dimensions.x;
@@ -188,9 +206,9 @@ void ibmeshmanager_init (int mesh_count) {
   periods[2] = Period.z;
 #endif
   MPI_Cart_create (MPI_COMM_WORLD, dimension, dims, periods, 0, &ibmm.cartcomm);
+#endif // !TREE
 
-#endif
-#endif
+#endif // _MPI
 
   foreach_ibmesh () {
     ibmesh_init (mesh);
@@ -315,28 +333,142 @@ void ibmeshmanager_set_model (int mesh_id, IBMeshModel model) {
   ibmesh_set_model (mesh, pool, model);
 }
 
-/** 
+/**
  * @brief
  *
  * @relates IBMeshManager
  */
 void ibmeshmanager_advance_positions (double dt) {
-  foreach_ibmesh () {
-    if (mesh->pid == pid ()) {
-      switch (mesh->model.type) {
-      case IB_MODEL_VELOCITY_COUPLED: {
-        // TODO
-      }
-      case IB_MODEL_FORCE_COUPLED: {
-        IBForceCoupledModelOps *ops = mesh->model.force_ops;
-        void *ctx = mesh->model.ctx;
-        ops->advance(ctx, mesh, dt);
-      }
-      default:
-        break;
+#if _MPI
+  ibmeshmanager_update_pid ();
+#endif
+
+#if _MPI
+  // Synchronize inputs
+  {
+    size_t stride = dimension;
+    size_t n = ibmm.pool.active.size * stride;
+    double* f_global = calloc (n, sizeof (double));
+    double* vel_global = calloc (n, sizeof (double));
+
+    foreach_ibnode_per_ibmesh () {
+      if (node->pid == pid ()) {
+        int di = 0;
+        foreach_dimension () {
+          f_global[node_id * stride + di] = ibval (nforce.x);
+          di++;
+        }
       }
     }
+
+    MPI_Allreduce (
+      MPI_IN_PLACE, f_global, n, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+    // if (pid () == 0) {
+    //   printf ("[proc %d]: ", pid ());
+    //   for (int i = 0; i < n; i++) {
+    //     printf ("%f ", f_global[i]);
+    //   }
+    //   printf ("\n");
+    // }
+
+    foreach_ibnode_per_ibmesh () {
+      const int owner = mesh->pid >= 0 ? mesh->pid : 0;
+      if (owner == pid ()) {
+        int di = 0;
+        foreach_dimension () {
+          ibval (nforce.x) = f_global[node_id * stride + di];
+          di++;
+        }
+      }
+    }
+
+    free (f_global);
+    free (vel_global);
   }
+#endif
+
+  // Call the models
+  foreach_ibmesh () {
+    switch (mesh->model.type) {
+    case IB_MODEL_VELOCITY_COUPLED: {
+      // TODO
+      break;
+    }
+    case IB_MODEL_FORCE_COUPLED: {
+      const int owner = mesh->pid >= 0 ? mesh->pid : 0;
+      if (owner == pid ()) {
+        IBForceCoupledModelOps* ops = mesh->model.force_ops;
+        void* ctx = mesh->model.ctx;
+        ops->advance (ctx, mesh, dt);
+      }
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
+#if _MPI
+  // Syncronize outputs
+  foreach_ibmesh () {
+    switch (mesh->model.type) {
+    case IB_MODEL_VELOCITY_COUPLED: {
+      break;
+    }
+    case IB_MODEL_FORCE_COUPLED: {
+      const int owner = mesh->pid >= 0 ? mesh->pid : 0;
+      const int nn = (int) mesh->nodes.size;
+      const int stride = 2 * dimension;
+      double* buff = malloc ((size_t) nn * stride * sizeof (double));
+
+      if (owner == pid ()) {
+        // Pack
+        for (int ni = 0; ni < nn; ni++) {
+          IBNode* node = mesh->nodes.ptrs[ni];
+          int k = ni * stride;
+
+          foreach_dimension () {
+            buff[k++] = ibval (npos.x);
+          }
+          foreach_dimension () {
+            buff[k++] = ibval (nvel.x);
+          }
+        }
+      }
+
+      MPI_Bcast (buff, nn * stride, MPI_DOUBLE, owner, MPI_COMM_WORLD);
+
+      if (owner != pid ()) {
+        // Free whatever model object we have, we will not call it later
+        // ibmeshmodel_destroy (&mesh->model);
+
+        // Unpack
+        for (int ni = 0; ni < nn; ni++) {
+          IBNode* node = mesh->nodes.ptrs[ni];
+          int k = ni * stride;
+          foreach_dimension () {
+            ibval (npos.x) = buff[k++];
+          }
+          foreach_dimension () {
+            ibval (nvel.x) = buff[k++];
+          }
+        }
+      }
+
+      free (buff);
+      break;
+    }
+
+    default: {
+      break;
+    }
+    }
+  }
+
+  ibmm.dirty = true;
+  ibmeshmanager_update_pid ();
+#endif
 }
 
 #if _MPI
@@ -461,10 +593,13 @@ trace void ibmeshmanager_update_pid () {
 
   /* Pass 1: local owner candidates only. */
   foreach_ibnode () {
-    coord d = node->pos;
-    coord_periodic_boundary (d);
+    IBNODE_VARIABLES();
+    // coord d = {0};
+    // foreach_dimension () d.x = ibval (npos.x);
+
+    // coord_periodic_boundary (d);
 #if TREE
-    Point point = locate_level (d.x, d.y, d.z, node->depth);
+    Point point = locate_level (pos.x, pos.y, pos.z, node->depth);
     int ig = 0, jg = 0, kg = 0;
     NOT_UNUSED (ig);
     NOT_UNUSED (jg);
@@ -520,9 +655,12 @@ trace void ibmeshmanager_update_pid () {
     NOT_UNUSED (ig);
     NOT_UNUSED (jg);
     NOT_UNUSED (kg);
-    coord d = node->pos;
-    coord_periodic_boundary (d);
-    Point point = locate_level (d.x, d.y, d.z, node->depth);
+    IBNODE_VARIABLES();
+    // coord d = {0};
+    // foreach_dimension()
+    //   d.x = ibval(npos.x);
+    // coord_periodic_boundary (d);
+    Point point = locate_level (pos.x, pos.y, pos.z, node->depth);
     POINT_VARIABLES ();
 
     if (node->pid == pid ()) { // local node
@@ -547,9 +685,10 @@ trace void ibmeshmanager_update_pid () {
         ibexchangelist_push_unique (&ibmm.rcv_boundary[node->pid], node);
     } // remote node
 #else // !TREE
-    coord d = node->pos;
-    coord_periodic_boundary (d);
-    Point point = locate_nonlocal (d.x, d.y, d.z);
+    // coord d = node->pos;
+    // coord_periodic_boundary (d);
+    IBNODE_VARIABLES();
+    Point point = locate_nonlocal (pos.x, pos.y, pos.z);
 
     int ig = 0, jg = 0, kg = 0;
     NOT_UNUSED (ig);
@@ -594,7 +733,7 @@ trace void ibmeshmanager_update_pid () {
       foreach_ibscalar (slist) {
         int nn = ibmm.snd_migrate[peer].nodes.size;
         for (int ni = 0; ni < nn; ni++) {
-          bool ib_set_dirty = false;
+          // bool ib_set_dirty = false;
           IBNode* node = ibmm.snd_migrate[peer].nodes.ptrs[ni];
           ibmm.snd_migrate[peer].buffs[si * nn + ni] = ibval (s);
         }
@@ -638,7 +777,7 @@ trace void ibmeshmanager_update_pid () {
       foreach_ibscalar (slist) {
         int nn = ibmm.rcv_migrate[peer].nodes.size;
         for (int ni = 0; ni < nn; ni++) {
-          bool ib_set_dirty = false;
+          // bool ib_set_dirty = false;
           IBNode* node = ibmm.rcv_migrate[peer].nodes.ptrs[ni];
           ibval (s) = ibmm.rcv_migrate[peer].buffs[si * nn + ni];
         }
@@ -662,8 +801,7 @@ trace void ibmeshmanager_update_pid () {
  * into an ajacent process
  */
 void ibmeshmanager_boundary (IBscalar* slist = iball) {
-  if (ibmm.dirty)
-    ibmeshmanager_update_pid ();
+  ibmeshmanager_update_pid ();
 
   // IBscalar* slist = NULL;
 
@@ -691,7 +829,7 @@ void ibmeshmanager_boundary (IBscalar* slist = iball) {
       foreach_ibscalar (slist) {
         int nn = ibmm.snd_boundary[peer].nodes.size;
         for (int ni = 0; ni < nn; ni++) {
-          bool ib_set_dirty = false;
+          // bool ib_set_dirty = false;
           IBNode* node = ibmm.snd_boundary[peer].nodes.ptrs[ni];
           ibmm.snd_boundary[peer].buffs[si * nn + ni] = ibval (s);
         }
@@ -735,7 +873,7 @@ void ibmeshmanager_boundary (IBscalar* slist = iball) {
       foreach_ibscalar (slist) {
         int nn = ibmm.rcv_boundary[peer].nodes.size;
         for (int ni = 0; ni < nn; ni++) {
-          bool ib_set_dirty = false;
+          // bool ib_set_dirty = false;
           IBNode* node = ibmm.rcv_boundary[peer].nodes.ptrs[ni];
           ibval (s) = ibmm.rcv_boundary[peer].buffs[si * nn + ni];
         }

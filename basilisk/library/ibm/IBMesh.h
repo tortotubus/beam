@@ -10,6 +10,7 @@
  */
 typedef struct {
   int pid;
+  int depth;
   IBNodeList nodes;
   IBMeshModel model;
 } IBMesh;
@@ -41,6 +42,9 @@ void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool);
 void ibmesh_init (IBMesh* mesh) {
   if (!mesh)
     return;
+
+  mesh->pid = 0;
+  mesh->model = ibmeshmodel_init();
   ibnodelist_init (&mesh->nodes, 0);
 }
 
@@ -124,6 +128,7 @@ void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool) {
  * @brief Set the mesh model
  */
 void ibmesh_set_model (IBMesh* mesh, IBMempool* pool, IBMeshModel model) {
+  
   switch (model.type) {
   case IB_MODEL_VELOCITY_COUPLED: {
     // TODO

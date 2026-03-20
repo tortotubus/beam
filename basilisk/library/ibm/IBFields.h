@@ -36,11 +36,16 @@ IBscalar* iball = NULL;
 size_t _ibattribute_len = 0;
 size_t nibvar = 0;
 
+
+IBvector npos;
+IBvector nvel;
+IBvector nforce;
+
 /* Function decalarations */
 void init_ibsolver ();
 IBscalar _init_ibscalar (const char* name);
 IBvector _init_ibvector (const char* name);
-inline double * _ibval (IBscalar s, IBNode *n, bool set_dirty);
+inline double * _ibval (IBscalar s, IBNode *n);
 
 /* Macros */
 
@@ -65,7 +70,7 @@ inline double * _ibval (IBscalar s, IBNode *n, bool set_dirty);
  */
 
 // clang-format off
-#define ibval(s) (*_ibval((s), node, ib_set_dirty))
+#define ibval(s) (*_ibval((s), node))
 // #define ibval(s) (((double*) ((char*) (node) + sizeof (IBNode)))[(s).i])
 // clang-format on
 
@@ -129,11 +134,16 @@ macro foreach_ibvector (IBvector* list) {
  * @brief
  */
 void init_ibsolver () {
+  new_ibvector(nvel);
+  new_ibvector(nforce);
+  new_ibvector(npos);
+
   int n = nibvar;
   iball = (IBscalar*) malloc (sizeof (IBscalar*) * (n + 1));
   for (int i = 0; i < n; i++)
     iball[i].i = i;
   iball[n].i = -1;
+
 }
 
 /**
@@ -189,10 +199,10 @@ IBvector _init_ibvector (const char* name) {
 /**
  * @brief
  */
-inline double * _ibval (IBscalar s, IBNode * n, bool set_dirty)
+inline double * _ibval (IBscalar s, IBNode * n)
 {
-  if (set_dirty)
-    _ibattribute[s.i].dirty = true;
+  // if (set_dirty)
+  //   _ibattribute[s.i].dirty = true;
 
   return &((double *)((char *)n + sizeof(IBNode)))[s.i];
 }

@@ -25,7 +25,8 @@
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug"
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug",
+        "ELFF_TESTING": "On"
       }
     },
     {
@@ -60,6 +61,25 @@
         "MPI_HOME": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn",
         "ZLIB_ROOT": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo"
       }
+    },
+    {
+      "name": "r8k1",
+      "displayName": "r8k1",
+      "description": "Release build with system default generator.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/r8k1",
+      "environment": {
+        "CC": "/media/data/labdata/colive/.nix-profile/bin/gcc",
+        "CXX": "/media/data/labdata/colive/.nix-profile/bin/g++",
+        "MPICXX": "/media/data/labdata/colive/.nix-profile/bin/mpicxx",
+        "MPICC": "/media/data/labdata/colive/.nix-profile/bin/mpicc",
+        "PATH": "/media/data/labdata/colive/.nix-profile/bin:/usr/bin",
+        "LD_LIBRARY_PATH": "/media/data/labdata/colive/.nix-profile/lib"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/r8k1"
+      }
     }
   ],
   "buildPresets": [
@@ -79,6 +99,12 @@
       "name": "SockeyeRelease",
       "configurePreset": "SockeyeRelease",
       "description": "Build on Sockeye",
+      "jobs": 8
+    },
+    {
+      "name": "r8k1",
+      "configurePreset": "r8k1",
+      "description": "Build on r8k1",
       "jobs": 8
     }
   ],

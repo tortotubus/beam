@@ -48,7 +48,7 @@ main()
   const int N_circ = 20;
   const double r_circ = 0.15;
   coord cen_circ = { 0.0 };
-  cen_circ.x = 3*r_circ*pid();
+  cen_circ.x = 3 * r_circ * pid();
 
   ibmeshmanager_add_nodes(new_id, N_circ);
 
@@ -59,30 +59,33 @@ main()
 
   foreach_ibnode_per_ibmesh()
   {
-    node->pos = circle(node_id, N_circ, cen_circ, r_circ);
+    foreach_dimension()
+    {
+      ibval(npos.x) = circle(node_id, N_circ, cen_circ, r_circ).x;
+    }
   }
 
   //
   // Begin filling vtkPolyData
   //
 
-//   vtkPolyData pd = vtk_polydata_init(N_circ, N_circ, 0, 0, 0, 1);
+  //   vtkPolyData pd = vtk_polydata_init(N_circ, N_circ, 0, 0, 0, 1);
 
-//   foreach_ibnode()
-//   {
-// #if dimension == 1
-//     vtk_polydata_add_point(&pd, node->pos.x, 0., 0.);
-// #elif dimension == 2
-//     vtk_polydata_add_point(&pd, node->pos.x, node->pos.y, 0.);
-// #else
-//     vtk_polydata_add_point(&pd, node->pos.x, node->pos.y, node->pos.z);
-// #endif
-//   }
+  //   foreach_ibnode()
+  //   {
+  // #if dimension == 1
+  //     vtk_polydata_add_point(&pd, node->pos.x, 0., 0.);
+  // #elif dimension == 2
+  //     vtk_polydata_add_point(&pd, node->pos.x, node->pos.y, 0.);
+  // #else
+  //     vtk_polydata_add_point(&pd, node->pos.x, node->pos.y, node->pos.z);
+  // #endif
+  //   }
 
-//   foreach_ibnode()
-//   {
-//     vtk_polydata_add_vertex(&pd, node_id);
-//   }
+  //   foreach_ibnode()
+  //   {
+  //     vtk_polydata_add_vertex(&pd, node_id);
+  //   }
 
   // int64_t pntdata_id = vtk_polydata_add_pointdata_scalar(&pd, "pid");
   // double* pntdata_arr = vtk_polydata_get_pointdata_data(&pd, pntdata_id);
@@ -98,12 +101,13 @@ main()
   // Write polydata
   //
 
-  // vtkHDFPolyData hdf_pd = vtk_HDF_polydata_init_static("vtkhdfpolydata.vtkhdf", true, &pd);
+  // vtkHDFPolyData hdf_pd =
+  // vtk_HDF_polydata_init_static("vtkhdfpolydata.vtkhdf", true, &pd);
   // vtk_HDF_polydata_close(&hdf_pd);
 
   // vtk_polydata_free(&pd);
 
-  output_hdf_pd(NULL,0,0,false,true,false);
+  output_hdf_pd(NULL, 0, 0, false, true, false);
 
   ibmeshmanager_free();
 
