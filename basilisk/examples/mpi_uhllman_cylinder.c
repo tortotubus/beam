@@ -2,9 +2,10 @@
 // #include "grid/multigrid.h"
 
 #include "library/ibm/IBMeshManager.h"
-#include "library/ibm/navier-stokes/centered-split.h"
-#include "library/io/output-vtk.h"
+#include "library/ibm/navier-stokes/unserious/centered-split-rich.h"
 #include "tracer.h"
+#include "library/io/output-vtk.h"
+#include "library/io/output-dump.h"
 
 coord
 circle(int n, int N, coord centre, double radius)
@@ -29,11 +30,10 @@ const int minlevel = 6;
 const double L_fluid = 8;
 const int lvl_circ = 10;
 const double R_circ = 0.15;
-const coord c_circ = { 0. };
+const coord c_circ = { 0 };
 const double h_fluid = L_fluid / (1 << lvl_circ);
-const double u_circ = 2. * pi * R_circ;
-const int N_circ = (int)((0.75) * (u_circ / h_fluid));
-const double ds_circ = (u_circ / (double)N_circ);
+const int N_circ = (int)(1.5 * pi * R_circ / h_fluid);
+const double ds_circ = (double)(2 * pi * R_circ) / (N_circ);
 double dV_circ = 0;
 
 int
@@ -43,7 +43,8 @@ main()
   origin(-1.85, -L0 / 2.);
 
 #if TREE
-  N = 1 << minlevel;
+  // N = 1 << minlevel;
+  N = 1 << lvl_circ;
 #else
   N = 1 << lvl_circ;
 #endif
@@ -53,8 +54,7 @@ main()
 
   display_control(Reynolds, 10, 1000);
 
-  // DT = 0.00125;
-  DT = 0.001;
+  DT = 0.0005;
 
   run();
 }
@@ -79,8 +79,17 @@ init_ib(i = 0)
 {
   int new_id = ibmeshmanager_add_mesh();
   ibmeshmanager_add_nodes(new_id, N_circ);
-  foreach_ibnode() node->depth = lvl_circ;
-  foreach_ibnode_per_ibmesh() node->pos = circle(node_id, N_circ, c_circ, R_circ);
+  foreach_ibnode_per_ibmesh() {
+    node->depth = lvl_circ; 
+    mesh->depth = lvl_circ;
+    ibval(nweight) = ds_circ;
+  }
+  foreach_ibnode_per_ibmesh() {
+    coord cpos = circle(node_id, N_circ, c_circ, R_circ);
+    foreach_dimension() {
+      ibval(npos.x) = cpos.x;
+    }
+  }
 }
 
 event init(t = 0) foreach () u.x[] = U0;
@@ -98,15 +107,10 @@ statsfile(i++)
   coord f = { 0 };
   double Cd = 0., Cl = 0.;
   double fx = 0., fy = 0.;
-  foreach (reduction(+ : fx) reduction(+ : fy)) {
+  foreach (reduction(+:fx) reduction(+:fy)) {
     fx += -ibmf.x[] * dv();
     fy += -ibmf.y[] * dv();
   }
-
-#if _MPI
-  MPI_Allreduce(&fx, &fx, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  MPI_Allreduce(&fx, &fy, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-#endif
 
   Cd = fx / (0.5 * sq(U0) * 2 * R_circ);
   Cl = fy / (0.5 * sq(U0) * 2 * R_circ);
@@ -126,9 +130,8 @@ statsfile(i++)
 }
 
 event
-// output(i += 20; t <= 30.)
-output(i += 1; t <= 5.)
-// output(i += 25; t <= .1)
+output(i += 200; t <= 60.)
+// output(i += 1; i <= 5.)
 {
   scalar omega[];
   vorticity(u, omega);

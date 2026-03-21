@@ -44,7 +44,7 @@ solver. If embedded boundaries are used, a different scheme is used
 for viscosity. */
 
 #include "run.h"
-#include "timestep.h"
+#include "library/timestep.h"
 #include "bcg.h"
 #if EMBED
 #include "viscosity-embed.h"
@@ -166,9 +166,20 @@ event defaults (i = 0) {
   new_ibvector (eulvel);
   new_ibvector (gravity);
   new_ibvector (dforce);
+
+  foreach_dimension () {
+    ibnodump (eulvel.x) = true;
+    ibnodump (gravity.x) = true;
+    ibnodump (dforce.x) = true;
+  }
+
   new_ibscalar (eulrho);
   new_ibscalar (sumw2);
   new_ibscalar (nweight);
+
+  ibnodump (eulrho) = true;
+  ibnodump (sumw2) = true;
+  ibnodump (nweight) = true;
 
   ibmeshmanager_init (0);
 
@@ -249,10 +260,6 @@ event init_ib (i = 0) {
   ibmeshmanager_update_pid ();
   ibmeshmanager_boundary ();
 #endif
-
-#if TREE
-  adapt_wavelet_ibm (NULL, NULL, 10);
-#endif
 }
 
 event init (i = 0) {
@@ -271,6 +278,7 @@ event init (i = 0) {
 
   dtmax = DT;
   event ("stability");
+  // tnext = t;
 }
 
 /**

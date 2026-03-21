@@ -5,6 +5,10 @@
 #include "library/ibm/navier-stokes/unserious/centered-split-rich.h"
 #include "tracer.h"
 #include "library/io/output-vtk.h"
+#include "library/ibm/IBOutput.h"
+#include "library/io/output-dump.h"
+
+#define basenamestr "uhllman_cylinder_test"
 
 coord
 circle(int n, int N, coord centre, double radius)
@@ -53,8 +57,9 @@ main()
 
   display_control(Reynolds, 10, 1000);
 
-  DT = 0.0005;
+  DT = 0.001;
 
+  install_shutdown_handlers();
   run();
 }
 
@@ -74,7 +79,7 @@ p[right] = dirichlet(0.);
 pf[right] = dirichlet(0.);
 
 event
-init_ib(i = 0)
+init(i = 0)
 {
   int new_id = ibmeshmanager_add_mesh();
   ibmeshmanager_add_nodes(new_id, N_circ);
@@ -83,15 +88,18 @@ init_ib(i = 0)
     mesh->depth = lvl_circ;
     ibval(nweight) = ds_circ;
   }
-  foreach_ibnode_per_ibmesh() {
-    coord cpos = circle(node_id, N_circ, c_circ, R_circ);
-    foreach_dimension() {
-      ibval(npos.x) = cpos.x;
+
+  if (!restore_handler(basenamestr)) {
+    foreach () u.x[] = U0; 
+    foreach_ibnode_per_ibmesh() {
+      coord cpos = circle(node_id, N_circ, c_circ, R_circ);
+      foreach_dimension() {
+        ibval(npos.x) = cpos.x;
+      }
     }
+  } else {
   }
 }
-
-event init(t = 0) foreach () u.x[] = U0;
 
 event
 logfile(i++)
@@ -115,31 +123,29 @@ statsfile(i++)
   Cl = fy / (0.5 * sq(U0) * 2 * R_circ);
 
   if (pid() == 0) {
+     FILE* fp = NULL;
     if (i == 0) {
-      FILE* fp = fopen("cylinderstats.txt", "w");
-      fprintf(fp, "");
-      fclose(fp);
+      fp = fopen("cylinderstats.txt", "w");
+    } else {
+      fp = fopen("cylinderstats.txt", "a");
     }
-
-    FILE* fp = fopen("cylinderstats.txt", "a");
-
     fprintf(fp, "%f %f %f %f %f\n", t, fx, fy, Cd, Cl);
     fclose(fp);
   }
 }
 
 event
-output(i += 200; t <= 60.)
+output(i += 1; t <= 60.)
 // output(i += 1; i <= 5.)
 {
   scalar omega[];
   vorticity(u, omega);
 #if TREE
-  output_hdf_htg();
+  output_hdf_htg(NULL,NULL,basenamestr);
 #else
-  output_hdf_imagedata();
+  output_hdf_imagedata(NULL,NULL,basenamestr);
 #endif
-  output_hdf_pd();
+  output_hdf_pd(NULL,NULL,basenamestr);
 }
 
 #if TREE
@@ -150,3 +156,7 @@ adapt(i++)
     { u, f }, (double[]){ 3e-2, 3e-2, 3e-2 }, maxlevel, minlevel);
 }
 #endif
+
+event checkpoint_event (i++, last) {
+  return checkpoint_handler (t,i,basenamestr);
+}

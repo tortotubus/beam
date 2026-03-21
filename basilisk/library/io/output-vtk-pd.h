@@ -6,76 +6,54 @@
 
 #include "library/io/vtk/vtkHDFPolyData.h"
 #include "library/io/vtk/vtkPolyData.h"
+#include "library/io/vtk/vtkTimeSeries.h"
 #include "library/ibm/IBMeshManager.h"
 
-trace void output_hdf_pd_series (IBscalar* slist = all,
-                                 IBvector* vlist = NULL,
+trace void output_hdf_pd_series (IBscalar* scalar_list = NULL,
+                                 IBvector* vector_list = NULL,
                                  const char* basename,
                                  int iter,
                                  double time,
                                  bool overwrite) {
 
+  char pname[128];
+  sprintf (pname, "%s/vtkhdf-pd-series", basename);
+
   char fname[128];
-  sprintf (fname, "%s-vtkhdf-series/%s_%d.vtkhdf", basename, basename, iter);
+  sprintf (fname, "%s/vtkhdf-pd-series/polydata_%d.vtkhdf", basename, iter);
+
+  char series_entry[128];
+  sprintf (series_entry, "vtkhdf-pd-series/polydata_%d.vtkhdf", iter);
+
+  char series_filename[128];
+  sprintf (series_filename, "%s/pd.vtkhdf.series", basename);
 
   if (pid () == 0) {
-    char pname[128];
-    sprintf (pname, "%s-vtkhdf-series", basename);
-    create_path (pname);
-
-    static int timeseries_len = 0;
-    static char timeseries[1 << 24]; // 64 MB buffer
-
-    // Tail that always lives *after* the last entry
-    static const char timeseries_tail[] = ",\n\t]}";
-    const int timeseries_delta = (int) strlen (timeseries_tail);
-
-    char fname_timeseries[128];
-    sprintf (
-      fname_timeseries, "%s.vtkhdf.series", basename); // assuming fname exists
-
-    if (!timeseries_len) {
-      timeseries_len +=
-        sprintf (timeseries,
-                 "{\n"
-                 "\t\"file-series-version\" : \"1.0\",\n"
-                 "\t\"files\" : [\n"
-                 "\t\t{ \"iter\" : %d, \"time\" : %f, \"name\" : \"%s\" }%s",
-                 iter,
-                 time,
-                 fname,
-                 timeseries_tail);
-    } else {
-      // We currently have ... { last entry }",\n\t]}"
-      // The tail begins at timeseries_len - timeseries_delta
-      int start = timeseries_len - timeseries_delta;
-
-      // Overwrite the tail with: ",\n\t\t{ new entry }<tail again>"
-      // This keeps all old content up to 'start', and appends a new entry
-      timeseries_len =
-        start +
-        sprintf (timeseries + start,
-                 ",\n\t\t{ \"iter\" : %d, \"time\" : %f, \"name\" : \"%s\" }%s",
-                 iter,
-                 time,
-                 fname,
-                 timeseries_tail);
-    }
-
-    FILE* f = fopen (fname_timeseries, "w");
-    if (f) {
-      fwrite (timeseries, 1, (size_t) timeseries_len, f);
-      fclose (f);
-    }
+    assert (!create_path (basename));
+    assert (!create_path (pname));
+    output_vtk_series (series_entry, series_filename, iter, time);
   }
+
+IBscalar* slist = scalar_list;
+IBvector* vlist = vector_list;
+
+if (!slist && !vlist) {
+  foreach_ibscalar (iball) {
+    if (_ibattribute[s.i].v.x.i == s.i)
+      vlist = ibvectors_add (vlist, _ibattribute[s.i].v);
+    else if (_ibattribute[s.i].v.x.i < 0)
+      slist = iblist_add (slist, s);
+  }
+}
+
 
   // Init polydata
 
 #if _MPI
-  ibmeshmanager_update_pid();
+  ibmeshmanager_update_pid ();
   size_t n_points_local = 0;
+
   foreach_ibnode () {
-    // ibnode_update_pid (node);
     if (node->pid == pid ()) {
       n_points_local++;
     }
@@ -94,13 +72,8 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   size_t n_strips = 0;
   size_t n_polygons = 0;
 
-  int n_scalars = 0, n_vectors = 0;
-  foreach_ibscalar (slist) {
-    n_scalars++;
-  }
-  foreach_ibvector (vlist) {
-    n_vectors++;
-  }
+  int n_scalars = iblist_len(slist);
+  int n_vectors = ibvectors_len(vlist);
   size_t n_pointdata = n_scalars + n_vectors;
 
   vtkPolyData vtk_pd = vtk_polydata_init (
@@ -123,12 +96,6 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   double** vector_data = NULL;
   int64_t* scalar_ids = NULL;
   int64_t* vector_ids = NULL;
-  // int64_t pid_id = vtk_polydata_add_pointdata_scalar (&vtk_pd, "pid");
-  // double* pid_data = vtk_polydata_get_pointdata_data (&vtk_pd, pid_id);
-  // int64_t vel_id = vtk_polydata_add_pointdata_vector (&vtk_pd, "vel", dimension);
-  // double* vel_data = vtk_polydata_get_pointdata_data (&vtk_pd, vel_id);
-  // int64_t f_id = vtk_polydata_add_pointdata_vector (&vtk_pd, "f", dimension);
-  // double* f_data = vtk_polydata_get_pointdata_data (&vtk_pd, f_id);
 
   scalar_ids = malloc (sizeof (int64_t) * n_scalars);
   scalar_data = malloc (sizeof (double*) * n_scalars);
@@ -152,7 +119,7 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
       vector_name = malloc ((trunc_len + 1) * sizeof (char));
       strncpy (vector_name, ibname (v.x), trunc_len);
       vector_name[trunc_len] = '\0';
-      vector_ids[i] = vtk_polydata_add_pointdata_scalar (&vtk_pd, vector_name);
+      vector_ids[i] = vtk_polydata_add_pointdata_vector (&vtk_pd, vector_name, dimension);
       vector_data[i] = vtk_polydata_get_pointdata_data (&vtk_pd, vector_ids[i]);
       free (vector_name);
       i++;
@@ -181,20 +148,7 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
 #endif
           vi++;
         }
-
-        // ib nodal values
-
-//         pid_data[i] = node->pid;
-//         vel_data[i * dimension + 0] = ibval(vel.x;
-//         f_data[i * dimension + 0] = node->f.x;
-// #if dimension >= 2
-//         vel_data[i * dimension + 1] = node->vel.y;
-//         f_data[i * dimension + 1] = node->f.y;
-// #endif
-// #if dimension >= 3
-//         vel_data[i * dimension + 2] = node->vel.z;
-//         f_data[i * dimension + 2] = node->f.z;
-// #endif
+ 
 
         i++;
       }
@@ -210,26 +164,23 @@ trace void output_hdf_pd_series (IBscalar* slist = all,
   vtk_polydata_free (&vtk_pd);
 }
 
-trace void output_hdf_pd (IBscalar* slist = iball,
-                          IBvector* vlist = NULL,
+trace void output_hdf_pd (IBscalar* scalar_list = NULL,
+                          IBvector* vector_list = NULL,
                           const char* basename = NULL,
                           int iter = i,
                           double time = t,
                           bool use_transient = false,
                           bool overwrite = true,
                           bool use_ab = false) {
-  char basename_buff[64];
-  static char timestamp[15] = "";
 
-  if (timestamp[0] == '\0')
-    snprintf(timestamp, sizeof(timestamp), "%s", get_datetime_string());
+  char basename_buff[64];
 
   if (!basename) {
-    snprintf ( basename_buff, sizeof (basename_buff), "%s-%s-pd", get_executable_name (), timestamp);
+    snprintf (
+      basename_buff, sizeof (basename_buff), "%s", get_unique_basename ());
   } else {
-    snprintf (basename_buff, sizeof (basename_buff), "%s-%s-pd", basename, timestamp);
+    snprintf (basename_buff, sizeof (basename_buff), "%s", basename);
   }
 
-
-  output_hdf_pd_series (slist, vlist, basename_buff, iter, time, overwrite);
+  output_hdf_pd_series (scalar_list, vector_list, basename_buff, iter, time, overwrite);
 }

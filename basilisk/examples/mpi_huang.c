@@ -1,8 +1,5 @@
 #include "grid/quadtree.h"
-// #include "grid/multigrid.h"
-
 #include "library/ibm/IBMeshManager.h"
-// #include "library/ibm/navier-stokes/centered-dlmfd.h"
 #include "library/ibm/navier-stokes/unserious/centered-split-rich.h"
 #include "library/elff/elff.h"
 #include "library/io/output-vtk.h"
@@ -23,10 +20,9 @@ face vector muv[];
 #define b_length 1.
 #define b_EI huang_gamma
 #define b_mu huang_rho
-#define b_nodes ((int)65)               //((b_length / b_ds) + 1.))
-#define b_ds (b_length / (b_nodes - 1)) // (2. * h_fluid)
+#define b_nodes ((int)65)
+#define b_ds (b_length / (b_nodes - 1))
 #define b_r 1e3
-// #define b_r 1e4
 #define b_theta (0.1 * pi)
 #define b_gravity (1.)
 
@@ -57,10 +53,6 @@ u.t[left] = dirichlet(0.);
 p[left] = neumann(0.);
 pf[left] = neumann(0.);
 
-// u.t[top] = dirichlet(U0);
-// u.n[top] = dirichlet(0.);
-// u.t[bottom] = dirichlet(U0);
-// u.n[bottom] = dirichlet(0.);
 
 u.n[right] = neumann(0.);
 p[right] = dirichlet(0.);

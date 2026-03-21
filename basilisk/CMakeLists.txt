@@ -10,8 +10,7 @@ if(BUILD_BASILISK_EXAMPLES)
   find_package(MPI REQUIRED)
   include(elff_basilisk_add_executable)
   include(elff_basilisk_mpi_add_executable)
-  add_subdirectory(examples/serial)
-  add_subdirectory(examples/mpi)
+  add_subdirectory(examples)
 endif()
 
 
