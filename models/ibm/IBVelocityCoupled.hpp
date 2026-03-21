@@ -4,6 +4,7 @@
 #include "general/error.hpp"
 
 #include "models/ibm/IBMesh.hpp"
+#include "models/ibm/IBModel.hpp"
 
 #include <vector>
 

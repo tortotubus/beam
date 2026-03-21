@@ -2,6 +2,7 @@
 #include "output.h"
 #include <limits.h>
 
+#include "library/elff/runtime.h"
 // ============================================================================
 // Type declarations
 // ============================================================================
@@ -55,8 +56,20 @@ void ib_and_basilisk_dump(const char * file = "dump", scalar * list = all, FILE 
   char * ibname = (char *) malloc(strlen(file) + 4);
   strcpy(ibname,file);
   strcat(ibname,".ib");
-  dump(file,list,fp,unbuffered,zero);
+
+  char * elffname = (char *) malloc(strlen(file) + 6);
+  strcpy(elffname,file);
+  strcat(elffname,".elff");
+
+  if (elff_dump(elffname) != 0) {
+    fprintf (ferr, "ib_and_basilisk_dump(): error: failed to write ELFF checkpoint '%s'\n",
+             elffname);
+    exit (1);
+  }
   ib_dump(ibname, iball, NULL, unbuffered, zero);
+  dump(file,list,fp,unbuffered,zero);
+
+  free(elffname);
   free(ibname);
 }
 
@@ -67,9 +80,26 @@ bool ib_and_basilisk_restore(const char * file = "dump", scalar * list = all, FI
   char * ibname = (char *) malloc(strlen(file) + 4);
   strcpy(ibname,file);
   strcat(ibname,".ib");
-  ib_restore(ibname, iball, NULL);
-  restore(file,list,fp);
+
+  char * elffname = (char *) malloc(strlen(file) + 6);
+  strcpy(elffname,file);
+  strcat(elffname,".elff");
+
+  if (elff_restore(elffname) != 0) {
+    fprintf (ferr, "ib_and_basilisk_restore(): error: failed to restore ELFF checkpoint '%s'\n",
+             elffname);
+    exit (1);
+  }
+  if (!ib_restore(ibname, iball, NULL)) {
+    fprintf (ferr, "ib_and_basilisk_restore(): error: failed to restore IB checkpoint '%s'\n",
+             ibname);
+    exit (1);
+  }
+  bool ok = restore(file,list,fp);
+
+  free(elffname);
   free(ibname);
+  return ok;
 }
 
 

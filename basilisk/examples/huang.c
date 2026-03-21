@@ -2,12 +2,15 @@
 // #include "grid/multigrid.h"
 
 #include "library/ibm/IBMeshManager.h"
-// #include "library/ibm/navier-stokes/centered-dlmfd.h"
 #include "library/elff/elff.h"
 #include "library/ibm/navier-stokes/unserious/centered-split-rich.h"
+#include "library/ibm/IBOutput.h"
+#include "library/io/output-dump.h"
 #include "library/io/output-vtk.h"
 
 face vector muv[];
+
+#define basenamestr "huang_200"
 
 #define L_fluid 16.
 #define maxlevel 10
@@ -43,6 +46,7 @@ main()
   display_control(Reynolds, 10, 1000);
   DT = 0.0003;
 
+  install_shutdown_handlers();
   run();
 }
 
@@ -57,23 +61,18 @@ u.t[left] = dirichlet(0.);
 p[left] = neumann(0.);
 pf[left] = neumann(0.);
 
-// u.t[top] = dirichlet(U0);
-// u.n[top] = dirichlet(0.);
-// u.t[bottom] = dirichlet(U0);
-// u.n[bottom] = dirichlet(0.);
-
 u.n[right] = neumann(0.);
 p[right] = dirichlet(0.);
 pf[right] = dirichlet(0.);
 
 event
-init_ib(i = 0)
+init(i = 0)
 {
-  // ib_force_relaxation = 0.1;
   int m_id = ibmeshmanager_add_mesh();
   IBMeshModel beam_model =
     elff_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta);
   ibmeshmanager_set_model(m_id, beam_model);
+
   foreach_ibnode_per_ibmesh()
   {
     mesh->depth = ibmlevel;
@@ -83,9 +82,13 @@ init_ib(i = 0)
     if (node_id == 0 || node_id == mesh->nodes.size - 1)
       ibval(nweight) *= 0.5;
   }
-}
 
-event init(t = 0) foreach () u.x[] = U0;
+  if (!restore_handler(basenamestr)) {
+    foreach ()
+      u.x[] = U0;
+  } else {
+  }
+}
 
 event
 logfile(i++)
@@ -98,37 +101,46 @@ logfile(i++)
 
   coord nforce_sum = { 0. };
   if (pid() == 0) {
-    foreach_ibnode() {
-      foreach_dimension() {
+    foreach_ibnode()
+    {
+      foreach_dimension()
+      {
         nforce_sum.x += (ibval(nforce.x) - ibval(gravity.x)) * ibval(nweight);
       }
     }
   }
 
-  
   double ibmf_sum_x = 0., ibmf_sum_y = 0.;
-  foreach(reduction(+:ibmf_sum_x) reduction(+:ibmf_sum_y)) {
+  foreach (reduction(+ : ibmf_sum_x) reduction(+ : ibmf_sum_y)) {
     ibmf_sum_x += ibmf.x[] * dv();
     ibmf_sum_y += ibmf.y[] * dv();
   }
 
   if (pid() == 0)
-    fprintf(stderr, "%d %g %g %g %g %g %g\n", i, t, y_tip, nforce_sum.x, nforce_sum.y, ibmf_sum_x, ibmf_sum_y);
+    fprintf(stderr,
+            "%d %g %g %g %g %g %g\n",
+            i,
+            t,
+            y_tip,
+            nforce_sum.x,
+            nforce_sum.y,
+            ibmf_sum_x,
+            ibmf_sum_y);
 }
 
 scalar omega[];
 
 event
-output(t += 0.05; t <= 50)
+// output(t += 0.05; t <= 50)
+output(i += 1; t <= 10)
 {
-
   vorticity(u, omega);
 #if TREE
-  output_hdf_htg();
+  output_hdf_htg(NULL, NULL, basenamestr);
 #else
-  output_hdf_imagedata();
+  output_hdf_imagedata(NULL, NULL, basenamestr);
 #endif
-  output_hdf_pd();
+  output_hdf_pd(NULL, NULL, basenamestr);
 }
 
 #if TREE
@@ -138,3 +150,9 @@ adapt(i++)
   adapt_wavelet_ibm({ u }, (double[]){ 3e-3, 3e-3 }, maxlevel, minlevel);
 }
 #endif
+
+event
+checkpoint_event(i++, last)
+{
+  return checkpoint_handler(t, i, basenamestr);
+}

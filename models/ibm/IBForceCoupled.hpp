@@ -3,6 +3,7 @@
 #include "config/config.hpp"
 #include "general/error.hpp"
 #include "models/ibm/IBMesh.hpp"
+#include "models/ibm/IBModel.hpp"
 
 #include <vector>
 
@@ -13,7 +14,8 @@ namespace Models {
  * @brief Immersed boundary coupling abstract base class for constitutive models
  * that take forces as inputs and give position and velocity as outputs
  */
-class IBForceCoupled
+class IBForceCoupled :
+  public IBModel
 {
 protected:
   IBMesh mesh, mesh_next;

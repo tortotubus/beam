@@ -3,6 +3,7 @@ list(APPEND SRCS
   models/ibm/IBForceCoupled.cpp
   models/ibm/IBMesh.cpp
   models/ibm/IBVelocityCoupled.cpp
+  models/ibm/IBRuntime.cpp
 )
 
 list(APPEND HDRS 
@@ -10,6 +11,7 @@ list(APPEND HDRS
   models/ibm/IBForceCoupled.h
   models/ibm/IBMesh.h
   models/ibm/IBVelocityCoupled.h
+  models/ibm/IBRuntime.h
 )
 
 convert_filenames_to_full_paths(SRCS)

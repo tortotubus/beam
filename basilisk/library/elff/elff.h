@@ -3,6 +3,8 @@
 #include "models/ibm/IBForceCoupled.h"
 #include "library/ibm/IBMeshModel.h"
 
+#include "library/elff/runtime.h"
+
 /**
  * ELFF Force-Coupled Operations
  */
@@ -93,6 +95,9 @@ void elff_beam_destroy (void* ctx);
 IBMeshModel elff_beam_new (
   double length, double EI, double mu, int nodes, double r_penalty) {
   ib_beam_t beam_ptr = ib_beam_new (length, EI, mu, nodes, r_penalty);
+
+  elff_runtime_register((ib_model_t) beam_ptr);
+
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
   ib_model.ctx = beam_ptr;
@@ -107,6 +112,9 @@ IBMeshModel elff_beam_new (
 IBMeshModel elff_beam_new_theta (
   double length, double EI, double mu, int nodes, double r_penalty, double theta) {
   ib_beam_t beam_ptr = ib_beam_new_theta (length, EI, mu, nodes, r_penalty, theta);
+
+  elff_runtime_register((ib_model_t) beam_ptr);
+
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
   ib_model.ctx = beam_ptr;

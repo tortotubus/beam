@@ -13,7 +13,6 @@ namespace Models {
 class IBEulerBeam
   : public IBForceCoupled
   , public EulerBeamDynamicInextensibleMoM
-
 {
 private:
   void EBMeshToIBMeshNext()
@@ -116,6 +115,76 @@ public:
       ib_velocity[ni].y = eb_velocity[ni][1];
       ib_velocity[ni].z = eb_velocity[ni][2];
     }
+  }
+
+  void pack_state(IBModelState &s) const override {
+    static constexpr int64_t state_version = 1;
+
+    s.ints.clear();
+    s.reals.clear();
+    s.bytes.clear();
+
+    s.ints.push_back(state_version);
+    s.ints.push_back(static_cast<int64_t>(nodes));
+    s.ints.push_back(static_cast<int64_t>(ndof));
+    s.ints.push_back(static_cast<int64_t>(ndof_l));
+    s.ints.push_back(static_cast<int64_t>(time_iter));
+
+    s.reals.reserve(1 + 3 * ndof + ndof_l);
+    s.reals.push_back(t);
+
+    auto pack_vec = [&](const VectorXd& v) {
+      for (Eigen::Index i = 0; i < v.size(); ++i)
+        s.reals.push_back(v(i));
+    };
+
+    pack_vec(u);
+    pack_vec(lambda);
+    pack_vec(v_prev);
+    pack_vec(a_prev);
+  }
+
+  void unpack_state(const IBModelState& s) override
+  {
+    static constexpr int64_t state_version = 1;
+
+    ELFF_ASSERT(s.ints.size() == 5,
+                "IBEulerBeam::unpack_state(): invalid integer metadata.\n");
+    ELFF_ASSERT(s.ints[0] == state_version,
+                "IBEulerBeam::unpack_state(): unsupported state version.\n");
+    ELFF_ASSERT(static_cast<size_t>(s.ints[1]) == nodes,
+                "IBEulerBeam::unpack_state(): node count mismatch.\n");
+    ELFF_ASSERT(static_cast<size_t>(s.ints[2]) == ndof,
+                "IBEulerBeam::unpack_state(): ndof mismatch.\n");
+    ELFF_ASSERT(static_cast<size_t>(s.ints[3]) == ndof_l,
+                "IBEulerBeam::unpack_state(): constraint dof mismatch.\n");
+
+    const size_t expected_reals = 1 + 3 * ndof + ndof_l;
+    ELFF_ASSERT(s.reals.size() == expected_reals,
+                "IBEulerBeam::unpack_state(): invalid real buffer size.\n");
+
+    size_t k = 0;
+    t = s.reals[k++];
+
+    auto unpack_vec = [&](VectorXd& v) {
+      for (Eigen::Index i = 0; i < v.size(); ++i)
+        v(i) = s.reals[k++];
+    };
+
+    unpack_vec(u);
+    unpack_vec(lambda);
+    unpack_vec(v_prev);
+    unpack_vec(a_prev);
+
+    time_iter = static_cast<size_t>(s.ints[4]);
+
+    // Reconstruct step history and all geometric/IB views from the restored
+    // converged state.
+    u_prev = u;
+    u_prev_prev = u;
+    EulerBeamDynamicInextensibleMoM::update_mesh();
+    EBMeshToIBMeshCurrent();
+    EBMeshToIBMeshNext();
   }
 };
 
