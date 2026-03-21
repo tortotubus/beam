@@ -111,7 +111,7 @@ mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
 
 double alpha_split = 0.5;
 double beta_split = 0.5;
-double ib_force_relaxation = 0.7;
+double ib_force_relaxation = 0.3;
 int ib_richardson_iters = 4;
 /**
 ## Boundary conditions
@@ -421,36 +421,9 @@ event alpha_viscous_term (i++, last) {
 
 event advance_interface (i++) {
   foreach_ibnode () {
-    if (fp_weird (ibval (sumw2)) || fp_weird (ibval (nweight)) ||
-        fp_weird (ibval (nvel.x)) || fp_weird (ibval (eulvel.x))) {
-      printf ("[pid %d] bad inputs node=%zu sumw2=%g nweight=%g vel=%g "
-              "eulvel=%g dt=%g\n",
-              pid (),
-              node_id,
-              ibval (sumw2),
-              ibval (nweight),
-              ibval (nvel.x),
-              ibval (eulvel.x),
-              dt);
-    }
     foreach_dimension () ibval (nforce.x) += ibval (gravity.x);
   }
   ibmeshmanager_advance_positions (dt);
-
-  foreach_ibnode () {
-    if (fp_weird (ibval (sumw2)) || fp_weird (ibval (nweight)) ||
-        fp_weird (ibval (nvel.x)) || fp_weird (ibval (eulvel.x))) {
-      printf ("[pid %d] bad inputs node=%zu sumw2=%g nweight=%g vel=%g "
-              "eulvel=%g dt=%g\n",
-              pid (),
-              node_id,
-              ibval (sumw2),
-              ibval (nweight),
-              ibval (nvel.x),
-              ibval (eulvel.x),
-              dt);
-    }
-  }
 }
 
 event interface_force_richardson (i++, last) {

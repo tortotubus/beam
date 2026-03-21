@@ -124,7 +124,9 @@ astats adapt_wavelet_ibm (scalar* slist,
   free (maxlevel_c);
 
   ibmm.dirty = true;
+#if _MPI
   ibmeshmanager_update_pid ();
+#endif
 
   return st;
 }

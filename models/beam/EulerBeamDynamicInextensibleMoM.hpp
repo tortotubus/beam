@@ -11,7 +11,7 @@
 
 using namespace Eigen;
 
-namespace ELFF { 
+namespace ELFF {
 namespace Models {
 
 class EulerBeamDynamicInextensibleMoM : public EulerBeamStaticInextensibleMoM
@@ -32,7 +32,7 @@ public:
 
   virtual void solve(real_t dt, std::array<real_t, 3> load) override
   {
-    const real_t alpha = 0;
+    const real_t alpha = 0.0;
     const real_t gamma = 0.5 - alpha;
     const real_t beta = 0.25 * (1 - alpha) * (1 - alpha);
     solve_newmark(dt, load, beta, gamma);
@@ -42,7 +42,7 @@ public:
   {
     ELFF_ASSERT(load.size() == nodes,
                 "Size of load vector must equal number of nodes.");
-    const real_t alpha = 0.;
+    const real_t alpha = 0.0;
     const real_t gamma = 0.5 - alpha;
     const real_t beta = 0.25 * (1 - alpha) * (1 - alpha);
     solve_newmark(dt, load, beta, gamma);
@@ -56,8 +56,7 @@ public:
 
     // LDLT<MatrixXd> solver;
     // solver.setTolerance(tol_inner);
-    ConjugateGradient<MatrixXd, Upper | Lower>
-      solver;
+    ConjugateGradient<MatrixXd, Upper | Lower> solver;
 
     if (time_iter == 0) {
       VectorXd R0 =
@@ -68,9 +67,10 @@ public:
         size_t ix = offset_x + 2 * n;
         size_t iy = offset_y + 2 * n;
         size_t iz = offset_z + 2 * n;
-        a_prev(ix) = (-R0(ix)) / (mu * ds);
-        a_prev(iy) = (-R0(iy)) / (mu * ds);
-        a_prev(iz) = (-R0(iz)) / (mu * ds);
+        const real_t w = (n == 0 || n == nodes - 1) ? 0.5 * ds : ds;
+        a_prev(ix) = (-R0(ix)) / (mu * w);
+        a_prev(iy) = (-R0(iy)) / (mu * w);
+        a_prev(iz) = (-R0(iz)) / (mu * w);
       }
     }
 
@@ -105,7 +105,6 @@ public:
       S_norm = update_lambda();
     }
 
-
     size_t nodes = mesh.get_nodes();
 
     for (size_t ni = 0; ni < nodes; ++ni) {
@@ -130,7 +129,6 @@ public:
     u_prev_prev = u_prev; // carry old n-1
     u_prev = u;           // store new n
 
-
     update_mesh();
 
     time_iter++;
@@ -145,8 +143,7 @@ public:
 
     // LDLT<MatrixXd> solver;
     // solver.setTolerance(tol_inner);
-    ConjugateGradient<MatrixXd, Upper | Lower>
-      solver;
+    ConjugateGradient<MatrixXd, Upper | Lower> solver;
 
     if (time_iter == 0) {
       VectorXd R0 =
@@ -334,9 +331,11 @@ protected:
       const T ay = newmark_a(iy);
       const T az = newmark_a(iz);
 
-      residual(ix) += mu * ds * ax;
-      residual(iy) += mu * ds * ay;
-      residual(iz) += mu * ds * az;
+      const real_t w = (n == 0 || n == nodes - 1) ? 0.5 * ds : ds;
+
+      residual(ix) += mu * w * ax;
+      residual(iy) += mu * w * ay;
+      residual(iz) += mu * w * az;
     }
 
     return residual;
@@ -374,10 +373,11 @@ protected:
       const T ax = newmark_a(ix);
       const T ay = newmark_a(iy);
       const T az = newmark_a(iz);
+      const real_t w = (n == 0 || n == nodes - 1) ? 0.5 * ds : ds;
 
-      residual(ix) += mu * ds * ax;
-      residual(iy) += mu * ds * ay;
-      residual(iz) += mu * ds * az;
+      residual(ix) += mu * w * ax;
+      residual(iy) += mu * w * ay;
+      residual(iz) += mu * w * az;
     }
 
     return residual;
@@ -387,7 +387,8 @@ protected:
   {
 
     std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
-    std::vector<std::array<real_t, 3>>& velocity = mesh.get_centerline_velocity();
+    std::vector<std::array<real_t, 3>>& velocity =
+      mesh.get_centerline_velocity();
     std::vector<std::array<real_t, 3>>& slope = mesh.get_slope();
     std::vector<real_t>& s = mesh.get_curvilinear_axis();
 
@@ -403,8 +404,7 @@ protected:
       velocity[i][2] = v_prev(offset_z + 2 * i + 0);
     }
   }
-
 };
 
 } // namespace Models
-} // namespace ELFF 
+} // namespace ELFF

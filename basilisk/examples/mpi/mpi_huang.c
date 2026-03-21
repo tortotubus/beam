@@ -23,12 +23,12 @@ face vector muv[];
 #define b_length 1.
 #define b_EI huang_gamma
 #define b_mu huang_rho
-#define b_nodes ((int)64)               //((b_length / b_ds) + 1.))
+#define b_nodes ((int)65)               //((b_length / b_ds) + 1.))
 #define b_ds (b_length / (b_nodes - 1)) // (2. * h_fluid)
 #define b_r 1e3
 // #define b_r 1e4
 #define b_theta (0.1 * pi)
-#define b_gravity (b_mu * huang_Fr)
+#define b_gravity (1.)
 
 int Reynolds = huang_Re;
 double U0 = 1.;
@@ -90,8 +90,14 @@ event init(t = 0) foreach () u.x[] = U0;
 event
 logfile(i++)
 {
+  double y_tip = 0.;
+  {
+    IBNode *node = ibmm.pool.active.ptrs[0];
+    y_tip = ibval(npos.y);
+  }
   // fprintf(stderr, "%d %g %d\n", i, t, cgiter);
-  fprintf(stderr, "%d %g\n", i, t);
+  if (pid() == 0)
+  fprintf(stderr, "%d %g %g\n", i, t, y_tip);
 }
 
 scalar omega[];

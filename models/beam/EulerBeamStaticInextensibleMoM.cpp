@@ -206,7 +206,7 @@ EulerBeamStaticInextensibleMoM::apply_initial_condition(EulerBeamMesh& bmesh)
 real_t
 EulerBeamStaticInextensibleMoM::update_lambda(real_t omega)
 {
-  static_cast<void>(omega);
+  // static_cast<void>(omega);
 
   static constexpr std::array<real_t, 3> xi_q = { 0.1127016654,
                                                   0.5,
@@ -273,7 +273,9 @@ EulerBeamStaticInextensibleMoM::update_lambda(real_t omega)
     }
   }
 
-  lambda = lambda_n;
+  // lambda = lambda_n;
+  lambda = (1.0 - omega) * lambda + omega * lambda_n;
+
 
   return lambda_n.norm();
 }
