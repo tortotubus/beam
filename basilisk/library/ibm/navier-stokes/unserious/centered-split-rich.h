@@ -143,18 +143,19 @@ event default_display (i = 0) display ("squares (color = 'u.x', spread = -1);");
 
 double dtmax;
 
-event init_ib (i = 0) {
-#if _MPI
-  ibmeshmanager_update_pid ();
-  ibmeshmanager_boundary ();
-#endif
-}
+// event init_ib (i = 0) {
+
+// }
 
 event init (i = 0) {
 
   trash ({uf});
   foreach_face () uf.x[] = fm.x[] * face_value (u.x, 0);
  
+#if _MPI
+  ibmeshmanager_update_pid ();
+  ibmeshmanager_boundary ();
+#endif
 
   event ("properties");
 

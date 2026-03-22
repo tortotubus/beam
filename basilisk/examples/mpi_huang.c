@@ -123,7 +123,7 @@ output(t += 0.05; t <= 50)
 #else
   output_hdf_imagedata({omega,p}, {u,ibmf}, basenamestr);
 #endif
-  output_hdf_pd(NULL, (IBvector[]){eulvel, nforce, nvel}, basenamestr);
+  output_hdf_pd(NULL, (IBvector[]){eulvel, nforce, nvel, {{-1}}}, basenamestr);
 }
 
 #if TREE
