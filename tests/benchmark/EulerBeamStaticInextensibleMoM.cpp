@@ -13,7 +13,7 @@ TEST(EulerBeamStaticInextensibleMoMTest, BisshoppAndDrucker)
   real_t length = 1., EI = 1., area = 1., r_pentalty = 1e5;
   size_t nodes = 40;
 
-  real_t tip_force_y = -1.;
+  real_t tip_force_y = -1;
 
   double comparison_tol = 1e-5;
 
@@ -34,6 +34,9 @@ TEST(EulerBeamStaticInextensibleMoMTest, BisshoppAndDrucker)
 
   BisshoppAndDrucker1945Result res =
     BisshoppAndDrucker1945(length, EI, -tip_force_y);
+    
+  EXPECT_NEAR(std::abs(length - tip[0]), res.A, comparison_tol);
+  EXPECT_NEAR(std::abs(tip[1]), res.delta, comparison_tol);
 };
 
 }

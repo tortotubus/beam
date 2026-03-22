@@ -1,7 +1,5 @@
 set(HDRS
   beam/EulerBeam.hpp
-  beam/EulerBeamDynamicInextensibleADDM.hpp
-  beam/EulerBeamDynamicInextensibleAugKKT.hpp
   beam/EulerBeamDynamicInextensibleMoM.hpp
   beam/EulerBeamDynamicInextensibleMoMSparse.hpp
   beam/EulerBeamMesh.hpp
@@ -21,8 +19,6 @@ set(HDRS
 
 set(SRCS
   beam/EulerBeam.cpp
-  beam/EulerBeamDynamicInextensibleADDM.cpp
-  beam/EulerBeamDynamicInextensibleAugKKT.cpp
   beam/EulerBeamDynamicInextensibleMoM.cpp
   beam/EulerBeamDynamicInextensibleMoMSparse.cpp
   beam/EulerBeamMesh.cpp

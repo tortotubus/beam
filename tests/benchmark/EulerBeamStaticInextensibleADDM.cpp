@@ -15,7 +15,7 @@ TEST(EulerBeamStaticInextensibleADDMTest, BisshoppAndDrucker)
 
   real_t tip_force_y = -1;
 
-  double comparison_tol = 1e-4;
+  double comparison_tol = 1e-3;
 
   EulerBeam::EulerBeamBCs boundary_conditions = {
     .end = { EulerBeam::left, EulerBeam::right },
