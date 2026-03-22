@@ -30,7 +30,8 @@ jobs:
           -S . \
           -B ${{ github.workspace }}/build \
           -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-          -DBUILD_TESTS=ON
+          -DELFF_BUILD_TESTS=ON \
+          -DELFF_USE_BASILISK=OFF 
 
     - name: Build
       run: |
