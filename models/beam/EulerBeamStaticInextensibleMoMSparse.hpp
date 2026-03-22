@@ -4,7 +4,7 @@
 // #include <beam/LinAlg/Vector.hpp>
 
 #include "EulerBeam.hpp"
-#include "Shapes.hpp"
+#include "fem/Shapes.hpp"
 
 #include <cstdio> // for popen, pclose, fprintf
 #include <iostream>
@@ -222,10 +222,10 @@ protected:
       const real_t xi = xi_q[qi];
       const real_t w = w_q[qi];
 
-      const auto H = CubicHermite<real_t>::values(xi, ds);
-      const auto dH = CubicHermite<real_t>::derivs(xi, ds);
-      const auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
-      const auto M = LinearShape<real_t>::values(xi);
+      const auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, ds);
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+      const auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi, ds);
+      const auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
 
       T xp = 0, xpp = 0;
       T yp = 0, ypp = 0;
@@ -290,10 +290,10 @@ protected:
       const real_t xi = xi_q[qi];
       const real_t w = w_q[qi];
 
-      const auto H = CubicHermite<real_t>::values(xi, ds);
-      const auto dH = CubicHermite<real_t>::derivs(xi, ds);
-      const auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
-      const auto M = LinearShape<real_t>::values(xi);
+      const auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, ds);
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+      const auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi, ds);
+      const auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
 
       T xp = 0, xpp = 0;
       T yp = 0, ypp = 0;
@@ -430,10 +430,10 @@ protected:
         real_t xi = xi_q[qi];
         real_t w = w_q[qi];
 
-        auto H = CubicHermite<real_t>::values(xi, ds);
-        auto dH = CubicHermite<real_t>::derivs(xi, ds);
-        auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
-        auto M = LinearShape<real_t>::values(xi);
+        auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, ds);
+        auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+        auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi, ds);
+        auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
 
         T x = 0, xp = 0, xpp = 0;
         T y = 0, yp = 0, ypp = 0;
@@ -544,10 +544,10 @@ protected:
         real_t xi = xi_q[qi];
         real_t w = w_q[qi];
 
-        auto H = CubicHermite<real_t>::values(xi, ds);
-        auto dH = CubicHermite<real_t>::derivs(xi, ds);
-        auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
-        auto M = LinearShape<real_t>::values(xi);
+        auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, ds);
+        auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+        auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi, ds);
+        auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
 
         T x = 0, xp = 0, xpp = 0;
         T y = 0, yp = 0, ypp = 0;

@@ -4,7 +4,7 @@
 // #include <beam/LinAlg/Vector.hpp>
 
 #include "EulerBeam.hpp"
-#include "Shapes.hpp"
+#include "fem/Shapes.hpp"
 
 #include <cstdio> // for popen, pclose, fprintf
 #include <iostream>

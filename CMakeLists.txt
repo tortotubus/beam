@@ -65,7 +65,7 @@ endif()
 # 
 set(SOURCES "")
 set(HEADERS "")
-set(ELFF_SOURCE_DIRS c config general io models mpi)
+set(ELFF_SOURCE_DIRS c config general io models mpi fem)
 
 foreach(DIR IN LISTS ELFF_SOURCE_DIRS)
   add_subdirectory(${DIR})

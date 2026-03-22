@@ -217,7 +217,7 @@ EulerBeamStaticInextensibleADDM::compute_slopes_collocation()
   }
 
   for (size_t ei = 0; ei < elements; ei++) {
-    const std::array<real_t, 4> dH = CubicHermite<real_t>::derivs(0.5, h);
+    const std::array<real_t, 4> dH = ELFF::FEM::CubicHermite<real_t>::derivs(0.5, h);
 
     const size_t edofs[4] = {
       2 * (ei + 0) + 0, 2 * (ei + 0) + 1, 2 * (ei + 1) + 0, 2 * (ei + 1) + 1
@@ -432,8 +432,8 @@ EulerBeamStaticInextensibleADDM::assemble_A()
       const real_t xi = xi_q[q];
       const real_t w = w_q[q];
 
-      const auto dH = CubicHermite<real_t>::derivs(xi, h);
-      const auto ddH = CubicHermite<real_t>::second_derivs(xi, h);
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, h);
+      const auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi, h);
 
       for (size_t a = 0; a < 4; ++a) {
         for (size_t b = 0; b < 4; ++b) {
@@ -486,9 +486,9 @@ EulerBeamStaticInextensibleADDM::assemble_f(std::array<real_t, 3> load)
       const real_t xi = xi_q[qi];
       const real_t w = w_q[qi];
 
-      const auto L = QuadraticLagrange<real_t>::values(xi);
-      const auto H = CubicHermite<real_t>::values(xi, h);
-      const auto dH = CubicHermite<real_t>::derivs(xi, h);
+      const auto L = ELFF::FEM::QuadraticLagrange<real_t>::values(xi);
+      const auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, h);
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, h);
 
       const size_t li = e;
       const size_t mi = nodes + e;

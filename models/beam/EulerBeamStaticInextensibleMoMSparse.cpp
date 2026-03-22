@@ -294,10 +294,10 @@ EulerBeamStaticInextensibleMoMSparse::update_lambda(real_t omega)
       const real_t xi = xi_q[qi];
       const real_t w = w_q[qi];
 
-      const auto H = CubicHermite<real_t>::values(xi, ds);
-      const auto dH = CubicHermite<real_t>::derivs(xi, ds);
-      const auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
-      const auto M = LinearShape<real_t>::values(xi);
+      const auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, ds);
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+      const auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi, ds);
+      const auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
 
       real_t x = 0, xp = 0, xpp = 0;
       real_t y = 0, yp = 0, ypp = 0;

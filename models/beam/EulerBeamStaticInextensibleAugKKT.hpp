@@ -1,7 +1,7 @@
 #pragma once
 
 #include "EulerBeam.hpp"
-#include "Shapes.hpp"
+#include "fem/Shapes.hpp"
 
 #include <cmath>
 #include <cstdio> // for popen, pclose, fprintf
@@ -153,10 +153,10 @@ protected:
         real_t xi = xi_q[qi];
         real_t w = w_q[qi];
 
-        auto H = CubicHermite<real_t>::values(xi, ds);
-        auto dH = CubicHermite<real_t>::derivs(xi, ds);
-        auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
-        auto M = LinearShape<real_t>::values(xi);
+        auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, ds);
+        auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+        auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi, ds);
+        auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
 
         T x = 0, xp = 0, xpp = 0;
         T y = 0, yp = 0, ypp = 0;

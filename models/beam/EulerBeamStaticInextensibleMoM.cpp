@@ -243,8 +243,8 @@ EulerBeamStaticInextensibleMoM::update_lambda(real_t omega)
       real_t xi = xi_q[qi];
       real_t w = w_q[qi];
 
-      auto dH = CubicHermite<real_t>::derivs(xi, ds);
-      auto M = LinearShape<real_t>::values(xi);
+      auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+      auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
 
       real_t xp = 0;
       real_t yp = 0;

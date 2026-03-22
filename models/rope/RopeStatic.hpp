@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EulerBeam.hpp"
+#include "Rope.hpp"
 #include "fem/Shapes.hpp"
 
 #include <array>
@@ -17,28 +17,23 @@ namespace Models {
  * @brief Static inextensible Euler beam solved with a method-of-multipliers
  * formulation.
  */
-class EulerBeamStaticInextensibleMoM : public EulerBeam
+class RopeStatic : public Rope
 {
 public:
   /**
    * @brief Constructs a static inextensible beam model.
    *
    * @param length Beam length
-   * @param EI Flexural rigidity
    * @param nodes Number of discretization nodes
    * @param bcs Boundary conditions at the beam ends
    * @param r_penalty Penalty parameter used in the inextensibility constraint
    */
-  EulerBeamStaticInextensibleMoM(real_t length,
-                                 real_t EI,
-                                 size_t nodes,
-                                 EulerBeam::EulerBeamBCs bcs,
-                                 real_t r_penalty);
+  RopeStatic(real_t length, size_t nodes, Rope::RopeBCs bcs, real_t r_penalty);
 
   /**
    * @brief Destroys the beam model and releases any owned resources.
    */
-  ~EulerBeamStaticInextensibleMoM();
+  ~RopeStatic();
 
   /**
    * @brief Solves the static beam problem with no external load.
@@ -69,7 +64,7 @@ public:
    *
    * @param bmesh Beam mesh containing the initial geometry
    */
-  virtual void apply_initial_condition(EulerBeamMesh& bmesh) override;
+  virtual void apply_initial_condition(RopeMesh& bmesh) override;
 
 protected:
   /**
@@ -127,19 +122,17 @@ protected:
   /**
    * @brief Constructs the shared base state for dynamic derived classes.
    *
-   * @param length Beam length
-   * @param EI Flexural rigidity
+   * @param length Beam length 
    * @param mu Mass per unit length
    * @param nodes Number of discretization nodes
    * @param bcs Boundary conditions at the beam ends
    * @param r_penalty Penalty parameter used in the inextensibility constraint
    */
-  EulerBeamStaticInextensibleMoM(real_t length,
-                                 real_t EI,
-                                 real_t mu,
-                                 size_t nodes,
-                                 EulerBeam::EulerBeamBCs bcs,
-                                 real_t r_penalty);
+  RopeStatic(real_t length, 
+             real_t mu,
+             size_t nodes,
+             EulerBeam::EulerBeamBCs bcs,
+             real_t r_penalty);
 
   /**
    * @brief Updates the Lagrange multiplier iterate.
@@ -216,16 +209,14 @@ protected:
 
     Matrix<T, Dynamic, 1> residual = Matrix<T, Dynamic, 1>::Zero(ndof);
 
-    real_t Hq[3][4], dHq[3][4], ddHq[3][4], Mq[3][2];
+    real_t Hq[3][4], dHq[3][4], Mq[3][2];
     for (int qi = 0; qi < 3; ++qi) {
       auto H = ELFF::FEM::CubicHermite<real_t>::values(xi_q[qi], ds);
       auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi_q[qi], ds);
-      auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi_q[qi], ds);
       auto M = ELFF::FEM::LinearShape<real_t>::values(xi_q[qi]);
       for (int i = 0; i < 4; ++i) {
         Hq[qi][i] = H[i];
         dHq[qi][i] = dH[i];
-        ddHq[qi][i] = ddH[i];
       }
       Mq[qi][0] = M[0];
       Mq[qi][1] = M[1];
@@ -258,17 +249,14 @@ protected:
       T R_loc_z[4] = { T(0), T(0), T(0), T(0) };
 
       for (size_t qi = 0; qi < 3; ++qi) {
-        T xp = 0, xpp = 0;
-        T yp = 0, ypp = 0;
-        T zp = 0, zpp = 0;
+        T xp = 0;
+        T yp = 0;
+        T zp = 0;
 
         for (size_t i = 0; i < 4; i++) {
           xp += dHq[qi][i] * ux[i];
           yp += dHq[qi][i] * uy[i];
           zp += dHq[qi][i] * uz[i];
-          xpp += ddHq[qi][i] * ux[i];
-          ypp += ddHq[qi][i] * uy[i];
-          zpp += ddHq[qi][i] * uz[i];
         }
 
         T l = 0;
@@ -279,11 +267,6 @@ protected:
         T S = xp * xp + yp * yp + zp * zp - 1.0;
 
         for (size_t a = 0; a < 4; ++a) {
-          const T coeff_bending = EI * ddHq[qi][a] * w_q[qi] * ds;
-          R_loc_x[a] += xpp * coeff_bending;
-          R_loc_y[a] += ypp * coeff_bending;
-          R_loc_z[a] += zpp * coeff_bending;
-
           R_loc_x[a] -= load[0] * Hq[qi][a] * w_q[qi] * ds;
           R_loc_y[a] -= load[1] * Hq[qi][a] * w_q[qi] * ds;
           R_loc_z[a] -= load[2] * Hq[qi][a] * w_q[qi] * ds;
@@ -329,16 +312,16 @@ protected:
 
     Matrix<T, Dynamic, 1> residual = Matrix<T, Dynamic, 1>::Zero(ndof);
 
-    real_t Hq[3][4], dHq[3][4], ddHq[3][4], Mq[3][2];
+    real_t Hq[3][4];
+    real_t dHq[3][4];
+    real_t Mq[3][2];
     for (int qi = 0; qi < 3; ++qi) {
       auto H = ELFF::FEM::CubicHermite<real_t>::values(xi_q[qi], ds);
       auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi_q[qi], ds);
-      auto ddH = ELFF::FEM::CubicHermite<real_t>::second_derivs(xi_q[qi], ds);
       auto M = ELFF::FEM::LinearShape<real_t>::values(xi_q[qi]);
       for (int i = 0; i < 4; ++i) {
         Hq[qi][i] = H[i];
         dHq[qi][i] = dH[i];
-        ddHq[qi][i] = ddH[i];
       }
       Mq[qi][0] = M[0];
       Mq[qi][1] = M[1];
@@ -377,17 +360,14 @@ protected:
       T R_loc_z[4] = { T(0), T(0), T(0), T(0) };
 
       for (size_t qi = 0; qi < 3; ++qi) {
-        T xp = 0, xpp = 0;
-        T yp = 0, ypp = 0;
-        T zp = 0, zpp = 0;
+        T xp = 0;
+        T yp = 0;
+        T zp = 0;
 
         for (size_t i = 0; i < 4; i++) {
           xp += dHq[qi][i] * ux[i];
           yp += dHq[qi][i] * uy[i];
           zp += dHq[qi][i] * uz[i];
-          xpp += ddHq[qi][i] * ux[i];
-          ypp += ddHq[qi][i] * uy[i];
-          zpp += ddHq[qi][i] * uz[i];
         }
 
         T l = 0;
@@ -405,13 +385,8 @@ protected:
         T S = xp * xp + yp * yp + zp * zp - 1.0;
 
         for (size_t a = 0; a < 4; ++a) {
-          const T coeff_bending = EI * ddHq[qi][a] * w_q[qi] * ds;
-          R_loc_x[a] += xpp * coeff_bending;
-          R_loc_y[a] += ypp * coeff_bending;
-          R_loc_z[a] += zpp * coeff_bending;
-
           R_loc_x[a] -= fxp * Hq[qi][a] * w_q[qi] * ds;
-          R_loc_y[a] -= fyp * Hq[qi][a] * w_q[qi] * ds;
+          R_loc_y[a] -= fyp * Hq[qi][a] * w_q[qi] * ds;u
           R_loc_z[a] -= fzp * Hq[qi][a] * w_q[qi] * ds;
 
           const T coeff_constraint =

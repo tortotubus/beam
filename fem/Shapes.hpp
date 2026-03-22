@@ -4,10 +4,10 @@
 #include <cstddef>
 
 namespace ELFF {
-namespace Models { 
+namespace FEM { 
 
 /**
- * @class CubicHermite
+ * @class ELFF::FEM::CubicHermite
  *
  * @brief Cubic-Hermite shape functions on the reference element \f( [0,1] \f).
  *
@@ -24,7 +24,7 @@ namespace Models {
  * @tparam T Numeric type (e.g., double, float, or autodiff type)
  */
 template<class T>
-struct CubicHermite
+struct  CubicHermite
 {
   /**
    * @name Nodal Displacement Shape Functions

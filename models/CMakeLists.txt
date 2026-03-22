@@ -8,8 +8,7 @@ set(HDRS
   beam/EulerBeamStaticInextensibleAugKKT.hpp
   beam/EulerBeamStaticInextensibleMoM.hpp
   beam/EulerBeamStaticInextensibleMoMSparse.hpp
-  beam/IBEulerBeam.hpp
-  beam/Shapes.hpp
+  beam/IBEulerBeam.hpp 
   ibm/IBForceCoupled.hpp
   ibm/IBMesh.hpp
   ibm/IBRuntime.hpp
@@ -27,8 +26,7 @@ set(SRCS
   beam/EulerBeamStaticInextensibleAugKKT.cpp
   beam/EulerBeamStaticInextensibleMoM.cpp
   beam/EulerBeamStaticInextensibleMoMSparse.cpp
-  beam/IBEulerBeam.cpp
-  # beam/Shapes.cpp
+  beam/IBEulerBeam.cpp 
   ibm/IBForceCoupled.cpp
   ibm/IBMesh.cpp
   ibm/IBVelocityCoupled.cpp

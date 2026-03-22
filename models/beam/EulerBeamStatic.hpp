@@ -8,7 +8,7 @@
 #include "config/config.hpp"
 
 #include "models/beam/EulerBeam.hpp"
-#include "models/beam/Shapes.hpp"
+#include "fem/Shapes.hpp"
 
 using namespace Eigen;
 
@@ -204,7 +204,7 @@ protected:
 
     // integrate q(x) * H(xi) over the element
     for (int i = 0; i < 3; ++i) {
-      auto H_arr = CubicHermite<real_t>::values(q_points[i], h);
+      auto H_arr = ELFF::FEM::CubicHermite<real_t>::values(q_points[i], h);
       // wrap it in a 4×1 Eigen vector (no copy)
       Map<const Matrix<real_t, 4, 1>> H_map(H_arr.data());
 
@@ -243,7 +243,7 @@ protected:
 
     // integrate EI/h³ ∫ (d²H/dxi² ⊗ d²H/dxi²) dxi
     for (int q = 0; q < 3; ++q) {
-      auto d2H_arr = CubicHermite<real_t>::second_derivs(q_points[q], h);
+      auto d2H_arr = ELFF::FEM::CubicHermite<real_t>::second_derivs(q_points[q], h);
       Map<const Matrix<real_t, 4, 1>> d2H_map(d2H_arr.data());
 
       // then accumulate
@@ -282,7 +282,7 @@ protected:
 
       // Quadrature
       for (int qp = 0; qp < 3; ++qp) {
-        auto H_arr = CubicHermite<real_t>::values(q_points[qp], h);
+        auto H_arr = ELFF::FEM::CubicHermite<real_t>::values(q_points[qp], h);
         Map<const Matrix<real_t, 4, 1>> H_map(H_arr.data());
 
         // accumulate: ∫ N_i N_j dx ≈ ∑ h * w_q * H * H^T

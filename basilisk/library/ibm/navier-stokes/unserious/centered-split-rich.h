@@ -175,15 +175,12 @@ event tracer_diffusion (i++, last);
 
 event properties (i++, last) {
   if (!is_constant (mu.x)) {
-    // mu_alpha = new face vector;
-    // mu_beta = new face vector;
     foreach_face () {
       mu_alpha.x[] = mu.x[] * alpha_split;
       mu_beta.x[] = mu.x[] * beta_split;
     }
   }
 }
- 
 
 void prediction () {
   vector du;
