@@ -1,6 +1,14 @@
+#ifndef COMPRESSION
 #define COMPRESSION 1
+#endif 
+
+#ifndef COMPRESSION_LEVEL
 #define COMPRESSION_LEVEL 7
+#endif 
+
+#ifndef UNCOMPRESSED_CHUNK_SIZE
 #define UNCOMPRESSED_CHUNK_SIZE 10000
+#endif 
 
 #include "vtkHDF.h"
 #include "vtkHDFHyperTreeGridData.h"
@@ -45,6 +53,7 @@ void vtk_HDF_hypertreegrid_close (vtkHDFHyperTreeGrid* vtk_hdf_htg) {
  * @param scalar_list List of any basilisk scalar fields
  * @param vector_list List of any basilisk vector fields
  * @param fname The filename to write the vtkhdf (HDF5) file to
+ * @param overwrite If existing files should be overwritten
  *
  * @memberof vtkHDFHyperTreeGrid
  *
@@ -130,7 +139,7 @@ void vtk_HDF_hypertreegrid_close (vtkHDFHyperTreeGrid* vtk_hdf_htg) {
  *  - **Dataset**: "Descriptors"
  *    - **Datatype**: `char`
  *    - **Description**: This is the description of the actual structure of the
- * tree by breadth-first search. \sa @ref hdf_get_descriptors
+ * tree by breadth-first search. 
  *
  *  - **Dataset**: "DescriptorsSize"
  *    - **Datatype**: `int64`
@@ -312,6 +321,11 @@ vtkHDFHyperTreeGrid vtk_HDF_hypertreegrid_init_static (scalar* scalar_list,
                                                        vector* vector_list,
                                                        const char* fname,
                                                        bool overwrite) {
+#if !TREE
+  fprintf (stderr,
+          "error: vtk_HDF_hypertreegrid should only be used with TREE grids\n");
+    abort ();
+#endif
 
   // Create the vtkHDF struct
 #if _MPI
@@ -2917,6 +2931,8 @@ vtkHDFHyperTreeGrid vtk_HDF_hypertreegrid_init_transient (scalar* scalar_list,
           vtk_hdf_htg.grp_celldata_id, /* group_id */
           2,                           /* rank */
           dims,                        /* dims[] */
+          max_dims,
+          chunk_dims,
           local_size,                  /* local_size[] */
           local_offset,                /* local_offset[] */
           &vtk_hdf_htg.vtk_hdf         /* vtkHDFHyperTreeGrid */

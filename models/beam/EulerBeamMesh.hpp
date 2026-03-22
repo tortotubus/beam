@@ -47,18 +47,7 @@ public:
    * @param nodes Number of discretization nodes N (must be >= 2).
    * @param length Physical length L of the centerline.
    */
-  EulerBeamMesh(size_t nodes, real_t length)
-    : nodes(nodes)
-    , length(length)
-    , ds(length / (nodes - 1))
-    , s(nodes)
-    , centerline(nodes)
-    , slope(nodes)
-    , centerline_velocity(nodes)
-  {
-    set_curvilinear_axis();
-    set_centerline_x_axis_aligned();
-  }
+  EulerBeamMesh(size_t nodes, real_t length);
 
   /**
    * @brief Returns a reference to the entire centerline \f(\{\vec{r}_0,
@@ -163,31 +152,7 @@ public:
   /**
    * @brief Plots the mesh using gnuplot, if installed.
    */
-  void plot_gnuplot(std::string title)
-  {
-    FILE* pipe = popen("gnuplot -persist", "w");
-    if (!pipe) {
-      ELFF_ABORT("Failed to open pipe to gnuplot");
-    }
-
-    // Configure the plot
-    fprintf(pipe, "set title '%s'\n", title.c_str());
-    fprintf(pipe, "set xlabel 'x'\n");
-    fprintf(pipe, "set ylabel 'y'\n");
-    fprintf(pipe, "set grid\n");
-    fprintf(pipe, "set size square\n");
-    fprintf(pipe,
-            "plot '-' using 1:2 with lines title 'beam' smooth csplines\n");
-
-    // Send the data points
-    for (size_t i = 0; i < centerline.size(); ++i) {
-      fprintf(pipe, "%f %f\n", centerline[i][0], centerline[i][1]);
-    }
-    fprintf(pipe, "e\n"); // End of data marker for gnuplot
-
-    // Clean up
-    pclose(pipe);
-  }
+  void plot_gnuplot(std::string title);
 
   /**
    * @brief Plot the mesh using gnuplot with a default title.
@@ -196,7 +161,7 @@ public:
    * plot_gnuplot("Beam Centerline"). If gnuplot is not available the
    * function will abort with an error.
    */
-  void plot_gnuplot() { plot_gnuplot("Beam Centerline"); }
+  void plot_gnuplot();
 
   /**
    * @brief Export the centerline geometry as an in-memory VTK PolyData object.
@@ -205,48 +170,18 @@ public:
    * connectivity linking successive nodes. The function pre-allocates point
    * and line storage for efficiency.
    *
-   * @return A value (move) of io::CXX::vtkPolyData containing the centerline
+   * @return A value (move) of IO::CXX::vtkPolyData containing the centerline
    *         points and line cells. The caller takes ownership of the returned
    *         object and its internal memory.
    */
-  io::CXX::vtkPolyData to_vtk_polydata()
-  {
-    io::CXX::vtkPolyData pd;
-
-    pd.reserve_points(nodes);
-    pd.reserve_lines(nodes - 1);
-
-    for (size_t i = 0; i < nodes; i++)
-      pd.add_point(centerline[i][0], centerline[i][1], centerline[i][2]);
-
-    for (size_t i = 0; i < nodes - 1; i++)
-      pd.add_line(i, i + 1);
-
-    return pd;
-  }
+  IO::CXX::vtkPolyData to_vtk_polydata();
 
 private:
-  void set_centerline_velocity_zero()
-  {
-    for (size_t i = 0; i < nodes; i++) {
-      centerline_velocity[i] = { 0., 0., 0. };
-    }
-  }
+  void set_centerline_velocity_zero();
 
-  void set_curvilinear_axis()
-  {
-    for (size_t i = 0; i < nodes; ++i) {
-      s[i] = ds * i;
-    }
-  }
+  void set_curvilinear_axis();
 
-  void set_centerline_x_axis_aligned()
-  {
-    for (size_t i = 0; i < nodes; ++i) {
-      centerline[i] = { ds * i, 0., 0. };
-      slope[i] = { 1., 0., 0. };
-    }
-  }
+  void set_centerline_x_axis_aligned();
 };
 
 } // namespace Models

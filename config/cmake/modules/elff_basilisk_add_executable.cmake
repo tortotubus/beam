@@ -14,7 +14,7 @@ function(elff_basilisk_add_executable SOURCE_FILE)
             "${SOURCE_FILE}" "${CMAKE_CURRENT_BINARY_DIR}/${source_name}.c"
     COMMAND $<TARGET_FILE:basilisk::qcc>
       "${source_name}.c"
-      -I"${CMAKE_SOURCE_DIR}"
+      -I"${CMAKE_SOURCE_DIR}/c"
       -I"${CMAKE_SOURCE_DIR}/basilisk" 
       -DTRACE=2
       -source
@@ -37,7 +37,8 @@ function(elff_basilisk_add_executable SOURCE_FILE)
   if(ELFF_USE_HDF5) 
     target_link_libraries(${source_name}
       PUBLIC
-        HDF5::HDF5  
+        hdf5::hdf5
+        hdf5::hdf5_hl  
     )    
   endif()
 
@@ -50,6 +51,7 @@ function(elff_basilisk_add_executable SOURCE_FILE)
   set_target_properties(${source_name} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}"
+    BUILD_RPATH "${CMAKE_BINARY_DIR}"
   )
 endfunction()
 

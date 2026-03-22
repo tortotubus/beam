@@ -4,7 +4,7 @@
 #include "io/C/vtkHDFPolyData.hpp"
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace CXX {
 
 vtkHDFPolyData::vtkHDFPolyData(std::string filename)

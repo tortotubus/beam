@@ -1,4 +1,5 @@
 #include "grid/mempool.h"
+#include "library/ibm/IBFields.h"
 #include "library/ibm/IBNodeList.h"
 
 /**
@@ -10,21 +11,25 @@ typedef struct {
   Mempool* pool;   /**< Memory pool pointer */
   IBNodeList active; /**< list of pointers to active IBNodes */
   int len;           /**< The (1D) size of the array */
+  size_t datasize;   /**< Extra bytes stored after each IBNode */
 } IBMempool;
 
 
-#define alignof(T) offsetof(struct { char c; T x; }, x)
-
 /* Function declarations */
 
-IBMempool ibmempool_init (size_t pool_bytes);
+IBMempool ibmempool_init (size_t pool_bytes, size_t datasize);
 void ibmempool_free (IBMempool* ibmp);
 IBNode* ibmempool_alloc_node (IBMempool* ibmp);
 long ibmempool_index_of (IBMempool* ibmp, IBNode* node);
 int ibmempool_free_node_ptr (IBMempool* ibmp, IBNode* node);
 void ibmempool_free_node (IBMempool* ibmp, long i);
 inline size_t round_up_multiple(size_t n, size_t a);
+static inline size_t ibmempool_stride (const IBMempool* ibmp);
 
+
+/* Macro definitions */
+
+#define alignof(T) offsetof(struct { char c; T x; }, x)
 /* Function definitions */
 
 /**
@@ -38,9 +43,21 @@ inline size_t round_up_multiple(size_t n, size_t a)
 }
 
 /**
+ * @brief 
+ * 
+ * @relates IBMempool
+ */
+static inline size_t ibmempool_stride (const IBMempool* ibmp)
+{
+  assert (ibmp);
+  return round_up_multiple (sizeof (IBNode) + ibmp->datasize, 8);
+}
+
+/**
  * @brief Initialize an IBMempool with a specified pool size and initial capacity.
  *
  * @param pool_bytes Total size in bytes for the memory pool.
+ * @param datasize Total size in bytes of the data
  *
  * @return An initialized IBMempool structure.
  *
@@ -50,10 +67,11 @@ inline size_t round_up_multiple(size_t n, size_t a)
  * 
  * @relates IBMempool
  */
-IBMempool ibmempool_init (size_t pool_bytes) {
+IBMempool ibmempool_init (size_t pool_bytes, size_t datasize) {
   IBMempool ibmp = {0};
 
-  size_t block =  round_up_multiple (sizeof (IBNode), alignof (IBNode));
+  ibmp.datasize = datasize;
+  size_t block = ibmempool_stride (&ibmp);
   ibmp.pool = mempool_new (pool_bytes, block);
 
   ibnodelist_init (&ibmp.active, 0);
@@ -64,7 +82,7 @@ IBMempool ibmempool_init (size_t pool_bytes) {
 /**
  * @brief Destroy an IBMempool and free all associated resources.
  *
- * @param mp Pointer to the IBMempool to destroy. Must not be NULL.
+ * @param ibmp Pointer to the IBMempool to destroy. Must not be NULL.
  *
  * @details Deallocates the active nodes list and destroys the underlying memory pool.
  * Resets all pointers to NULL and counts to 0. Does not free individual IBNode objects
@@ -92,7 +110,7 @@ void ibmempool_free (IBMempool* ibmp) {
  * @relates IBMempool
  */
 IBNode* ibmempool_alloc_node (IBMempool* ibmp) {
-  IBNode* node = (IBNode*) mempool_alloc (ibmp->pool);
+  IBNode* node = (IBNode*) mempool_alloc0 (ibmp->pool);
   assert (node);
 
   ibnodelist_push (&ibmp->active, node);

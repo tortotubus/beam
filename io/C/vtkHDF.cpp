@@ -1,7 +1,7 @@
 #include "vtkHDF.hpp"
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace C {
 
 void
@@ -865,5 +865,5 @@ vtk_HDF_collective_write_compressed_dataset(const char* dataset_name,
 }
 
 } // namespace C
-} // namespace io
+} // namespace IO
 } // namespace ELFF

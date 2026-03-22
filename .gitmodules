@@ -1,9 +1,9 @@
-[submodule "docs/theme"]
-	path = docs/theme
-	url = https://github.com/jothepro/doxygen-awesome-css.git
-[submodule "thirdparty/basilisk/gitmodule"]
-	path = thirdparty/basilisk/basilisk_submodule
+[submodule "third_party/basilisk/basilisk_submodule"]
+	path = third_party/basilisk/basilisk_submodule
 	url = https://github.com/tortotubus/pacific-basilisk.git
-[submodule "thirdparty/hdf5/gitmodule"]
-	path = thirdparty/hdf5/hdf5_submodule
+[submodule "third_party/hdf5/hdf5_submodule"]
+	path = third_party/hdf5/hdf5_submodule
 	url = https://github.com/HDFGroup/hdf5.git
+[submodule "third_party/eigen/eigen_submodule"]
+	path = third_party/eigen/eigen_submodule
+	url = https://gitlab.com/libeigen/eigen.git

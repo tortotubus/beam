@@ -124,10 +124,7 @@ public:
    * the beam problem under the specified boundary conditions without any
    * external loads.
    */
-  virtual void solve()
-  {
-    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
-  };
+  virtual void solve();
 
   /**
    * @brief Solves the beam problem under uniform loading.
@@ -136,10 +133,7 @@ public:
   length applied to the beam. Components represent forces in \f(x\f), \f(y\f),
   and \f(z\f) directions.
    */
-  virtual void solve(std::array<real_t, 3> uniform_load)
-  {
-    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
-  };
+  virtual void solve(std::array<real_t, 3> uniform_load);
 
   /**
    * @brief Solves the beam problem under non-uniform loading.
@@ -147,20 +141,14 @@ public:
    * @param nonuniform_load Vector of 3D force vectors representing the load
    *        at each node of the beam mesh.
    */
-  virtual void solve(std::vector<std::array<real_t, 3>> nonuniform_load)
-  {
-    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
-  };
+  virtual void solve(std::vector<std::array<real_t, 3>> nonuniform_load);
 
   /**
    * @brief Advances the dynamic beam solution by one time step.
    *
    * @param dt Time step size for temporal discretization
    */
-  virtual void solve(real_t dt)
-  {
-    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
-  }
+  virtual void solve(real_t dt);
 
   /**
    * @brief Advances the dynamic beam solution under uniform loading by one time
@@ -170,10 +158,7 @@ public:
    * @param uniform_load A 3D vector representing the uniform load per unit
    * length
    */
-  virtual void solve(real_t dt, std::array<real_t, 3> uniform_load)
-  {
-    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
-  }
+  virtual void solve(real_t dt, std::array<real_t, 3> uniform_load);
 
   /**
    * @brief Advances the dynamic beam solution under non-uniform loading by one
@@ -183,10 +168,7 @@ public:
    * @param nonuniform_load Vector of 3D force vectors for each node
    */
   virtual void solve(real_t dt,
-                     std::vector<std::array<real_t, 3>> nonuniform_load)
-  {
-    ELFF_ABORT("EulerBeam base class does not implement a solution method.\n");
-  }
+                     std::vector<std::array<real_t, 3>> nonuniform_load);
 
   /**
    * @brief Applies initial conditions to the beam mesh.
@@ -203,7 +185,7 @@ public:
    *
    * Creates a visualization of the beam's centerline with default title.
    */
-  virtual void plot() { mesh.plot_gnuplot(); }
+  virtual void plot();
 
   /**
    * @brief Plots the current beam configuration using gnuplot with custom
@@ -211,14 +193,14 @@ public:
    *
    * @param title The title to display on the plot
    */
-  virtual void plot(std::string title) { mesh.plot_gnuplot(title); }
+  virtual void plot(std::string title);
 
   /**
    * @brief Gets a mutable reference to the beam mesh.
    *
    * @return Reference to the EulerBeamMesh object containing the beam geometry
    */
-  virtual EulerBeamMesh& get_mesh() { return mesh; }
+  virtual EulerBeamMesh& get_mesh();
 
   /**
    * @brief Gets a const reference to the beam mesh.
@@ -226,7 +208,7 @@ public:
    * @return Const reference to the EulerBeamMesh object containing the beam
    * geometry
    */
-  virtual const EulerBeamMesh& get_mesh() const { return mesh; }
+  virtual const EulerBeamMesh& get_mesh() const;
 
 protected:
   bool is_time_dependent;
@@ -251,20 +233,7 @@ protected:
    * - Left end clamped, right end free
    * - No mass (static problem)
    */
-  EulerBeam()
-    : EI(1)
-    , mu(0)
-    , is_time_dependent(false)
-    , time_iter(0)
-    , t(0)
-    , dimension(3)
-    , mesh(20, 1.)
-    , boundary_conditions(
-        { .end = { left, right },
-          .type = { clamped_bc, free_bc },
-          .vals = {
-            { .position = { 0., 0., 0. }, .slope = { 1., 0., 0. } },
-            { .position = { 0., 0., 0. }, .slope = { 0., 0., 0. } } } }) {};
+  EulerBeam();
 
   /**
    * @brief Constructor for static 3D beam with custom parameters.
@@ -274,15 +243,7 @@ protected:
    * @param nodes Number of nodes in the discretization
    * @param bcs Boundary conditions at both ends
    */
-  EulerBeam(real_t length, real_t EI, size_t nodes, EulerBeamBCs bcs)
-    : EI(EI)
-    , mu(0)
-    , is_time_dependent(false)
-    , time_iter(0)
-    , t(0)
-    , dimension(3)
-    , mesh(nodes, length)
-    , boundary_conditions(bcs) {};
+  EulerBeam(real_t length, real_t EI, size_t nodes, EulerBeamBCs bcs);
 
   /**
    * @brief Constructor for dynamic 3D beam with custom parameters.
@@ -293,15 +254,7 @@ protected:
    * @param nodes Number of nodes in the discretization
    * @param bcs Boundary conditions at both ends
    */
-  EulerBeam(real_t length, real_t EI, real_t mu, size_t nodes, EulerBeamBCs bcs)
-    : EI(EI)
-    , mu(mu)
-    , is_time_dependent(true)
-    , time_iter(0)
-    , t(0)
-    , dimension(3)
-    , mesh(nodes, length)
-    , boundary_conditions(bcs) {};
+  EulerBeam(real_t length, real_t EI, real_t mu, size_t nodes, EulerBeamBCs bcs);
 };
 
 } // namespace Models

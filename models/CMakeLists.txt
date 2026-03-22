@@ -14,6 +14,7 @@ set(HDRS
   beam/Shapes.hpp
   ibm/IBForceCoupled.hpp
   ibm/IBMesh.hpp
+  ibm/IBRuntime.hpp
   ibm/IBVelocityCoupled.hpp
   spring/IBSpringCircle.hpp
 )

@@ -1,136 +1,396 @@
-#include <stdio.h>
 
-// #include "library/ibm/IBNode.h"
-// #include "library/ibm/IBMesh.h"
-#include "library/ibm/IBMeshManager.h"
+// #include "output.h"
+// #include <limits.h>
 
-void output_ibnodes (const char* basename, int iter, double time) {
+#include "library/io/output-dump.h"
 
-  int total_points = 0;
+// ============================================================================
+// Type declarations
+// ============================================================================
 
-  foreach_ibnode () {
-    total_points++;
+struct IBDumpHeader {
+  int version;
+  int nscalars;
+  int nmeshes;
+  int nnodes;
+};
+
+// ============================================================================
+// Globals
+// ============================================================================
+
+static const int ib_dump_version = 1;
+
+// ============================================================================
+// Function declarations
+// ============================================================================
+
+void ib_dump (
+  const char* file, IBscalar* list, FILE* fp, bool unbuffered, bool zero);
+bool ib_restore (const char* file, IBscalar* list, FILE* fp);
+
+static int ib_checkpoint_dump (const char* path, void* ctx);
+static int ib_checkpoint_restore (const char* path, void* ctx);
+
+static IBscalar* ib_dump_list (IBscalar* lista);
+static void
+ib_dump_header (FILE* fp, struct IBDumpHeader* header, IBscalar* list);
+
+static IBscalar ib_scalar_from_name (const char* name);
+static IBscalar*
+ib_restore_header_list (FILE* fp, struct IBDumpHeader* header, IBscalar* list);
+
+// ============================================================================
+// Events
+// ============================================================================
+
+event defaults (i = 0) {
+  checkpointer_register (
+    (Checkpointer) {.filename = ".ib",
+                    .dump_phase = CKPT_PHASE_POST_DUMP,
+                    .dump = ib_checkpoint_dump,
+                    .restore_phase = CKPT_PHASE_POST_RESTORE,
+                    .restore = ib_checkpoint_restore,
+                    .ctx = NULL});
+}
+
+// ============================================================================
+// Function definitions
+// ============================================================================
+
+/**
+ * @brief
+ */
+static int ib_checkpoint_dump (const char* path, void* ctx) {
+  (void) ctx;
+  ib_dump (path, iball, NULL, false, true);
+  return 0;
+}
+
+/**
+ * @brief
+ */
+static int ib_checkpoint_restore (const char* path, void* ctx) {
+  (void) ctx;
+  return ib_restore (path, iball, NULL) ? 0 : -1;
+}
+
+/**
+ * @brief
+ */
+trace void ib_dump (const char* file = "dump.ib",
+                    IBscalar* list = iball,
+                    FILE* fp = NULL,
+                    bool unbuffered = false,
+                    bool zero = true) {
+  IBscalar* dlist = ib_dump_list (list);
+  NOT_UNUSED (zero);
+
+#if _MPI
+  int nscalars = iblist_len (dlist);
+  if (nscalars > 0 && ibmm.pool.active.size > 0) {
+    int nowned = 0;
+    foreach_ibnode () {
+      if (node->pid == pid ())
+        nowned++;
+    }
+
+    int* send_ids =
+      nowned > 0 ? (int*) malloc ((size_t) nowned * sizeof (int)) : NULL;
+    double* send_vals =
+      nowned > 0 ? (double*) malloc ((size_t) nowned * (size_t) nscalars *
+                                     sizeof (double))
+                 : NULL;
+    assert (nowned == 0 || (send_ids && send_vals));
+
+    int ni = 0;
+    foreach_ibnode () {
+      if (node->pid != pid ())
+        continue;
+
+      send_ids[ni] = (int) node_id;
+
+      int si = 0;
+      foreach_ibscalar (dlist) {
+        send_vals[(size_t) ni * (size_t) nscalars + (size_t) si++] = ibval (s);
+      }
+      ni++;
+    }
+
+    int* recv_counts =
+      pid () == 0 ? (int*) malloc ((size_t) npe () * sizeof (int)) : NULL;
+    MPI_Gather (
+      &nowned, 1, MPI_INT, recv_counts, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    int* recv_displs = NULL;
+    int* recv_counts_vals = NULL;
+    int* recv_displs_vals = NULL;
+    int* recv_ids = NULL;
+    double* recv_vals = NULL;
+
+    if (pid () == 0) {
+      recv_displs = (int*) malloc ((size_t) npe () * sizeof (int));
+      recv_counts_vals = (int*) malloc ((size_t) npe () * sizeof (int));
+      recv_displs_vals = (int*) malloc ((size_t) npe () * sizeof (int));
+      assert (recv_counts && recv_displs && recv_counts_vals &&
+              recv_displs_vals);
+
+      int total = 0;
+      int total_vals = 0;
+      for (int peer = 0; peer < npe (); peer++) {
+        recv_displs[peer] = total;
+        recv_counts_vals[peer] = recv_counts[peer] * nscalars;
+        recv_displs_vals[peer] = total_vals;
+        total += recv_counts[peer];
+        total_vals += recv_counts_vals[peer];
+      }
+
+      recv_ids =
+        total > 0 ? (int*) malloc ((size_t) total * sizeof (int)) : NULL;
+      recv_vals = total_vals > 0
+                    ? (double*) malloc ((size_t) total_vals * sizeof (double))
+                    : NULL;
+      assert ((total == 0 || recv_ids) && (total_vals == 0 || recv_vals));
+    }
+
+    MPI_Gatherv (send_ids,
+                 nowned,
+                 MPI_INT,
+                 recv_ids,
+                 recv_counts,
+                 recv_displs,
+                 MPI_INT,
+                 0,
+                 MPI_COMM_WORLD);
+
+    MPI_Gatherv (send_vals,
+                 nowned * nscalars,
+                 MPI_DOUBLE,
+                 recv_vals,
+                 recv_counts_vals,
+                 recv_displs_vals,
+                 MPI_DOUBLE,
+                 0,
+                 MPI_COMM_WORLD);
+
+    if (pid () == 0) {
+      int total = 0;
+      for (int peer = 0; peer < npe (); peer++)
+        total += recv_counts[peer];
+
+      for (int i = 0; i < total; i++) {
+        IBNode* node = ibmm.pool.active.ptrs[recv_ids[i]];
+        int si = 0;
+        foreach_ibscalar (dlist) {
+          ibval (s) = recv_vals[(size_t) i * (size_t) nscalars + (size_t) si++];
+        }
+      }
+    }
+
+    free (send_ids);
+    free (send_vals);
+    free (recv_counts);
+    free (recv_displs);
+    free (recv_counts_vals);
+    free (recv_displs_vals);
+    free (recv_ids);
+    free (recv_vals);
+  }
+#endif
+
+  if (pid () == 0) {
+    char* name = NULL;
+    if (!fp) {
+      name = (char*) malloc (strlen (file) + 2);
+      strcpy (name, file);
+      if (!unbuffered)
+        strcat (name, "~");
+      if ((fp = fopen (name, "wb")) == NULL) {
+        perror (name);
+        exit (1);
+      }
+    }
+    assert (fp);
+    struct IBDumpHeader header = {.version = ib_dump_version,
+                                  .nscalars = iblist_len (dlist),
+                                  .nmeshes = ibmm.nm,
+                                  .nnodes = (int) ibmm.pool.active.size};
+
+    ib_dump_header (fp, &header, dlist);
+
+    foreach_ibnode () {
+      foreach_ibscalar (dlist) {
+        double val = ibval (s);
+        if (fwrite (&val, sizeof (double), 1, fp) < 1) {
+          perror ("ib_dump(): error while writing scalars");
+          exit (1);
+        }
+      }
+    }
+
+    if (file) {
+      fclose (fp);
+      if (!unbuffered)
+        rename (name, file);
+      free (name);
+    }
   }
 
-  if (total_points == 0) {
-    return;
+  free (dlist);
+}
+
+/**
+ * @brief
+ */
+trace bool ib_restore (const char* file = "dump.ib",
+                       IBscalar* list = NULL,
+                       FILE* fp = NULL) {
+
+  if (pid () == 0) {
+    if (!fp && (fp = fopen (file, "rb")) == NULL)
+      return false;
+    assert (fp);
+
+    struct IBDumpHeader header = {0};
+    if (fread (&header, sizeof (header), 1, fp) < 1) {
+      fprintf (ferr, "ib_restore(): error: expecting header\n");
+      exit (1);
+    }
+
+    if (header.version != ib_dump_version) {
+      fprintf (ferr,
+               "ib_restore(): error: file version mismatch: %d (file) != %d "
+               "(code)\n",
+               header.version,
+               ib_dump_version);
+      exit (1);
+    }
+
+    if (header.nmeshes != ibmm.nm) {
+      fprintf (ferr,
+               "ib_restore(): error: mesh count mismatch: %d (file) != %d "
+               "(code)\n",
+               header.nmeshes,
+               ibmm.nm);
+      exit (1);
+    }
+
+    if (header.nnodes != (int) ibmm.pool.active.size) {
+      fprintf (ferr,
+               "ib_restore(): error: node count mismatch: %d (file) != %d "
+               "(code)\n",
+               header.nnodes,
+               (int) ibmm.pool.active.size);
+      exit (1);
+    }
+
+    IBscalar* slist = ib_restore_header_list (fp, &header, list);
+
+    foreach_ibnode () {
+      foreach_ibscalar (slist) {
+        double val = 0.;
+        if (fread (&val, sizeof (double), 1, fp) < 1) {
+          fprintf (ferr, "ib_restore(): error: expecting scalar\n");
+          exit (1);
+        }
+        if (s.i != INT_MAX)
+          ibval (s) = val;
+      }
+    }
+    if (file)
+      fclose (fp);
+
+    free (slist);
   }
 
-  // Name the file
-  char fname[128];
-  sprintf (fname, "%s_pid_%d_%d.vtk", basename, pid (), iter);
+#if _MPI
+  ibmeshmanager_update_pid();
+#endif 
 
-  // Open the file
-  FILE* fp = fopen (fname, "w");
+  return true;
+}
 
-  if (!fp) {
-    // char error_msg[256];
-    // sprintf (error_msg, "error: fopen for %s failed\n", fname);
-    // fprintf (stderr, error_msg);
-    return;
+/**
+ * @brief
+ */
+static IBscalar* ib_dump_list (IBscalar* lista) {
+  IBscalar* list = NULL;
+  IBscalar* listb = iblist_copy (lista ? lista : iball);
+
+  foreach_ibscalar (listb) {
+    if (!ibnodump (s))
+      list = iblist_add (list, s);
   }
 
-  // Legacy VTK header
-  fprintf (fp, "# vtk DataFile Version 3.0\n");
-  fprintf (fp, "IB points at step %d\n", iter);
-  fprintf (fp, "ASCII\n");
-  fprintf (fp, "DATASET POLYDATA\n");
-  fprintf (fp, "POINTS %d double\n", total_points);
+  free (listb);
+  return list;
+}
 
-  // Write point coordinate(s)
-  foreach_ibnode () {
-    fprintf (fp,
-             "%.16g %.16g %.16g\n",
-             node->lagpos.x,
-             node->lagpos.y,
-             node->lagpos.z);
+/**
+ * @brief
+ */
+static void
+ib_dump_header (FILE* fp, struct IBDumpHeader* header, IBscalar* list) {
+  if (fwrite (header, sizeof (struct IBDumpHeader), 1, fp) < 1) {
+    perror ("ib_dump(): error while writing header");
+    exit (1);
   }
 
-  // Write vertices for each point
-  fprintf (fp, "VERTICES %d %d\n", total_points, 2 * total_points);
-  for (int i = 0; i < total_points; i++) {
-    fprintf (fp, "1 %d\n", i);
+  foreach_ibscalar (list) {
+    unsigned len = strlen (ibname (s));
+    if (fwrite (&len, sizeof (unsigned), 1, fp) < 1) {
+      perror ("ib_dump(): error while writing len");
+      exit (1);
+    }
+    if (fwrite (ibname (s), sizeof (char), len, fp) < len) {
+      perror ("ib_dump(): error while writing field name");
+      exit (1);
+    }
+  }
+}
+
+/**
+ * @brief
+ */
+static IBscalar ib_scalar_from_name (const char* name) {
+  for (size_t i = 0; i < _ibattribute_len; i++) {
+    if (_ibattribute[i].name && !strcmp (_ibattribute[i].name, name))
+      return (IBscalar) {.i = (int) i};
   }
 
-  // ===========================
-  // POINT DATA (one value per node)
-  // ===========================
-  fprintf (fp, "\nPOINT_DATA %d\n", total_points);
+  return (IBscalar) {.i = -1};
+}
 
-  // Example 1: scalar “mesh_id” telling which mesh the node belongs to
-  // fprintf (fp, "SCALARS mesh_id int 1\n");
-  // fprintf (fp, "LOOKUP_TABLE default\n");
+/**
+ * @brief
+ */
+static IBscalar*
+ib_restore_header_list (FILE* fp, struct IBDumpHeader* header, IBscalar* list) {
+  IBscalar* input = NULL;
+  IBscalar* allowed = list ? ib_dump_list (list) : NULL;
+  bool restore_all = (list == NULL || list == iball);
 
-  // foreach_ibnode(mesh)() {
+  for (int i = 0; i < header->nscalars; i++) {
+    unsigned len = 0;
+    if (fread (&len, sizeof (unsigned), 1, fp) < 1) {
+      fprintf (ferr, "ib_restore(): error: expecting len\n");
+      exit (1);
+    }
 
-  //     // assume mesh has an integer id; if not, use a counter
-  //     fprintf (fp, "%d\n", mesh_index);
+    char name[len + 1];
+    if (fread (name, sizeof (char), len, fp) < len) {
+      fprintf (ferr, "ib_restore(): error: expecting field name\n");
+      exit (1);
+    }
+    name[len] = '\0';
 
-  // }
-
-  // Example 2: vector “lag_velocity” at each node
-  fprintf (fp, "VECTORS force double\n");
-
-  foreach_ibnode () {
-    fprintf (
-      fp, "%.16g %.16g %.16g\n", node->force.x, node->force.y, node->force.z);
+    IBscalar s = ib_scalar_from_name (name);
+    if (s.i >= 0 && (restore_all || iblist_lookup (allowed, s)))
+      input = iblist_append (input, s);
+    else
+      input = iblist_append (input, (IBscalar) {.i = INT_MAX});
   }
 
-  // Example 2: vector “lag_velocity” at each node
-  fprintf (fp, "VECTORS lagvel double\n");
-  foreach_ibnode () {
-    fprintf (fp,
-             "%.16g %.16g %.16g\n",
-             node->lagvel.x,
-             node->lagvel.y,
-             node->lagvel.z);
-  }
-
-  fprintf (fp, "VECTORS eulvel double\n");
-  foreach_ibnode () {
-    fprintf (fp,
-             "%.16g %.16g %.16g\n",
-             node->eulvel.x,
-             node->eulvel.y,
-             node->eulvel.z);
-  }
-
-  // Example 2: vector “lag_velocity” at each node
-  //   fprintf (fp, "VECTORS rhs double\n");
-
-  //   foreach_ibmesh () {
-  //     foreach_ibnode (mesh)  {
-  //       fprintf (
-  //         fp, "%.16g %.16g %.16g\n", node->rhs.x, node->rhs.y, node->rhs.z);
-  //     }
-  //   }
-
-  // Example 2: vector “lag_velocity” at each node
-  //   fprintf (fp, "VECTORS res double\n");
-
-  //   foreach_ibmesh () {
-  //     foreach_ibnode (mesh)  {
-  //       fprintf (
-  //         fp, "%.16g %.16g %.16g\n", node->res.x, node->res.y, node->res.z);
-  //     }
-  //   }
-
-  // Example 2: vector “lag_velocity” at each node
-  // fprintf (fp, "VECTORS w double\n");
-
-  // foreach_ibnode ()  {
-  //   fprintf (fp, "%.16g %.16g %.16g\n", node->w.x, node->w.y, node->w.z);
-  // }
-
-  // Example 2: vector “lag_velocity” at each node
-  //   fprintf (fp, "VECTORS Ay double\n");
-
-  //   foreach_ibmesh () {
-  //     foreach_ibnode (mesh)  {
-  //       fprintf (fp, "%.16g %.16g %.16g\n", node->Ay.x, node->Ay.y,
-  //       node->Ay.z);
-  //     }
-  //   }
-
-  fclose (fp);
+  free (allowed);
+  return input;
 }

@@ -13,110 +13,66 @@ namespace Models {
 class IBEulerBeam
   : public IBForceCoupled
   , public EulerBeamDynamicInextensibleMoM
-
 {
 private:
-  void EBMeshToIBMeshNext()
-  {
-    // Update the E-B Mesh
-    EulerBeamDynamicInextensibleMoM::update_mesh();
+  /**
+   * @brief Copies the updated beam state into the next immersed-boundary mesh.
+   */
+  void EBMeshToIBMeshNext();
 
-    // Get refernce to IB Mesh
-    auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
-    auto& ib_velocity = IBForceCoupled::mesh_next.GetVelocity();
-
-    // Get reference to E-B Mesh
-    auto& eb_points = EulerBeam::mesh.get_centerline();
-    auto& eb_velocity = EulerBeam::mesh.get_centerline_velocity();
-
-    // Copy
-    for (size_t ni = 0; ni < nodes; ni++) {
-      ib_points[ni].x = eb_points[ni][0];
-      ib_points[ni].y = eb_points[ni][1];
-      ib_points[ni].z = eb_points[ni][2];
-
-      ib_velocity[ni].x = eb_velocity[ni][0];
-      ib_velocity[ni].y = eb_velocity[ni][1];
-      ib_velocity[ni].z = eb_velocity[ni][2];
-    }
-  }
-
-  void EBMeshToIBMeshCurrent()
-  {
-    // Update the E-B Mesh
-    EulerBeamDynamicInextensibleMoM::update_mesh();
-
-    // Get refernce to IB Mesh
-    auto& ib_points = IBForceCoupled::mesh.GetPoints();
-    auto& ib_velocity = IBForceCoupled::mesh.GetVelocity();
-
-    // Get reference to E-B Mesh
-    auto& eb_points = EulerBeam::mesh.get_centerline();
-    auto& eb_velocity = EulerBeam::mesh.get_centerline_velocity();
-
-    // Copy
-    for (size_t ni = 0; ni < nodes; ni++) {
-      ib_points[ni].x = eb_points[ni][0];
-      ib_points[ni].y = eb_points[ni][1];
-      ib_points[ni].z = eb_points[ni][2];
-
-      ib_velocity[ni].x = eb_velocity[ni][0];
-      ib_velocity[ni].y = eb_velocity[ni][1];
-      ib_velocity[ni].z = eb_velocity[ni][2];
-    }
-  }
+  /**
+   * @brief Copies the updated beam state into the current immersed-boundary
+   * mesh.
+   */
+  void EBMeshToIBMeshCurrent();
 
 public:
+  /**
+   * @brief Constructs an immersed-boundary-coupled dynamic beam model.
+   *
+   * @param length Beam length
+   * @param EI Flexural rigidity
+   * @param mu Mass per unit length
+   * @param nodes Number of beam and immersed-boundary nodes
+   * @param bcs Boundary conditions applied to the beam
+   * @param r_penalty Penalty parameter used in the inextensibility constraint
+   */
   IBEulerBeam(real_t length,
               real_t EI,
               real_t mu,
               size_t nodes,
               EulerBeamBCs bcs,
-              real_t r_penalty)
-    : EulerBeamDynamicInextensibleMoM(length, EI, mu, nodes, bcs, r_penalty)
-    , IBForceCoupled(nodes)
-  {
-    EBMeshToIBMeshCurrent();
-    EBMeshToIBMeshNext();
-  };
+              real_t r_penalty);
 
-  void apply_initial_condition(EulerBeamMesh& mesh) override
-  {
-    EulerBeamDynamicInextensibleMoM::apply_initial_condition(mesh);
-    EBMeshToIBMeshCurrent();
-  }
+  /**
+   * @brief Applies initial beam conditions and synchronizes the IB mesh.
+   *
+   * @param mesh Beam mesh containing the initial geometry
+   */
+  void apply_initial_condition(EulerBeamMesh& mesh) override;
 
+  /**
+   * @brief Advances the coupled beam model using immersed-boundary forces.
+   *
+   * @param force Nodal forces from the immersed-boundary solver
+   * @param dt Time-step size
+   */
   void ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
-                         real_t dt) override
-  {
-    ELFF_ASSERT(force.size() == nodes, "Force array must match node count.\n");
+                         real_t dt) override;
 
-    std::vector<std::array<real_t, 3>> load(nodes);
-    for (size_t ni = 0; ni < nodes; ni++) {
-      load[ni][0] = force[ni].x;
-      load[ni][1] = force[ni].y;
-      load[ni][2] = force[ni].z;
-    }
+  /**
+   * @brief Serializes the beam state into an immersed-boundary state buffer.
+   *
+   * @param s Output state buffer
+   */
+  void pack_state(IBModelState &s) const override;
 
-    EulerBeamDynamicInextensibleMoM::solve(dt, load);
-
-    auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
-    auto& ib_velocity = IBForceCoupled::mesh_next.GetVelocity();
-
-    auto& eb_points = EulerBeamDynamicInextensibleMoM::mesh.get_centerline();
-    auto& eb_velocity =
-      EulerBeamDynamicInextensibleMoM::mesh.get_centerline_velocity();
-
-    for (size_t ni = 0; ni < nodes; ni++) {
-      ib_points[ni].x = eb_points[ni][0];
-      ib_points[ni].y = eb_points[ni][1];
-      ib_points[ni].z = eb_points[ni][2];
-
-      ib_velocity[ni].x = eb_velocity[ni][0];
-      ib_velocity[ni].y = eb_velocity[ni][1];
-      ib_velocity[ni].z = eb_velocity[ni][2];
-    }
-  }
+  /**
+   * @brief Restores the beam state from an immersed-boundary state buffer.
+   *
+   * @param s Input state buffer
+   */
+  void unpack_state(const IBModelState& s) override;
 };
 
 } // namespace Models 

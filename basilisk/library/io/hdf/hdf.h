@@ -30,7 +30,7 @@ typedef struct {
  *
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_close (HDF* hdf) {
   // if (hdf->grp_vtkhdf_id >= 0)
@@ -58,7 +58,7 @@ void HDF_close (HDF* hdf) {
  *
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_error (HDF* hdf) {
   HDF_close (hdf);
@@ -70,7 +70,7 @@ void HDF_error (HDF* hdf) {
  * @param hdf Pointer or reference to HDF object/struct
  * @param result Result of a HDF5 operation to check
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_check_result (HDF* hdf, herr_t result) {
   if (result < 0) {
@@ -84,7 +84,7 @@ void HDF_check_result (HDF* hdf, herr_t result) {
  * @param hdf Pointer or reference to HDF object/struct
  * @param object_id Object id to check
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_check_object (HDF* hdf, hid_t object_id) {
   if (object_id <= H5I_INVALID_HID) {
@@ -95,7 +95,7 @@ void HDF_check_object (HDF* hdf, hid_t object_id) {
 /**
  * @brief Initialize the HDF struct by writing a new file
  *
- * @memberof HDF
+ * @relates HDF
  */
 HDF HDF_init (const char* fname, bool overwrite) {
   HDF hdf = {
@@ -170,7 +170,7 @@ HDF HDF_init_MPIIO (const char* fname, bool overwrite) {
 /**
  * @brief Initialize the HDF struct by opening an existing file
  *
- * @memberof HDF
+ * @relates HDF
  */
 HDF HDF_open (const char* fname) {
   HDF hdf = {
@@ -203,7 +203,7 @@ HDF HDF_open (const char* fname) {
 /**
  * @brief Initialize the HDF struct by opening an existing file
  *
- * @memberof HDF
+ * @relates HDF
  */
 HDF HDF_open_MPIIO (const char* fname) {
   HDF hdf = {
@@ -253,7 +253,7 @@ HDF HDF_open_MPIIO (const char* fname) {
  * @param dims The dimensions of the data
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_write_attribute (const char* attribute_name,
                           const void* data,
@@ -300,7 +300,7 @@ void HDF_write_attribute (const char* attribute_name,
  * @param group_id The HDF5 group to write the attribute in
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 
 void HDF_write_scalar_attribute (const char* attribute_name,
@@ -347,7 +347,7 @@ void HDF_write_scalar_attribute (const char* attribute_name,
  * @param group_id The HDF5 group to write the attribute in
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_modify_scalar_attribute (const char* attribute_name,
                                   const void* data,
@@ -395,7 +395,7 @@ void HDF_modify_scalar_attribute (const char* attribute_name,
  * @param group_id The HDF5 group to write the attribute in
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_read_scalar_attribute (const char* attribute_name,
                                 void* data,
@@ -432,7 +432,7 @@ void HDF_read_scalar_attribute (const char* attribute_name,
  * @param group_id The HDF5 group to write the attribute in
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_write_type_attribute (const char* type_name,
                                const hid_t group_id,
@@ -493,7 +493,7 @@ void HDF_write_type_attribute (const char* type_name,
  * the maximum dimensions of the dataset
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_read_dataset (const char* dataset_name,
                        void** data,
@@ -552,10 +552,9 @@ void HDF_read_dataset (const char* dataset_name,
 }
 
 /**
- * @brief Read dataset
+ * @brief Read dataset dimensions
  *
- * @param dataset_name The name of the dataset
- * @param data Pointer to the array of data
+ * @param dataset_name The name of the dataset 
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
  * @param rank The rank of the dataset (e.g. the size of the dims array)
@@ -565,7 +564,7 @@ void HDF_read_dataset (const char* dataset_name,
  * the maximum dimensions of the dataset
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_read_dataset_dims (const char* dataset_name,
                             const hid_t dtype_id,
@@ -613,7 +612,7 @@ void HDF_read_dataset_dims (const char* dataset_name,
  * @param dims The dimensions of the dataset
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_write_dataset (const char* dataset_name,
                         const void* data,
@@ -841,7 +840,7 @@ void HDF_append_chunked_dataset (const char* dataset_name,
  * @param compression_level The level of compression
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_write_compressed_dataset (const char* dataset_name,
                                    const void* data,
@@ -912,7 +911,7 @@ void HDF_write_compressed_dataset (const char* dataset_name,
  * @param local_offset The position of the sub-array this process writes into
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_collective_write_dataset (const char* dataset_name,
                                    const void* data,
@@ -1004,7 +1003,7 @@ void HDF_collective_write_dataset (const char* dataset_name,
  * @param local_offset The position of the sub-array this process writes into
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 void HDF_collective_write_chunked_dataset (const char* dataset_name,
                                            const void* data,
@@ -1250,7 +1249,7 @@ void HDF_collective_append_chunked_dataset (
  * @param compression_level The level of compression
  * @param hdf Pointer or reference to HDF object/struct
  *
- * @memberof HDF
+ * @relates HDF
  */
 
 void HDF_collective_write_compressed_dataset (const char* dataset_name,

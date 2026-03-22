@@ -1,0 +1,70 @@
+include(ExternalProject)
+include(GNUInstallDirs)
+
+if (ELFF_USE_SUBMODULES)
+  ExternalProject_Add(hdf5_ep
+    UPDATE_COMMAND ""
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/hdf5/hdf5_submodule"
+    BINARY_DIR  "${CMAKE_BINARY_DIR}/_deps/hdf5-build"
+    INSTALL_DIR "${ELFF_HDF5_PREFIX}"
+    CMAKE_ARGS
+      -DHDF5_ENABLE_PARALLEL=${ELFF_USE_MPI}
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DHDF5_ONLY_SHARED_LIBS=ON
+      -DHDF5_USE_GNU_DIRS=ON
+
+      -DHDF5_ALLOW_EXTERNAL_SUPPORT:STRING=GIT
+      -DHDF5_ENABLE_ZLIB_SUPPORT:BOOL=ON
+      -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=ON
+      
+    UPDATE_DISCONNECTED 1
+    BUILD_ALWAYS OFF
+  )
+else()
+  ExternalProject_Add(hdf5_ep
+    GIT_REPOSITORY https://github.com/HDFGroup/hdf5.git
+    GIT_TAG        hdf5_2.0.0 
+
+    SOURCE_DIR  "${CMAKE_BINARY_DIR}/_deps/hdf5-src"
+    BINARY_DIR  "${CMAKE_BINARY_DIR}/_deps/hdf5-build"
+    INSTALL_DIR "${ELFF_HDF5_PREFIX}"
+  
+
+    CMAKE_ARGS
+      -DHDF5_ENABLE_PARALLEL=${ELFF_USE_MPI}
+      -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+      -DHDF5_ONLY_SHARED_LIBS=ON
+      -DHDF5_USE_GNU_DIRS=ON
+
+      -DHDF5_ALLOW_EXTERNAL_SUPPORT:STRING=GIT
+      -DHDF5_ENABLE_ZLIB_SUPPORT:BOOL=ON
+      -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=ON
+      
+    UPDATE_DISCONNECTED 1
+    BUILD_ALWAYS OFF
+  )
+endif()
+
+
+file(MAKE_DIRECTORY "${ELFF_HDF5_PREFIX}/include")
+file(MAKE_DIRECTORY "${ELFF_HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+add_library(hdf5::hdf5 UNKNOWN IMPORTED GLOBAL)
+set(_hdf5_hdf5 "${ELFF_HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libhdf5.so")
+set_target_properties(hdf5::hdf5 PROPERTIES
+  IMPORTED_LOCATION "${_hdf5_hdf5}"
+  INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${ELFF_HDF5_PREFIX}/include>"
+)
+add_dependencies(hdf5::hdf5 hdf5_ep)
+
+add_library(hdf5::hdf5_hl UNKNOWN IMPORTED GLOBAL)
+set(_hdf5_hdf5hl "${ELFF_HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libhdf5_hl.so")
+set_target_properties(hdf5::hdf5_hl PROPERTIES
+  IMPORTED_LOCATION "${_hdf5_hdf5hl}"
+  INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${ELFF_HDF5_PREFIX}/include>"
+)
+add_dependencies(hdf5::hdf5_hl hdf5_ep)
+
+list(PREPEND CMAKE_PREFIX_PATH "${ELFF_HDF5_PREFIX}")

@@ -15,7 +15,7 @@ function(elff_basilisk_mpi_add_executable SOURCE_FILE)
     COMMAND $<TARGET_FILE:basilisk::qcc>
       -D_MPI=1
       "${source_name}.c"
-      -I"${CMAKE_SOURCE_DIR}"
+      -I"${CMAKE_SOURCE_DIR}/c"
       -I"${CMAKE_SOURCE_DIR}/basilisk" 
       -source
     DEPENDS ${SOURCE_FILE} ${basilisk_headers}
@@ -40,7 +40,8 @@ function(elff_basilisk_mpi_add_executable SOURCE_FILE)
   if(ELFF_USE_HDF5) 
     target_link_libraries(${source_name}
       PUBLIC
-        HDF5::HDF5  
+        hdf5::hdf5
+        hdf5::hdf5_hl  
     )    
   endif()
 
