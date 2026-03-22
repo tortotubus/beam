@@ -10,6 +10,8 @@ namespace Models {
 class EulerBeamDynamicInextensibleADDM : public EulerBeamStaticInextensibleADDM
 {
 public:
+  using EulerBeamStaticInextensibleADDM::apply_initial_condition;
+
   MatrixXd M;
 
   size_t previous_times;

@@ -65,6 +65,7 @@ public:
     , dof((2 * nodes))
 
     , A(MatrixXd::Zero(dof, dof))
+    , A_unconstrained(MatrixXd::Zero(dof, dof))
     , f_x(VectorXd::Zero(dof))
     , f_y(VectorXd::Zero(dof))
     , f_z(VectorXd::Zero(dof))
@@ -142,6 +143,7 @@ protected:
   real_t r_penalty, alpha;
 
   MatrixXd A;
+  MatrixXd A_unconstrained;
   VectorXd x, y, z;
   VectorXd f_x, f_y, f_z;
 
@@ -166,6 +168,7 @@ protected:
     , dof((2 * nodes))
 
     , A(MatrixXd::Zero(dof, dof))
+    , A_unconstrained(MatrixXd::Zero(dof, dof))
     , f_x(VectorXd::Zero(dof))
     , f_y(VectorXd::Zero(dof))
     , f_z(VectorXd::Zero(dof))
@@ -199,12 +202,16 @@ protected:
   {
     size_t nodes = this->mesh.get_nodes();
     std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
+    std::vector<std::array<real_t, 3>>& slope = mesh.get_slope();
     std::vector<real_t>& s = mesh.get_curvilinear_axis();
 
     for (size_t i = 0; i < nodes; ++i) {
       centerline[i][0] = x(2 * i);
       centerline[i][1] = y(2 * i);
       centerline[i][2] = z(2 * i);
+      slope[i][0] = x(2 * i + 1);
+      slope[i][1] = y(2 * i + 1);
+      slope[i][2] = z(2 * i + 1);
     }
   }
 
@@ -331,6 +338,33 @@ protected:
     }
   }
 
+  void apply_boundary_condition_lambda()
+  {
+    const size_t nodes = mesh.get_nodes();
+
+    for (size_t bi = 0; bi < 2; ++bi) {
+      const EulerBeamBCType bctype = boundary_conditions.type[bi];
+
+      if (bctype != free_bc && bctype != simple_bc) {
+        continue;
+      }
+
+      size_t ci = 0;
+      switch (boundary_conditions.end[bi]) {
+        case left:
+          ci = 0;
+          break;
+        case right:
+          ci = nodes - 1;
+          break;
+      }
+
+      lambda_x(ci) = 0.;
+      lambda_y(ci) = 0.;
+      lambda_z(ci) = 0.;
+    }
+  }
+
   // Perform a pointwise projection of (p^n, q^n) onto the unit circle to obtain
   // (p^{n+1}, q^{n+1})
   virtual void update_pq()
@@ -372,6 +406,8 @@ protected:
   // Apply boundary conditions to the matrix A
   void apply_boundary_condition_A()
   {
+    A = A_unconstrained;
+
     size_t nodes = mesh.get_nodes();
     real_t h = mesh.get_ds();
 
@@ -496,7 +532,8 @@ protected:
       }
     }
 
-    this->A = this->EI * K4 + this->r_penalty * K2;
+    this->A_unconstrained = this->EI * K4 + this->r_penalty * K2;
+    this->A = this->A_unconstrained;
   }
 
   // Cholesky decompose the matrix A
@@ -636,6 +673,12 @@ protected:
           break;
         default:
           for (size_t i = 0; i < xvals.size(); i++) {
+            const VectorXd A_col = A_unconstrained.col(idx[i]);
+
+            f_x.noalias() -= A_col * xvals[i];
+            f_y.noalias() -= A_col * yvals[i];
+            f_z.noalias() -= A_col * zvals[i];
+
             // Set boundary conditions in f_x
             f_x(idx[i]) = xvals[i];
             // Set boundary conditions in f_y
@@ -672,6 +715,8 @@ protected:
       lambda_y[ci] += r_penalty * (q[ci] - yp[ci]);
       lambda_z[ci] += r_penalty * (r[ci] - zp[ci]);
     }
+
+    apply_boundary_condition_lambda();
   }
 
   // compute the inf norm ||\mathbf{p} - \mathbf{x}'||_{\infty} and ||\mathbf{q}

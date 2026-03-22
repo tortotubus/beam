@@ -42,12 +42,28 @@ vtkHDFPolyData::write_new_static(bool overwrite)
 }
 
 void
+vtkHDFPolyData::write_new_static(bool overwrite, int compression_level)
+{
+  (void)compression_level;
+  write_new_static(overwrite);
+}
+
+void
 vtkHDFPolyData::write_new_transient(bool overwrite, float time)
 {
   C::vtkHDFPolyData vtk_hdf_pd =
     C::vtk_HDF_polydata_init_transient(filename.c_str(), overwrite, &vtk_polydata, time);
 
   C::vtk_HDF_polydata_close(&vtk_hdf_pd);
+}
+
+void
+vtkHDFPolyData::write_new_transient(bool overwrite,
+                                    float time,
+                                    int compression_level)
+{
+  (void)compression_level;
+  write_new_transient(overwrite, time);
 }
 
 
@@ -58,6 +74,13 @@ vtkHDFPolyData::append_transient(float time)
     C::vtk_HDF_polydata_append_transient(filename.c_str(), &vtk_polydata, time);
 
   C::vtk_HDF_polydata_close(&vtk_hdf_pd);
+}
+
+void
+vtkHDFPolyData::append_transient(float time, int compression_level)
+{
+  (void)compression_level;
+  append_transient(time);
 }
 
 }

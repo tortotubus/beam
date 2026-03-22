@@ -22,9 +22,26 @@ using namespace Eigen;
 namespace ELFF {
 namespace Models {
 
+/**
+ * @brief Static inextensible Euler beam solved with a sparse
+ * method-of-multipliers formulation.
+ *
+ * This variant assembles the nonlinear tangent matrix into a sparse global
+ * system and is intended for larger beam discretizations where dense storage
+ * becomes expensive.
+ */
 class EulerBeamStaticInextensibleMoMSparse : public EulerBeam
 {
 public:
+  /**
+   * @brief Constructs a static inextensible sparse beam model.
+   *
+   * @param length Beam length
+   * @param EI Flexural rigidity
+   * @param nodes Number of discretization nodes
+   * @param bcs Boundary conditions at the beam ends
+   * @param r_penalty Penalty parameter used in the inextensibility constraint
+   */
   EulerBeamStaticInextensibleMoMSparse(real_t length,
                                        real_t EI,
                                        size_t nodes,
@@ -56,10 +73,21 @@ public:
     apply_initial_condition(mesh);
   };
 
+  /**
+   * @brief Destroys the sparse beam model and releases any owned resources.
+   */
   ~EulerBeamStaticInextensibleMoMSparse() {};
 
+  /**
+   * @brief Solves the static beam problem with no external load.
+   */
   void solve() override { solve({ 0., 0., 0. }); }
 
+  /**
+   * @brief Solves the static beam problem under uniform loading.
+   *
+   * @param load Uniform distributed load vector
+   */
   void solve(std::array<real_t, 3> load) override
   {
     real_t S_norm = 0;
@@ -109,6 +137,11 @@ public:
     update_mesh();
   }
 
+  /**
+   * @brief Solves the static beam problem under nodal loading.
+   *
+   * @param load Load vector specified at the mesh nodes
+   */
   void solve(std::vector<std::array<real_t, 3>> load) override
   {
     ELFF_ASSERT(load.size() == nodes,
@@ -153,6 +186,11 @@ public:
     update_mesh();
   }
 
+  /**
+   * @brief Initializes the solver state from a supplied beam mesh.
+   *
+   * @param bmesh Beam mesh containing the initial geometry
+   */
   virtual void apply_initial_condition(EulerBeamMesh& bmesh) override
   {
     ELFF_ASSERT(
@@ -174,6 +212,9 @@ public:
     update_mesh();
   }
 
+  /**
+   * @brief Applies the model's default initial condition.
+   */
   virtual void apply_initial_condition()
   {
     for (size_t i = 0; i < nodes; i++) {
@@ -187,20 +228,68 @@ public:
   }
 
 protected:
+  /**
+   * @brief Spatial dimension of the beam formulation.
+   */
   size_t dimension;
+  /**
+   * @brief Element and node counts used by the discretization.
+   */
   size_t elements, nodes;
+  /**
+   * @brief Uniform spacing between nodes along the beam centerline.
+   */
   real_t ds;
+  /**
+   * @brief Degrees of freedom in each Cartesian block and in the constraint
+   * block.
+   */
   size_t ndof_x, ndof_y, ndof_z, ndof_l;
+  /**
+   * @brief Offsets into the global state vector for each degree-of-freedom
+   * block.
+   */
   size_t offset_x, offset_y, offset_z, offset_l;
+  /**
+   * @brief Total number of algebraic degrees of freedom.
+   */
   size_t ndof;
+  /**
+   * @brief Penalty parameter used to enforce inextensibility.
+   */
   real_t r_penalty;
+  /**
+   * @brief Inner and outer nonlinear-iteration limits.
+   */
   size_t max_iter_inner, max_iter_outer;
+  /**
+   * @brief Inner and outer nonlinear solver tolerances.
+   */
   real_t tol_inner, tol_outer;
 
+  /**
+   * @brief Current residual vector and Lagrange multiplier state.
+   */
   VectorXd residual, lambda;
+  /**
+   * @brief Sparse global tangent matrix.
+   */
   SparseMatrix<real_t> jacobian;
+  /**
+   * @brief Global state vector for beam displacements and slopes.
+   */
   VectorXd u;
 
+  /**
+   * @brief Constructs the shared base state for dynamic derived classes.
+   *
+   * @param length Beam length
+   * @param EI Flexural rigidity
+   * @param mu Mass per unit length
+   * @param nodes Number of discretization nodes
+   * @param bcs Boundary conditions at the beam ends
+   * @param r_penalty Penalty parameter used in the inextensibility constraint
+   */
   EulerBeamStaticInextensibleMoMSparse(real_t length,
                                        real_t EI,
                                        real_t mu,
@@ -232,16 +321,33 @@ protected:
     apply_initial_condition(mesh);
   };
 
+  /**
+   * @brief Assembles the residual for uniform loading.
+   *
+   * @param load Uniform distributed load vector
+   */
   void assemble_residual(std::array<real_t, 3> load)
   {
     residual = assemble_residual_template<real_t>(u, load);
   }
 
+  /**
+   * @brief Assembles the residual for nodal loading.
+   *
+   * @param load Load vector specified at the mesh nodes
+   */
   void assemble_residual(std::vector<std::array<real_t, 3>> load)
   {
     residual = assemble_residual_template<real_t>(u, load);
   }
 
+  /**
+   * @brief Returns the global degree-of-freedom indices for a two-node beam
+   * element.
+   *
+   * @param e Element index
+   * @return Global indices for the element displacement and slope unknowns
+   */
   std::array<size_t, 12> get_element_dof_indices(size_t e) const
   {
     const size_t n0 = e;
@@ -261,6 +367,12 @@ protected:
              offset_z + 2 * n1 + 1 };
   }
 
+  /**
+   * @brief Extracts the local element state from the global state vector.
+   *
+   * @param idx Global degree-of-freedom indices for the element
+   * @return Local 12-entry state vector for the element
+   */
   Matrix<real_t, 12, 1> get_element_state(
     const std::array<size_t, 12>& idx) const
   {
@@ -271,12 +383,27 @@ protected:
     return u_elem;
   }
 
+  /**
+   * @brief Extracts the local Lagrange-multiplier values for an element.
+   *
+   * @param e Element index
+   * @return Multiplier values associated with the element endpoints
+   */
   std::array<real_t, 2> get_element_lambda(size_t e) const
   {
     return { lambda(e), lambda(e + 1) };
   }
 
   template<typename T>
+  /**
+   * @brief Assembles a local static element residual for uniform loading.
+   *
+   * @tparam T Scalar type used for residual assembly
+   * @param u_elem Local element state vector
+   * @param lambda_elem Element-end multiplier values
+   * @param load Uniform distributed load vector
+   * @return Local residual contribution for the element
+   */
   Matrix<T, 12, 1> assemble_element_residual_template(
     const Matrix<T, 12, 1>& u_elem,
     const std::array<real_t, 2>& lambda_elem,
@@ -336,6 +463,15 @@ protected:
   }
 
   template<typename T>
+  /**
+   * @brief Assembles a local static element residual for nodal loading.
+   *
+   * @tparam T Scalar type used for residual assembly
+   * @param u_elem Local element state vector
+   * @param lambda_elem Element-end multiplier values
+   * @param load_elem Nodal load values at the two element endpoints
+   * @return Local residual contribution for the element
+   */
   Matrix<T, 12, 1> assemble_element_residual_template(
     const Matrix<T, 12, 1>& u_elem,
     const std::array<real_t, 2>& lambda_elem,
@@ -398,7 +534,10 @@ protected:
   }
 
   /**
+   * @brief Updates the Lagrange multiplier iterate.
    *
+   * @param omega Relaxation parameter for the multiplier update
+   * @return Norm of the multiplier correction
    */
   real_t update_lambda(real_t omega = 1.0)
   {
@@ -485,6 +624,9 @@ protected:
     return lambda_n.norm();
   }
 
+  /**
+   * @brief Updates the beam mesh from the current solution state.
+   */
   void update_mesh()
   {
     size_t nodes = this->mesh.get_nodes();
@@ -503,6 +645,11 @@ protected:
     }
   }
 
+  /**
+   * @brief Assembles the nonlinear system for uniform loading.
+   *
+   * @param load Uniform distributed load vector
+   */
   void assemble_system(std::array<real_t, 3> load)
   {
     using ADDeriv = Matrix<real_t, 12, 1>;
@@ -547,6 +694,11 @@ protected:
     jacobian.makeCompressed();
   }
 
+  /**
+   * @brief Assembles the nonlinear system for nodal loading.
+   *
+   * @param load Load vector specified at the mesh nodes
+   */
   void assemble_system(std::vector<std::array<real_t, 3>> load)
   {
     using ADDeriv = Matrix<real_t, 12, 1>;
