@@ -13,10 +13,10 @@ function(elff_basilisk_add_executable SOURCE_FILE)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${SOURCE_FILE}" "${CMAKE_CURRENT_BINARY_DIR}/${source_name}.c"
     COMMAND $<TARGET_FILE:basilisk::qcc>
+      -DTRACE=3
       "${source_name}.c"
       -I"${CMAKE_SOURCE_DIR}/c"
       -I"${CMAKE_SOURCE_DIR}/basilisk" 
-      -DTRACE=2
       -source
     DEPENDS ${SOURCE_FILE} ${basilisk_headers}
     BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/_${source_name}.c"
@@ -24,8 +24,6 @@ function(elff_basilisk_add_executable SOURCE_FILE)
   )
   
   add_executable(${source_name} "_${source_name}.c")
-
-  # find_package(HDF5 REQUIRED)
 
   if(ELFF_USE_MPI) 
     target_link_libraries(${source_name}

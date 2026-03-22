@@ -24,7 +24,7 @@ int elff_fc_node_count (void* ctx) {
 /**
  * @brief
  */
-void elff_fc_sync (void* ctx, void* mesh) {
+trace void elff_fc_sync (void* ctx, void* mesh) {
 
   // Basilisk pointers
   IBMesh* ib_mesh = (IBMesh*) mesh;
@@ -49,7 +49,7 @@ void elff_fc_sync (void* ctx, void* mesh) {
 /**
  * @brief
  */
-void elff_fc_advance (void* ctx, void* mesh, double dt) {
+trace void elff_fc_advance (void* ctx, void* mesh, double dt) {
   // Basilisk pointers
   IBMesh* ib_mesh = (IBMesh*) mesh;
   int ib_nodes_count = ib_mesh->nodes.size;

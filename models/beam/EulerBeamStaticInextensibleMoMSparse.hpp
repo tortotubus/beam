@@ -109,6 +109,50 @@ public:
     update_mesh();
   }
 
+  void solve(std::vector<std::array<real_t, 3>> load) override
+  {
+    ELFF_ASSERT(load.size() == nodes,
+                "Size of load vector must equal number of nodes.");
+
+    real_t S_norm = 0;
+
+    ConjugateGradient<SparseMatrix<real_t>,
+                      Lower | Upper,
+                      IncompleteCholesky<real_t>>
+      solver;
+
+    for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
+      assemble_system(load);
+      apply_boundary_conditions();
+
+      real_t res_norm = residual.norm();
+
+      if (res_norm < tol_outer) {
+        break;
+      } else if (iter_outer == max_iter_outer - 1) {
+        ELFF_ABORT(
+          "EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
+      }
+
+      solver.setTolerance(tol_inner);
+      solver.compute(jacobian);
+
+      if (solver.info() != Success) {
+        ELFF_ABORT("EulerBeamStaticInextensibleMoMSparse::solve(): "
+                   "Preconditioner failed.\n");
+      }
+
+      VectorXd delta_u = solver.solve(-residual);
+      u += delta_u;
+
+      S_norm = update_lambda();
+    }
+
+    (void) S_norm;
+
+    update_mesh();
+  }
+
   virtual void apply_initial_condition(EulerBeamMesh& bmesh) override
   {
     ELFF_ASSERT(
@@ -189,6 +233,11 @@ protected:
   };
 
   void assemble_residual(std::array<real_t, 3> load)
+  {
+    residual = assemble_residual_template<real_t>(u, load);
+  }
+
+  void assemble_residual(std::vector<std::array<real_t, 3>> load)
   {
     residual = assemble_residual_template<real_t>(u, load);
   }
@@ -286,12 +335,16 @@ protected:
     size_t nodes = this->mesh.get_nodes();
 
     std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
+    std::vector<std::array<real_t, 3>>& slope = mesh.get_slope();
     std::vector<real_t>& s = mesh.get_curvilinear_axis();
 
     for (size_t i = 0; i < nodes; ++i) {
       centerline[i][0] = u(offset_x + 2 * i);
       centerline[i][1] = u(offset_y + 2 * i);
       centerline[i][2] = u(offset_z + 2 * i);
+      slope[i][0] = u(offset_x + 2 * i + 1);
+      slope[i][1] = u(offset_y + 2 * i + 1);
+      slope[i][2] = u(offset_z + 2 * i + 1);
     }
   }
 
@@ -347,6 +400,45 @@ protected:
     }
 
     // --- 4) Assemble the sparse matrix ---
+    jacobian.resize(ndof, ndof);
+    jacobian.setFromTriplets(triplets.begin(), triplets.end());
+    jacobian.makeCompressed();
+  }
+
+  void assemble_system(std::vector<std::array<real_t, 3>> load)
+  {
+    using AD = AutoDiffScalar<VectorXd>;
+    using ADVec = Matrix<AD, Dynamic, 1>;
+    using Tpl = Triplet<real_t>;
+
+    ADVec x_ad(ndof);
+    for (int i = 0; i < ndof; ++i) {
+      VectorXd seed = VectorXd::Zero(ndof);
+      seed(i) = 1.0;
+      x_ad(i) = AD(u(i), seed);
+    }
+
+    ADVec R_ad = assemble_residual_template<AD>(x_ad, load);
+
+    residual.resize(ndof);
+
+    std::vector<Tpl> triplets;
+    triplets.reserve(ndof * 5);
+
+    for (int i = 0; i < ndof; ++i) {
+      residual(i) = R_ad(i).value();
+
+      const VectorXd& dRi = R_ad(i).derivatives();
+      const int nnz = static_cast<int>(dRi.size());
+
+      for (int j = 0; j < nnz; ++j) {
+        const real_t dj = dRi[j];
+        if (dj != 0.0) {
+          triplets.emplace_back(i, j, dj);
+        }
+      }
+    }
+
     jacobian.resize(ndof, ndof);
     jacobian.setFromTriplets(triplets.begin(), triplets.end());
     jacobian.makeCompressed();
@@ -596,6 +688,113 @@ protected:
       // for (size_t i = 0; i < 2; ++i) {
       //   residual[idx_l[i]] += R_loc_l[i];
       // }
+    }
+    return residual;
+  }
+
+  template<typename T>
+  Matrix<T, Dynamic, 1> assemble_residual_template(
+    const Matrix<T, Dynamic, 1>& u,
+    const std::vector<std::array<real_t, 3>> load) const
+  {
+    ELFF_ASSERT(load.size() == nodes,
+                "Nodes does not match load vector size.\n");
+
+    real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+    real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+
+    Matrix<T, Dynamic, 1> residual = Matrix<T, Dynamic, 1>::Zero(ndof);
+
+    for (size_t e = 0; e < elements; ++e) {
+      std::vector<size_t> elem_nodes = { e, e + 1 };
+      std::vector<size_t> idx_x = { offset_x + 2 * elem_nodes[0],
+                                    offset_x + 2 * elem_nodes[0] + 1,
+                                    offset_x + 2 * elem_nodes[1],
+                                    offset_x + 2 * elem_nodes[1] + 1 };
+      std::vector<size_t> idx_y = { offset_y + 2 * elem_nodes[0],
+                                    offset_y + 2 * elem_nodes[0] + 1,
+                                    offset_y + 2 * elem_nodes[1],
+                                    offset_y + 2 * elem_nodes[1] + 1 };
+      std::vector<size_t> idx_z = { offset_z + 2 * elem_nodes[0],
+                                    offset_z + 2 * elem_nodes[0] + 1,
+                                    offset_z + 2 * elem_nodes[1],
+                                    offset_z + 2 * elem_nodes[1] + 1 };
+      std::vector<size_t> idx_load = { elem_nodes[0], elem_nodes[1] };
+      std::vector<size_t> idx_l = { elem_nodes[0], elem_nodes[1] };
+
+      std::array<T, 4> ux = {
+        u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
+      };
+      std::array<T, 4> uy = {
+        u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
+      };
+      std::array<T, 4> uz = {
+        u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]]
+      };
+      std::array<real_t, 2> fx = { load[idx_load[0]][0], load[idx_load[1]][0] };
+      std::array<real_t, 2> fy = { load[idx_load[0]][1], load[idx_load[1]][1] };
+      std::array<real_t, 2> fz = { load[idx_load[0]][2], load[idx_load[1]][2] };
+      std::array<T, 2> ul = { lambda[idx_l[0]], lambda[idx_l[1]] };
+
+      std::vector<T> R_loc_x(4, 0);
+      std::vector<T> R_loc_y(4, 0);
+      std::vector<T> R_loc_z(4, 0);
+
+      for (size_t qi = 0; qi < 3; ++qi) {
+        real_t xi = xi_q[qi];
+        real_t w = w_q[qi];
+
+        auto H = CubicHermite<real_t>::values(xi, ds);
+        auto dH = CubicHermite<real_t>::derivs(xi, ds);
+        auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
+        auto M = LinearShape<real_t>::values(xi);
+
+        T x = 0, xp = 0, xpp = 0;
+        T y = 0, yp = 0, ypp = 0;
+        T z = 0, zp = 0, zpp = 0;
+        for (size_t i = 0; i < 4; i++) {
+          x += H[i] * ux[i];
+          xp += dH[i] * ux[i];
+          xpp += ddH[i] * ux[i];
+          y += H[i] * uy[i];
+          yp += dH[i] * uy[i];
+          ypp += ddH[i] * uy[i];
+          z += H[i] * uz[i];
+          zp += dH[i] * uz[i];
+          zpp += ddH[i] * uz[i];
+        }
+
+        T l = 0;
+        real_t fxp = 0;
+        real_t fyp = 0;
+        real_t fzp = 0;
+        for (size_t i = 0; i < 2; i++) {
+          l += M[i] * ul[i];
+          fxp += M[i] * fx[i];
+          fyp += M[i] * fy[i];
+          fzp += M[i] * fz[i];
+        }
+
+        T S = xp * xp + yp * yp + zp * zp - 1.0;
+
+        for (size_t a = 0; a < 4; ++a) {
+          R_loc_x[a] += EI * xpp * ddH[a] * w * ds;
+          R_loc_y[a] += EI * ypp * ddH[a] * w * ds;
+          R_loc_z[a] += EI * zpp * ddH[a] * w * ds;
+          R_loc_x[a] -= fxp * H[a] * w * ds;
+          R_loc_y[a] -= fyp * H[a] * w * ds;
+          R_loc_z[a] -= fzp * H[a] * w * ds;
+          R_loc_x[a] += 2 * (l + r_penalty * S) * xp * dH[a] * w * ds;
+          R_loc_y[a] += 2 * (l + r_penalty * S) * yp * dH[a] * w * ds;
+          R_loc_z[a] += 2 * (l + r_penalty * S) * zp * dH[a] * w * ds;
+        }
+      }
+
+      for (size_t i = 0; i < 4; ++i) {
+        residual[idx_x[i]] += R_loc_x[i];
+        residual[idx_y[i]] += R_loc_y[i];
+        residual[idx_z[i]] += R_loc_z[i];
+      }
     }
     return residual;
   }

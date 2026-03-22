@@ -318,7 +318,7 @@ void ibmeshmanager_set_model (int mesh_id, IBMeshModel model) {
  * @brief
  * @relates IBMeshManager
  */
-void ibmeshmanager_advance_positions (double dt) {
+trace void ibmeshmanager_advance_positions (double dt) {
 #if _MPI
   ibmeshmanager_update_pid ();
 #endif
@@ -780,7 +780,7 @@ trace void ibmeshmanager_update_pid () {
  * @brief Updates the list of local IBNodes as well as those with kernel support
  * into an ajacent process
  */
-void ibmeshmanager_boundary (IBscalar* slist = iball) {
+trace void ibmeshmanager_boundary (IBscalar* slist = iball) {
   ibmeshmanager_update_pid ();
 
   // IBscalar* slist = NULL;

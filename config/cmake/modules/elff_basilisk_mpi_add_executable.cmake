@@ -14,6 +14,7 @@ function(elff_basilisk_mpi_add_executable SOURCE_FILE)
             "${SOURCE_FILE}" "${CMAKE_CURRENT_BINARY_DIR}/${source_name}.c"
     COMMAND $<TARGET_FILE:basilisk::qcc>
       -D_MPI=1
+      -DTRACE=3
       "${source_name}.c"
       -I"${CMAKE_SOURCE_DIR}/c"
       -I"${CMAKE_SOURCE_DIR}/basilisk" 

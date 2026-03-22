@@ -7,7 +7,7 @@ void
 IBEulerBeam::EBMeshToIBMeshNext()
 {
   // Update the E-B Mesh
-  EulerBeamDynamicInextensibleMoM::update_mesh();
+  EulerBeamDynamicInextensibleMoMSparse::update_mesh();
 
   // Get refernce to IB Mesh
   auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
@@ -33,7 +33,7 @@ void
 IBEulerBeam::EBMeshToIBMeshCurrent()
 {
   // Update the E-B Mesh
-  EulerBeamDynamicInextensibleMoM::update_mesh();
+  EulerBeamDynamicInextensibleMoMSparse::update_mesh();
 
   // Get refernce to IB Mesh
   auto& ib_points = IBForceCoupled::mesh.GetPoints();
@@ -61,7 +61,7 @@ IBEulerBeam::IBEulerBeam(real_t length,
                          size_t nodes,
                          EulerBeamBCs bcs,
                          real_t r_penalty)
-  : EulerBeamDynamicInextensibleMoM(length, EI, mu, nodes, bcs, r_penalty)
+  : EulerBeamDynamicInextensibleMoMSparse(length, EI, mu, nodes, bcs, r_penalty)
   , IBForceCoupled(nodes)
 {
   EBMeshToIBMeshCurrent();
@@ -71,7 +71,7 @@ IBEulerBeam::IBEulerBeam(real_t length,
 void
 IBEulerBeam::apply_initial_condition(EulerBeamMesh& mesh)
 {
-  EulerBeamDynamicInextensibleMoM::apply_initial_condition(mesh);
+  EulerBeamDynamicInextensibleMoMSparse::apply_initial_condition(mesh);
   EBMeshToIBMeshCurrent();
 }
 
@@ -87,14 +87,14 @@ IBEulerBeam::ComputeNextPoints(std::vector<IBMesh::IBVertex> force, real_t dt)
     load[ni][2] = force[ni].z;
   }
 
-  EulerBeamDynamicInextensibleMoM::solve(dt, load);
+  EulerBeamDynamicInextensibleMoMSparse::solve(dt, load);
 
   auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
   auto& ib_velocity = IBForceCoupled::mesh_next.GetVelocity();
 
-  auto& eb_points = EulerBeamDynamicInextensibleMoM::mesh.get_centerline();
+  auto& eb_points = EulerBeamDynamicInextensibleMoMSparse::mesh.get_centerline();
   auto& eb_velocity =
-    EulerBeamDynamicInextensibleMoM::mesh.get_centerline_velocity();
+    EulerBeamDynamicInextensibleMoMSparse::mesh.get_centerline_velocity();
 
   for (size_t ni = 0; ni < nodes; ni++) {
     ib_points[ni].x = eb_points[ni][0];
@@ -174,7 +174,7 @@ IBEulerBeam::unpack_state(const IBModelState& s)
   // Reconstruct step history and all geometric/IB views from the restored
   // converged state.
   u_prev = u;
-  EulerBeamDynamicInextensibleMoM::update_mesh();
+  EulerBeamDynamicInextensibleMoMSparse::update_mesh();
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }

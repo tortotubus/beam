@@ -45,8 +45,7 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Glowinski)
   EulerBeamStaticInextensibleMoM static_beam(
     length, EI, nodes, boundary_conditions, r_pentalty);
   static_beam.apply_initial_condition();
-  static_beam.solve(load);
-  static_beam.plot("Static Inextensible Euler Beam");
+  static_beam.solve(load); 
 
   boundary_conditions.type[1] = EulerBeam::free_bc;
 

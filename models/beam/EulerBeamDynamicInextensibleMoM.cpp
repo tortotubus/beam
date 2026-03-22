@@ -148,9 +148,10 @@ EulerBeamDynamicInextensibleMoM::solve_newmark(real_t dt,
       size_t ix = offset_x + 2 * n;
       size_t iy = offset_y + 2 * n;
       size_t iz = offset_z + 2 * n;
-      a_prev(ix) = (-R0(ix)) / (mu * ds);
-      a_prev(iy) = (-R0(iy)) / (mu * ds);
-      a_prev(iz) = (-R0(iz)) / (mu * ds);
+      const real_t w = (n == 0 || n == nodes - 1) ? 0.5 * ds : ds;
+      a_prev(ix) = (-R0(ix)) / (mu * w);
+      a_prev(iy) = (-R0(iy)) / (mu * w);
+      a_prev(iz) = (-R0(iz)) / (mu * w);
     }
   }
 
