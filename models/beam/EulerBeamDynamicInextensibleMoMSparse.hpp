@@ -56,6 +56,8 @@ protected:
                                real_t beta,
                                real_t gamma);
 
+  void add_newmark_inertial_terms(real_t dt, real_t beta);
+
   void update_mesh();
 
   template<typename T>

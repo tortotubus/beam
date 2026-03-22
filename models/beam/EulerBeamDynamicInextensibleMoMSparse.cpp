@@ -239,41 +239,10 @@ EulerBeamDynamicInextensibleMoMSparse::assemble_system_newmark(
   real_t beta,
   real_t gamma)
 {
-  using AD = AutoDiffScalar<VectorXd>;
-  using ADVec = Matrix<AD, Dynamic, 1>;
-  using Tpl = Triplet<real_t>;
+  static_cast<void>(gamma);
 
-  ADVec x_ad(ndof);
-  for (int i = 0; i < ndof; ++i) {
-    VectorXd seed = VectorXd::Zero(ndof);
-    seed(i) = 1.0;
-    x_ad(i) = AD(u(i), seed);
-  }
-
-  ADVec R_ad = assemble_residual_newmark<AD>(x_ad, dt, load, beta, gamma);
-
-  residual.resize(ndof);
-
-  std::vector<Tpl> triplets;
-  triplets.reserve(ndof * 5);
-
-  for (int i = 0; i < ndof; ++i) {
-    residual(i) = R_ad(i).value();
-
-    const VectorXd& dRi = R_ad(i).derivatives();
-    const int nnz = static_cast<int>(dRi.size());
-
-    for (int j = 0; j < nnz; ++j) {
-      const real_t dj = dRi[j];
-      if (dj != 0.0) {
-        triplets.emplace_back(i, j, dj);
-      }
-    }
-  }
-
-  jacobian.resize(ndof, ndof);
-  jacobian.setFromTriplets(triplets.begin(), triplets.end());
-  jacobian.makeCompressed();
+  EulerBeamStaticInextensibleMoMSparse::assemble_system(load);
+  add_newmark_inertial_terms(dt, beta);
 }
 
 void
@@ -283,40 +252,47 @@ EulerBeamDynamicInextensibleMoMSparse::assemble_system_newmark(
   real_t beta,
   real_t gamma)
 {
-  using AD = AutoDiffScalar<VectorXd>;
-  using ADVec = Matrix<AD, Dynamic, 1>;
-  using Tpl = Triplet<real_t>;
+  static_cast<void>(gamma);
 
-  ADVec x_ad(ndof);
-  for (int i = 0; i < ndof; ++i) {
-    VectorXd seed = VectorXd::Zero(ndof);
-    seed(i) = 1.0;
-    x_ad(i) = AD(u(i), seed);
+  EulerBeamStaticInextensibleMoMSparse::assemble_system(load);
+  add_newmark_inertial_terms(dt, beta);
+}
+
+void
+EulerBeamDynamicInextensibleMoMSparse::add_newmark_inertial_terms(real_t dt,
+                                                                  real_t beta)
+{
+  if (!(dt > 0.0)) {
+    throw std::runtime_error("Newmark: dt must be > 0");
+  }
+  if (!(beta > 0.0)) {
+    throw std::runtime_error("Newmark: beta must be > 0");
   }
 
-  ADVec R_ad = assemble_residual_newmark<AD>(x_ad, dt, load, beta, gamma);
+  const real_t inv = 1.0 / (beta * dt * dt);
+  const real_t inv_bt = 1.0 / (beta * dt);
+  const real_t kappa = (1.0 - 2.0 * beta) / (2.0 * beta);
 
-  residual.resize(ndof);
+  for (size_t n = 0; n < nodes; ++n) {
+    const size_t ix = offset_x + 2 * n;
+    const size_t iy = offset_y + 2 * n;
+    const size_t iz = offset_z + 2 * n;
+    const real_t w = (n == 0 || n == nodes - 1) ? 0.5 * ds : ds;
+    const real_t mass_coeff = mu * w;
+    const real_t tangent_coeff = mass_coeff * inv;
 
-  std::vector<Tpl> triplets;
-  triplets.reserve(ndof * 5);
+    auto add_newmark = [&](size_t i) {
+      const real_t a_new =
+        inv * (u(i) - u_prev(i)) - inv_bt * v_prev(i) - kappa * a_prev(i);
+      residual(i) += mass_coeff * a_new;
+      jacobian.coeffRef(i, i) += tangent_coeff;
+    };
 
-  for (int i = 0; i < ndof; ++i) {
-    residual(i) = R_ad(i).value();
-
-    const VectorXd& dRi = R_ad(i).derivatives();
-    const int nnz = static_cast<int>(dRi.size());
-
-    for (int j = 0; j < nnz; ++j) {
-      const real_t dj = dRi[j];
-      if (dj != 0.0) {
-        triplets.emplace_back(i, j, dj);
-      }
-    }
+    add_newmark(ix);
+    add_newmark(iy);
+    add_newmark(iz);
   }
 
-  jacobian.resize(ndof, ndof);
-  jacobian.setFromTriplets(triplets.begin(), triplets.end());
   jacobian.makeCompressed();
 }
 

@@ -242,6 +242,161 @@ protected:
     residual = assemble_residual_template<real_t>(u, load);
   }
 
+  std::array<size_t, 12> get_element_dof_indices(size_t e) const
+  {
+    const size_t n0 = e;
+    const size_t n1 = e + 1;
+
+    return { offset_x + 2 * n0 + 0,
+             offset_x + 2 * n0 + 1,
+             offset_x + 2 * n1 + 0,
+             offset_x + 2 * n1 + 1,
+             offset_y + 2 * n0 + 0,
+             offset_y + 2 * n0 + 1,
+             offset_y + 2 * n1 + 0,
+             offset_y + 2 * n1 + 1,
+             offset_z + 2 * n0 + 0,
+             offset_z + 2 * n0 + 1,
+             offset_z + 2 * n1 + 0,
+             offset_z + 2 * n1 + 1 };
+  }
+
+  Matrix<real_t, 12, 1> get_element_state(
+    const std::array<size_t, 12>& idx) const
+  {
+    Matrix<real_t, 12, 1> u_elem;
+    for (int i = 0; i < 12; ++i) {
+      u_elem(i) = u(idx[i]);
+    }
+    return u_elem;
+  }
+
+  std::array<real_t, 2> get_element_lambda(size_t e) const
+  {
+    return { lambda(e), lambda(e + 1) };
+  }
+
+  template<typename T>
+  Matrix<T, 12, 1> assemble_element_residual_template(
+    const Matrix<T, 12, 1>& u_elem,
+    const std::array<real_t, 2>& lambda_elem,
+    const std::array<real_t, 3>& load) const
+  {
+    Matrix<T, 12, 1> residual = Matrix<T, 12, 1>::Zero();
+
+    const Matrix<T, 4, 1> ux = u_elem.template segment<4>(0);
+    const Matrix<T, 4, 1> uy = u_elem.template segment<4>(4);
+    const Matrix<T, 4, 1> uz = u_elem.template segment<4>(8);
+
+    const real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+    const real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+
+    for (size_t qi = 0; qi < 3; ++qi) {
+      const real_t xi = xi_q[qi];
+      const real_t w = w_q[qi];
+
+      const auto H = CubicHermite<real_t>::values(xi, ds);
+      const auto dH = CubicHermite<real_t>::derivs(xi, ds);
+      const auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
+      const auto M = LinearShape<real_t>::values(xi);
+
+      T xp = 0, xpp = 0;
+      T yp = 0, ypp = 0;
+      T zp = 0, zpp = 0;
+
+      for (size_t i = 0; i < 4; ++i) {
+        xp += dH[i] * ux(i);
+        yp += dH[i] * uy(i);
+        zp += dH[i] * uz(i);
+        xpp += ddH[i] * ux(i);
+        ypp += ddH[i] * uy(i);
+        zpp += ddH[i] * uz(i);
+      }
+
+      const T l = M[0] * lambda_elem[0] + M[1] * lambda_elem[1];
+      const T S = xp * xp + yp * yp + zp * zp - 1.0;
+
+      for (size_t a = 0; a < 4; ++a) {
+        residual(a) += EI * xpp * ddH[a] * w * ds;
+        residual(4 + a) += EI * ypp * ddH[a] * w * ds;
+        residual(8 + a) += EI * zpp * ddH[a] * w * ds;
+
+        residual(a) -= load[0] * H[a] * w * ds;
+        residual(4 + a) -= load[1] * H[a] * w * ds;
+        residual(8 + a) -= load[2] * H[a] * w * ds;
+
+        const T coeff = 2 * (l + r_penalty * S) * dH[a] * w * ds;
+        residual(a) += xp * coeff;
+        residual(4 + a) += yp * coeff;
+        residual(8 + a) += zp * coeff;
+      }
+    }
+
+    return residual;
+  }
+
+  template<typename T>
+  Matrix<T, 12, 1> assemble_element_residual_template(
+    const Matrix<T, 12, 1>& u_elem,
+    const std::array<real_t, 2>& lambda_elem,
+    const std::array<std::array<real_t, 3>, 2>& load_elem) const
+  {
+    Matrix<T, 12, 1> residual = Matrix<T, 12, 1>::Zero();
+
+    const Matrix<T, 4, 1> ux = u_elem.template segment<4>(0);
+    const Matrix<T, 4, 1> uy = u_elem.template segment<4>(4);
+    const Matrix<T, 4, 1> uz = u_elem.template segment<4>(8);
+
+    const real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+    const real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+
+    for (size_t qi = 0; qi < 3; ++qi) {
+      const real_t xi = xi_q[qi];
+      const real_t w = w_q[qi];
+
+      const auto H = CubicHermite<real_t>::values(xi, ds);
+      const auto dH = CubicHermite<real_t>::derivs(xi, ds);
+      const auto ddH = CubicHermite<real_t>::second_derivs(xi, ds);
+      const auto M = LinearShape<real_t>::values(xi);
+
+      T xp = 0, xpp = 0;
+      T yp = 0, ypp = 0;
+      T zp = 0, zpp = 0;
+
+      for (size_t i = 0; i < 4; ++i) {
+        xp += dH[i] * ux(i);
+        yp += dH[i] * uy(i);
+        zp += dH[i] * uz(i);
+        xpp += ddH[i] * ux(i);
+        ypp += ddH[i] * uy(i);
+        zpp += ddH[i] * uz(i);
+      }
+
+      const T l = M[0] * lambda_elem[0] + M[1] * lambda_elem[1];
+      const real_t fx = M[0] * load_elem[0][0] + M[1] * load_elem[1][0];
+      const real_t fy = M[0] * load_elem[0][1] + M[1] * load_elem[1][1];
+      const real_t fz = M[0] * load_elem[0][2] + M[1] * load_elem[1][2];
+      const T S = xp * xp + yp * yp + zp * zp - 1.0;
+
+      for (size_t a = 0; a < 4; ++a) {
+        residual(a) += EI * xpp * ddH[a] * w * ds;
+        residual(4 + a) += EI * ypp * ddH[a] * w * ds;
+        residual(8 + a) += EI * zpp * ddH[a] * w * ds;
+
+        residual(a) -= fx * H[a] * w * ds;
+        residual(4 + a) -= fy * H[a] * w * ds;
+        residual(8 + a) -= fz * H[a] * w * ds;
+
+        const T coeff = 2 * (l + r_penalty * S) * dH[a] * w * ds;
+        residual(a) += xp * coeff;
+        residual(4 + a) += yp * coeff;
+        residual(8 + a) += zp * coeff;
+      }
+    }
+
+    return residual;
+  }
+
   /**
    *
    */
@@ -350,56 +505,43 @@ protected:
 
   void assemble_system(std::array<real_t, 3> load)
   {
-    using AD = AutoDiffScalar<VectorXd>;
-    using ADVec = Matrix<AD, Dynamic, 1>;
+    using ADDeriv = Matrix<real_t, 12, 1>;
+    using AD = AutoDiffScalar<ADDeriv>;
+    using ADVec = Matrix<AD, 12, 1>;
     using Tpl = Triplet<real_t>;
 
-    // --- 1) Build the AutoDiff input vector x_ad ---
-    ADVec x_ad(ndof);
-    for (int i = 0; i < ndof; ++i) {
-      VectorXd seed = VectorXd::Zero(ndof);
-      seed(i) = 1.0;
-      x_ad(i) = AD(u(i), seed);
-    }
-
-    // --- 2) Compute AD residuals ---
-    ADVec R_ad = assemble_residual_template<AD>(x_ad, load);
-
-    // --- 3) Extract values + build Jacobian triplets ---
-    residual.resize(ndof);
-
-    // If you know roughly how many nonzeros per row, you can reserve:
+    residual = VectorXd::Zero(ndof);
     std::vector<Tpl> triplets;
-    triplets.reserve(ndof * 5); // e.g. assume 5 nnz/row on average
+    triplets.reserve(elements * 12 * 12);
 
-    for (int i = 0; i < ndof; ++i) {
-      residual(i) = R_ad(i).value();
+    for (size_t e = 0; e < elements; ++e) {
+      const auto idx = get_element_dof_indices(e);
+      const auto lambda_elem = get_element_lambda(e);
+      const Matrix<real_t, 12, 1> u_elem = get_element_state(idx);
 
-      // Access the derivative vector for row i
-      const VectorXd& dRi = R_ad(i).derivatives();
-      const int nnz = static_cast<int>(dRi.size());
+      ADVec u_ad;
+      for (int a = 0; a < 12; ++a) {
+        ADDeriv seed = ADDeriv::Zero();
+        seed(a) = 1.0;
+        u_ad(a) = AD(u_elem(a), seed);
+      }
 
-      // OPTION A: Filter zeros on the fly
-      for (int j = 0; j < nnz; ++j) {
-        const real_t dj = dRi[j];
-        if (dj != 0.0) {
-          triplets.emplace_back(i, j, dj);
+      const ADVec R_loc_ad =
+        assemble_element_residual_template<AD>(u_ad, lambda_elem, load);
+
+      for (int a = 0; a < 12; ++a) {
+        residual(idx[a]) += R_loc_ad(a).value();
+
+        const ADDeriv& dRa = R_loc_ad(a).derivatives();
+        for (int b = 0; b < 12; ++b) {
+          const real_t dj = dRa(b);
+          if (dj != 0.0) {
+            triplets.emplace_back(idx[a], idx[b], dj);
+          }
         }
       }
-
-      /*
-      // OPTION B: If you have a precomputed sparsity pattern
-      //   (e.g. std::vector<std::vector<int>> sparsity where
-      //    sparsity[i] lists the column-indices that can be nonzero in row i)
-      for (int j : sparsity[i]) {
-        real_t dj = dRi[j];
-        if (dj != 0.0)
-          triplets.emplace_back(i, j, dj);
-      }
-      */
     }
 
-    // --- 4) Assemble the sparse matrix ---
     jacobian.resize(ndof, ndof);
     jacobian.setFromTriplets(triplets.begin(), triplets.end());
     jacobian.makeCompressed();
@@ -407,34 +549,42 @@ protected:
 
   void assemble_system(std::vector<std::array<real_t, 3>> load)
   {
-    using AD = AutoDiffScalar<VectorXd>;
-    using ADVec = Matrix<AD, Dynamic, 1>;
+    using ADDeriv = Matrix<real_t, 12, 1>;
+    using AD = AutoDiffScalar<ADDeriv>;
+    using ADVec = Matrix<AD, 12, 1>;
     using Tpl = Triplet<real_t>;
 
-    ADVec x_ad(ndof);
-    for (int i = 0; i < ndof; ++i) {
-      VectorXd seed = VectorXd::Zero(ndof);
-      seed(i) = 1.0;
-      x_ad(i) = AD(u(i), seed);
-    }
-
-    ADVec R_ad = assemble_residual_template<AD>(x_ad, load);
-
-    residual.resize(ndof);
-
+    residual = VectorXd::Zero(ndof);
     std::vector<Tpl> triplets;
-    triplets.reserve(ndof * 5);
+    triplets.reserve(elements * 12 * 12);
 
-    for (int i = 0; i < ndof; ++i) {
-      residual(i) = R_ad(i).value();
+    for (size_t e = 0; e < elements; ++e) {
+      const auto idx = get_element_dof_indices(e);
+      const auto lambda_elem = get_element_lambda(e);
+      const Matrix<real_t, 12, 1> u_elem = get_element_state(idx);
+      const std::array<std::array<real_t, 3>, 2> load_elem = {
+        load[e], load[e + 1]
+      };
 
-      const VectorXd& dRi = R_ad(i).derivatives();
-      const int nnz = static_cast<int>(dRi.size());
+      ADVec u_ad;
+      for (int a = 0; a < 12; ++a) {
+        ADDeriv seed = ADDeriv::Zero();
+        seed(a) = 1.0;
+        u_ad(a) = AD(u_elem(a), seed);
+      }
 
-      for (int j = 0; j < nnz; ++j) {
-        const real_t dj = dRi[j];
-        if (dj != 0.0) {
-          triplets.emplace_back(i, j, dj);
+      const ADVec R_loc_ad =
+        assemble_element_residual_template<AD>(u_ad, lambda_elem, load_elem);
+
+      for (int a = 0; a < 12; ++a) {
+        residual(idx[a]) += R_loc_ad(a).value();
+
+        const ADDeriv& dRa = R_loc_ad(a).derivatives();
+        for (int b = 0; b < 12; ++b) {
+          const real_t dj = dRa(b);
+          if (dj != 0.0) {
+            triplets.emplace_back(idx[a], idx[b], dj);
+          }
         }
       }
     }
