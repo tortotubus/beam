@@ -13,42 +13,127 @@ using namespace Eigen;
 namespace ELFF {
 namespace Models {
 
+/**
+ * @brief Static inextensible Euler beam solved with a method-of-multipliers
+ * formulation.
+ */
 class EulerBeamStaticInextensibleMoM : public EulerBeam
 {
 public:
+  /**
+   * @brief Constructs a static inextensible beam model.
+   *
+   * @param length Beam length
+   * @param EI Flexural rigidity
+   * @param nodes Number of discretization nodes
+   * @param bcs Boundary conditions at the beam ends
+   * @param r_penalty Penalty parameter used in the inextensibility constraint
+   */
   EulerBeamStaticInextensibleMoM(real_t length,
                                  real_t EI,
                                  size_t nodes,
                                  EulerBeam::EulerBeamBCs bcs,
                                  real_t r_penalty);
 
+  /**
+   * @brief Destroys the beam model and releases any owned resources.
+   */
   ~EulerBeamStaticInextensibleMoM();
 
+  /**
+   * @brief Solves the static beam problem with no external load.
+   */
   virtual void solve() override;
 
+  /**
+   * @brief Solves the static beam problem under uniform loading.
+   *
+   * @param load Uniform distributed load vector
+   */
   void solve(std::array<real_t, 3> load) override;
 
+  /**
+   * @brief Solves the static beam problem under nodal loading.
+   *
+   * @param load Load vector specified at the mesh nodes
+   */
   void solve(std::vector<std::array<real_t, 3>> load);
 
+  /**
+   * @brief Applies the model's default initial condition.
+   */
   virtual void apply_initial_condition();
 
+  /**
+   * @brief Initializes the solver state from a supplied beam mesh.
+   *
+   * @param bmesh Beam mesh containing the initial geometry
+   */
   virtual void apply_initial_condition(EulerBeamMesh& bmesh) override;
 
 protected:
+  /**
+   * @brief Spatial dimension of the beam formulation.
+   */
   size_t dimension;
+  /**
+   * @brief Element and node counts used by the discretization.
+   */
   size_t elements, nodes;
+  /**
+   * @brief Uniform spacing between nodes along the beam centerline.
+   */
   real_t ds;
+  /**
+   * @brief Degrees of freedom in each Cartesian block and in the constraint
+   * block.
+   */
   size_t ndof_x, ndof_y, ndof_z, ndof_l;
+  /**
+   * @brief Offsets into the global state vector for each degree-of-freedom
+   * block.
+   */
   size_t offset_x, offset_y, offset_z, offset_l;
+  /**
+   * @brief Total number of algebraic degrees of freedom.
+   */
   size_t ndof;
+  /**
+   * @brief Penalty parameter used to enforce inextensibility.
+   */
   real_t r_penalty;
+  /**
+   * @brief Outer and inner nonlinear-iteration limits.
+   */
   size_t max_iter_outer, max_iter_inner;
+  /**
+   * @brief Outer and inner nonlinear solver tolerances.
+   */
   real_t tol_outer, tol_inner;
 
+  /**
+   * @brief Current residual vector.
+   */
   VectorXd residual;
+  /**
+   * @brief Current Jacobian and mass-matrix storage.
+   */
   MatrixXd jacobian, mass;
+  /**
+   * @brief Global state vector and Lagrange multiplier vector.
+   */
   VectorXd u, lambda;
 
+  /**
+   * @brief Constructs the shared base state for dynamic derived classes.
+   *
+   * @param length Beam length
+   * @param EI Flexural rigidity
+   * @param mu Mass per unit length
+   * @param nodes Number of discretization nodes
+   * @param bcs Boundary conditions at the beam ends
+   * @param r_penalty Penalty parameter used in the inextensibility constraint
+   */
   EulerBeamStaticInextensibleMoM(real_t length,
                                  real_t EI,
                                  real_t mu,
@@ -56,23 +141,70 @@ protected:
                                  EulerBeam::EulerBeamBCs bcs,
                                  real_t r_penalty);
 
+  /**
+   * @brief Updates the Lagrange multiplier iterate.
+   *
+   * @param omega Relaxation parameter for the multiplier update
+   * @return Norm of the multiplier correction
+   */
   real_t update_lambda(real_t omega = 1.0);
 
+  /**
+   * @brief Assembles the residual for uniform loading.
+   *
+   * @param load Uniform distributed load vector
+   */
   void assemble_residual(std::array<real_t, 3> load);
 
+  /**
+   * @brief Assembles the residual for nodal loading.
+   *
+   * @param load Load vector specified at the mesh nodes
+   */
   void assemble_residual(std::vector<std::array<real_t, 3>> load);
 
+  /**
+   * @brief Assembles the nonlinear system for uniform loading.
+   *
+   * @param load Uniform distributed load vector
+   */
   virtual void assemble_system(std::array<real_t, 3> load);
 
+  /**
+   * @brief Assembles the nonlinear system for nodal loading.
+   *
+   * @param load Load vector specified at the mesh nodes
+   */
   virtual void assemble_system(std::vector<std::array<real_t, 3>> load);
 
+  /**
+   * @brief Applies the configured boundary conditions to the current system.
+   */
   void apply_boundary_conditions();
 
+  /**
+   * @brief Applies the configured boundary conditions to a supplied matrix and
+   * residual pair.
+   *
+   * @param A System matrix to modify
+   * @param R Residual vector to modify
+   */
   void apply_boundary_conditions(MatrixXd& A, VectorXd& R);
 
+  /**
+   * @brief Updates the beam mesh from the current solution state.
+   */
   void update_mesh();
 
   template<typename T>
+  /**
+   * @brief Assembles the static residual for uniform loading.
+   *
+   * @tparam T Scalar type used for residual assembly
+   * @param u State vector at which to evaluate the residual
+   * @param load Uniform distributed load vector
+   * @return Residual vector for the current state
+   */
   Matrix<T, Dynamic, 1> assemble_residual_template(
     const Matrix<T, Dynamic, 1>& u,
     std::array<real_t, 3> load) const
@@ -175,11 +307,20 @@ protected:
   }
 
   template<typename T>
+  /**
+   * @brief Assembles the static residual for nodal loading.
+   *
+   * @tparam T Scalar type used for residual assembly
+   * @param u State vector at which to evaluate the residual
+   * @param load Load vector specified at the mesh nodes
+   * @return Residual vector for the current state
+   */
   Matrix<T, Dynamic, 1> assemble_residual_template(
     const Matrix<T, Dynamic, 1>& u,
     const std::vector<std::array<real_t, 3>> load) const
   {
-    ELFF_ASSERT(load.size() == nodes, "Nodes does not match load vector size.\n");
+    ELFF_ASSERT(load.size() == nodes,
+                "Nodes does not match load vector size.\n");
 
     static constexpr real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
     static constexpr real_t w_q[] = { 0.2777777778,

@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace CXX {
 
 class vtkHDFPolyData;

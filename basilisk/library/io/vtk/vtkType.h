@@ -1,8 +1,3 @@
-/** @defgroup basilisk Basilisk library 
- * 
- *  @{
- */
-
 typedef uint8_t UInt8_t;
 typedef uint16_t UInt16_t;
 typedef uint32_t UInt32_t;
@@ -112,24 +107,4 @@ char *vtkType_to_string(vtkType t) {
     break;
   }
 }
-
-// #define VTK_VOID 0
-// #define VTK_BIT 1
-// #define VTK_CHAR 2
-// #define VTK_SIGNED_CHAR 15
-// #define VTK_UNSIGNED_CHAR 3
-// #define VTK_SHORT 4
-// #define VTK_UNSIGNED_SHORT 5
-// #define VTK_INT 6
-// #define VTK_UNSIGNED_INT 7
-// #define VTK_LONG 8
-// #define VTK_UNSIGNED_LONG 9
-// #define VTK_FLOAT 10
-// #define VTK_DOUBLE 11
-// #define VTK_ID_TYPE 12
-// #define VTK_STRING 13
-// #define VTK_OPAQUE 14
-// #define VTK_LONG_LONG 16
-// #define VTK_UNSIGNED_LONG_LONG 17
-// #define VTK_VARIANT 20
-// #define VTK_OBJECT 21
+ 

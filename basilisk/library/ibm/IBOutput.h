@@ -1,8 +1,9 @@
 
-#include "output.h"
-#include <limits.h>
+// #include "output.h"
+// #include <limits.h>
 
-#include "library/elff/runtime.h"
+#include "library/io/output-dump.h"
+
 // ============================================================================
 // Type declarations
 // ============================================================================
@@ -24,26 +25,34 @@ static const int ib_dump_version = 1;
 // Function declarations
 // ============================================================================
 
-void ib_dump (const char* file, IBscalar* list, FILE* fp, bool unbuffered, bool zero);
+void ib_dump (
+  const char* file, IBscalar* list, FILE* fp, bool unbuffered, bool zero);
 bool ib_restore (const char* file, IBscalar* list, FILE* fp);
 
-void ib_and_basilisk_dump(const char * file, scalar * list, FILE* fp, bool unbuffered, bool zero);
-bool ib_and_basilisk_restore(const char * file, scalar * list, FILE *fp);
+static int ib_checkpoint_dump (const char* path, void* ctx);
+static int ib_checkpoint_restore (const char* path, void* ctx);
 
 static IBscalar* ib_dump_list (IBscalar* lista);
-static void ib_dump_header (FILE* fp, struct IBDumpHeader* header, IBscalar* list);
+static void
+ib_dump_header (FILE* fp, struct IBDumpHeader* header, IBscalar* list);
 
 static IBscalar ib_scalar_from_name (const char* name);
-static IBscalar* ib_restore_header_list (FILE* fp, struct IBDumpHeader* header, IBscalar* list);
+static IBscalar*
+ib_restore_header_list (FILE* fp, struct IBDumpHeader* header, IBscalar* list);
 
 // ============================================================================
-// Macros
+// Events
 // ============================================================================
 
-@define dump_function(fname,slist) ib_and_basilisk_dump((fname),(slist),NULL,false,true)
-@define restore_function(fname,slist) ib_and_basilisk_restore((fname),(slist),NULL)
-
-#include "library/io/output-dump.h"
+event defaults (i = 0) {
+  checkpointer_register (
+    (Checkpointer) {.filename = ".ib",
+                    .dump_phase = CKPT_PHASE_POST_DUMP,
+                    .dump = ib_checkpoint_dump,
+                    .restore_phase = CKPT_PHASE_POST_RESTORE,
+                    .restore = ib_checkpoint_restore,
+                    .ctx = NULL});
+}
 
 // ============================================================================
 // Function definitions
@@ -52,174 +61,254 @@ static IBscalar* ib_restore_header_list (FILE* fp, struct IBDumpHeader* header, 
 /**
  * @brief
  */
-void ib_and_basilisk_dump(const char * file = "dump", scalar * list = all, FILE * fp = NULL, bool unbuffered = false, bool zero = true) {
-  char * ibname = (char *) malloc(strlen(file) + 4);
-  strcpy(ibname,file);
-  strcat(ibname,".ib");
-
-  char * elffname = (char *) malloc(strlen(file) + 6);
-  strcpy(elffname,file);
-  strcat(elffname,".elff");
-
-  if (elff_dump(elffname) != 0) {
-    fprintf (ferr, "ib_and_basilisk_dump(): error: failed to write ELFF checkpoint '%s'\n",
-             elffname);
-    exit (1);
-  }
-  ib_dump(ibname, iball, NULL, unbuffered, zero);
-  dump(file,list,fp,unbuffered,zero);
-
-  free(elffname);
-  free(ibname);
+static int ib_checkpoint_dump (const char* path, void* ctx) {
+  (void) ctx;
+  ib_dump (path, iball, NULL, false, true);
+  return 0;
 }
 
 /**
  * @brief
  */
-bool ib_and_basilisk_restore(const char * file = "dump", scalar * list = all, FILE * fp = NULL) {
-  char * ibname = (char *) malloc(strlen(file) + 4);
-  strcpy(ibname,file);
-  strcat(ibname,".ib");
-
-  char * elffname = (char *) malloc(strlen(file) + 6);
-  strcpy(elffname,file);
-  strcat(elffname,".elff");
-
-  if (elff_restore(elffname) != 0) {
-    fprintf (ferr, "ib_and_basilisk_restore(): error: failed to restore ELFF checkpoint '%s'\n",
-             elffname);
-    exit (1);
-  }
-  if (!ib_restore(ibname, iball, NULL)) {
-    fprintf (ferr, "ib_and_basilisk_restore(): error: failed to restore IB checkpoint '%s'\n",
-             ibname);
-    exit (1);
-  }
-  bool ok = restore(file,list,fp);
-
-  free(elffname);
-  free(ibname);
-  return ok;
+static int ib_checkpoint_restore (const char* path, void* ctx) {
+  (void) ctx;
+  return ib_restore (path, iball, NULL) ? 0 : -1;
 }
 
-
-#if !_MPI
 /**
  * @brief
  */
-trace void ib_dump (const char* file = "ibdump",
+trace void ib_dump (const char* file = "dump.ib",
                     IBscalar* list = iball,
                     FILE* fp = NULL,
                     bool unbuffered = false,
                     bool zero = true) {
-  char* name = NULL;
-  if (!fp) {
-    name = (char*) malloc (strlen (file) + 2);
-    strcpy (name, file);
-    if (!unbuffered)
-      strcat (name, "~");
-    if ((fp = fopen (name, "wb")) == NULL) {
-      perror (name);
-      exit (1);
-    }
-  }
-  assert (fp);
-
   IBscalar* dlist = ib_dump_list (list);
-  struct IBDumpHeader header = {.version = ib_dump_version,
-                                .nscalars = iblist_len (dlist),
-                                .nmeshes = ibmm.nm,
-                                .nnodes = (int) ibmm.pool.active.size};
+  NOT_UNUSED (zero);
 
-  ib_dump_header (fp, &header, dlist);
+#if _MPI
+  int nscalars = iblist_len (dlist);
+  if (nscalars > 0 && ibmm.pool.active.size > 0) {
+    int nowned = 0;
+    foreach_ibnode () {
+      if (node->pid == pid ())
+        nowned++;
+    }
 
-  foreach_ibnode () {
-    foreach_ibscalar (dlist) {
-      double val = ibval (s);
-      if (fwrite (&val, sizeof (double), 1, fp) < 1) {
-        perror ("ib_dump(): error while writing scalars");
+    int* send_ids =
+      nowned > 0 ? (int*) malloc ((size_t) nowned * sizeof (int)) : NULL;
+    double* send_vals =
+      nowned > 0 ? (double*) malloc ((size_t) nowned * (size_t) nscalars *
+                                     sizeof (double))
+                 : NULL;
+    assert (nowned == 0 || (send_ids && send_vals));
+
+    int ni = 0;
+    foreach_ibnode () {
+      if (node->pid != pid ())
+        continue;
+
+      send_ids[ni] = (int) node_id;
+
+      int si = 0;
+      foreach_ibscalar (dlist) {
+        send_vals[(size_t) ni * (size_t) nscalars + (size_t) si++] = ibval (s);
+      }
+      ni++;
+    }
+
+    int* recv_counts =
+      pid () == 0 ? (int*) malloc ((size_t) npe () * sizeof (int)) : NULL;
+    MPI_Gather (
+      &nowned, 1, MPI_INT, recv_counts, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    int* recv_displs = NULL;
+    int* recv_counts_vals = NULL;
+    int* recv_displs_vals = NULL;
+    int* recv_ids = NULL;
+    double* recv_vals = NULL;
+
+    if (pid () == 0) {
+      recv_displs = (int*) malloc ((size_t) npe () * sizeof (int));
+      recv_counts_vals = (int*) malloc ((size_t) npe () * sizeof (int));
+      recv_displs_vals = (int*) malloc ((size_t) npe () * sizeof (int));
+      assert (recv_counts && recv_displs && recv_counts_vals &&
+              recv_displs_vals);
+
+      int total = 0;
+      int total_vals = 0;
+      for (int peer = 0; peer < npe (); peer++) {
+        recv_displs[peer] = total;
+        recv_counts_vals[peer] = recv_counts[peer] * nscalars;
+        recv_displs_vals[peer] = total_vals;
+        total += recv_counts[peer];
+        total_vals += recv_counts_vals[peer];
+      }
+
+      recv_ids =
+        total > 0 ? (int*) malloc ((size_t) total * sizeof (int)) : NULL;
+      recv_vals = total_vals > 0
+                    ? (double*) malloc ((size_t) total_vals * sizeof (double))
+                    : NULL;
+      assert ((total == 0 || recv_ids) && (total_vals == 0 || recv_vals));
+    }
+
+    MPI_Gatherv (send_ids,
+                 nowned,
+                 MPI_INT,
+                 recv_ids,
+                 recv_counts,
+                 recv_displs,
+                 MPI_INT,
+                 0,
+                 MPI_COMM_WORLD);
+
+    MPI_Gatherv (send_vals,
+                 nowned * nscalars,
+                 MPI_DOUBLE,
+                 recv_vals,
+                 recv_counts_vals,
+                 recv_displs_vals,
+                 MPI_DOUBLE,
+                 0,
+                 MPI_COMM_WORLD);
+
+    if (pid () == 0) {
+      int total = 0;
+      for (int peer = 0; peer < npe (); peer++)
+        total += recv_counts[peer];
+
+      for (int i = 0; i < total; i++) {
+        IBNode* node = ibmm.pool.active.ptrs[recv_ids[i]];
+        int si = 0;
+        foreach_ibscalar (dlist) {
+          ibval (s) = recv_vals[(size_t) i * (size_t) nscalars + (size_t) si++];
+        }
+      }
+    }
+
+    free (send_ids);
+    free (send_vals);
+    free (recv_counts);
+    free (recv_displs);
+    free (recv_counts_vals);
+    free (recv_displs_vals);
+    free (recv_ids);
+    free (recv_vals);
+  }
+#endif
+
+  if (pid () == 0) {
+    char* name = NULL;
+    if (!fp) {
+      name = (char*) malloc (strlen (file) + 2);
+      strcpy (name, file);
+      if (!unbuffered)
+        strcat (name, "~");
+      if ((fp = fopen (name, "wb")) == NULL) {
+        perror (name);
         exit (1);
       }
+    }
+    assert (fp);
+    struct IBDumpHeader header = {.version = ib_dump_version,
+                                  .nscalars = iblist_len (dlist),
+                                  .nmeshes = ibmm.nm,
+                                  .nnodes = (int) ibmm.pool.active.size};
+
+    ib_dump_header (fp, &header, dlist);
+
+    foreach_ibnode () {
+      foreach_ibscalar (dlist) {
+        double val = ibval (s);
+        if (fwrite (&val, sizeof (double), 1, fp) < 1) {
+          perror ("ib_dump(): error while writing scalars");
+          exit (1);
+        }
+      }
+    }
+
+    if (file) {
+      fclose (fp);
+      if (!unbuffered)
+        rename (name, file);
+      free (name);
     }
   }
 
   free (dlist);
-
-  if (file) {
-    fclose (fp);
-    if (!unbuffered)
-      rename (name, file);
-    free (name);
-  }
 }
 
 /**
  * @brief
  */
-trace bool ib_restore (const char* file = "ibdump",
+trace bool ib_restore (const char* file = "dump.ib",
                        IBscalar* list = NULL,
                        FILE* fp = NULL) {
-  if (!fp && (fp = fopen (file, "rb")) == NULL)
-    return false;
-  assert (fp);
 
-  struct IBDumpHeader header = {0};
-  if (fread (&header, sizeof (header), 1, fp) < 1) {
-    fprintf (ferr, "ib_restore(): error: expecting header\n");
-    exit (1);
-  }
+  if (pid () == 0) {
+    if (!fp && (fp = fopen (file, "rb")) == NULL)
+      return false;
+    assert (fp);
 
-  if (header.version != ib_dump_version) {
-    fprintf (ferr,
-             "ib_restore(): error: file version mismatch: %d (file) != %d "
-             "(code)\n",
-             header.version,
-             ib_dump_version);
-    exit (1);
-  }
-
-  if (header.nmeshes != ibmm.nm) {
-    fprintf (ferr,
-             "ib_restore(): error: mesh count mismatch: %d (file) != %d "
-             "(code)\n",
-             header.nmeshes,
-             ibmm.nm);
-    exit (1);
-  }
-
-  if (header.nnodes != (int) ibmm.pool.active.size) {
-    fprintf (ferr,
-             "ib_restore(): error: node count mismatch: %d (file) != %d "
-             "(code)\n",
-             header.nnodes,
-             (int) ibmm.pool.active.size);
-    exit (1);
-  }
-
-  IBscalar* slist = ib_restore_header_list (fp, &header, list);
-
-  foreach_ibnode () {
-    foreach_ibscalar (slist) {
-      double val = 0.;
-      if (fread (&val, sizeof (double), 1, fp) < 1) {
-        fprintf (ferr, "ib_restore(): error: expecting scalar\n");
-        exit (1);
-      }
-      if (s.i != INT_MAX)
-        ibval (s) = val;
+    struct IBDumpHeader header = {0};
+    if (fread (&header, sizeof (header), 1, fp) < 1) {
+      fprintf (ferr, "ib_restore(): error: expecting header\n");
+      exit (1);
     }
+
+    if (header.version != ib_dump_version) {
+      fprintf (ferr,
+               "ib_restore(): error: file version mismatch: %d (file) != %d "
+               "(code)\n",
+               header.version,
+               ib_dump_version);
+      exit (1);
+    }
+
+    if (header.nmeshes != ibmm.nm) {
+      fprintf (ferr,
+               "ib_restore(): error: mesh count mismatch: %d (file) != %d "
+               "(code)\n",
+               header.nmeshes,
+               ibmm.nm);
+      exit (1);
+    }
+
+    if (header.nnodes != (int) ibmm.pool.active.size) {
+      fprintf (ferr,
+               "ib_restore(): error: node count mismatch: %d (file) != %d "
+               "(code)\n",
+               header.nnodes,
+               (int) ibmm.pool.active.size);
+      exit (1);
+    }
+
+    IBscalar* slist = ib_restore_header_list (fp, &header, list);
+
+    foreach_ibnode () {
+      foreach_ibscalar (slist) {
+        double val = 0.;
+        if (fread (&val, sizeof (double), 1, fp) < 1) {
+          fprintf (ferr, "ib_restore(): error: expecting scalar\n");
+          exit (1);
+        }
+        if (s.i != INT_MAX)
+          ibval (s) = val;
+      }
+    }
+    if (file)
+      fclose (fp);
+
+    free (slist);
   }
 
-  free (slist);
-
-  if (file)
-    fclose (fp);
+#if _MPI
+  ibmeshmanager_update_pid();
+#endif 
 
   return true;
 }
-#else // _MPI
-#endif
-
 
 /**
  * @brief

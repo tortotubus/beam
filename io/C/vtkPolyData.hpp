@@ -5,7 +5,7 @@
 #include <cstdlib>
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace C {
 
 /**
@@ -221,5 +221,5 @@ vtk_polydata_add_line(vtkPolyData* pd,
                       int64_t line_point_1,
                       int64_t line_point_2);
 } // namespace C
-} // namespace io
+} // namespace IO
 } // namespace ELFF

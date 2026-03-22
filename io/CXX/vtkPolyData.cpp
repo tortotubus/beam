@@ -4,7 +4,7 @@
 #include <cstring>   // std::memcpy
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace CXX {
 
 C::vtkPolyData

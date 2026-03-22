@@ -3,7 +3,7 @@
 IndentWidth: 2          # "standard indentation is two spaces"
 TabWidth: 2
 UseTab: Never           # spaces only
-ColumnLimit: 80         # "Lines are not longer than 80 characters."
+ColumnLimit: 90         # "Lines are not longer than 80 characters."
 
 ContinuationIndentWidth: 2
 

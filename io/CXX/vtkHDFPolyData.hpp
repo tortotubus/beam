@@ -5,7 +5,7 @@
 #include <string>
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace CXX {
 
 

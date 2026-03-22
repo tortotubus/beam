@@ -4,7 +4,7 @@
 #include "vtkPolyData.hpp"
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace C {
 
 /**
@@ -70,5 +70,5 @@ vtk_HDF_polydata_append_transient(const char* fname,
                                   float time);
 
 } // namespace C
-} // namespace io
+} // namespace IO
 } // namespace ELFF

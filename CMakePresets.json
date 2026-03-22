@@ -14,7 +14,9 @@
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release"
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
+        "ELFF_BUILD_DOC": "On",
+        "ELFF_BUILD_TESTS": "On"
       }
     },
     {

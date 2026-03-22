@@ -3,7 +3,7 @@
 #include <cstdlib>
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace C {
 
 bool
@@ -340,5 +340,5 @@ vtk_polydata_free(vtkPolyData* pd)
 }
 
 } // namespace C
-} // namespace io
+} // namespace IO
 } // namespace ELFF

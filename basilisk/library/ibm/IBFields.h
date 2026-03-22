@@ -78,21 +78,21 @@ IBvector* ibvectors_copy (IBvector* l);
 // ============================================================================
 
 /**
- * @def
+ * @def new_ibscalar
  */
 // clang-format off
 @define new_ibscalar(name) name = _init_ibscalar (#name);
 // clang-format on
 
 /**
- * @def
+ * @def new_ibvector
  */
 // clang-format off
 @define new_ibvector(name) name = _init_ibvector (#name);
 // clang-format on
 
 /**
- * @def
+ * @def ibval
  * @note Assume node exists in scope and is a pointer of IBNode
  */
 // clang-format off
@@ -100,7 +100,7 @@ IBvector* ibvectors_copy (IBvector* l);
 // clang-format on
 
 /**
- * @def
+ * @def ibname
  * @note Assume node exists in scope and is a pointer of IBNode
  */
 // clang-format off
@@ -108,7 +108,7 @@ IBvector* ibvectors_copy (IBvector* l);
 // clang-format on
 
 /**
- * @def
+ * @def ibdirty
  * @note Assume node exists in scope and is a pointer of IBNode
  */
 // clang-format off
@@ -116,7 +116,7 @@ IBvector* ibvectors_copy (IBvector* l);
 // clang-format on
 
 /**
- * @def
+ * @def ibnodump
  * @note Assume node exists in scope and is a pointer of IBNode
  */
 // clang-format off
@@ -124,8 +124,7 @@ IBvector* ibvectors_copy (IBvector* l);
 // clang-format on
 
 /**
- * @def
- * @note
+ * @def foreach_ibscalar 
  */
 macro foreach_ibscalar (IBscalar* list = iball) {
   {
@@ -140,8 +139,7 @@ macro foreach_ibscalar (IBscalar* list = iball) {
 }
 
 /**
- * @def
- * @note
+ * @def foreach_ibvector
  */
 macro foreach_ibvector (IBvector* list) {
   {
@@ -182,6 +180,8 @@ void init_ibsolver () {
 
 /**
  * @brief
+ * 
+ * @relates IBscalar
  */
 IBscalar _init_ibscalar (const char* name) {
   IBscalar s = {.i = nibvar++};
@@ -213,6 +213,7 @@ IBscalar _init_ibscalar (const char* name) {
 
 /**
  * @brief
+ * @relates IBscalar
  */
 inline double* _ibval (IBscalar s, IBNode* n) {
   // if (set_dirty)
@@ -223,6 +224,8 @@ inline double* _ibval (IBscalar s, IBNode* n) {
 
 /**
  * @brief
+ * 
+ * @relates IBscalar
  */
 int iblist_len (IBscalar* list) {
   if (!list)
@@ -234,6 +237,8 @@ int iblist_len (IBscalar* list) {
 
 /**
  * @brief
+ * 
+ * @relates IBscalar
  */
 IBscalar* iblist_append (IBscalar* list, IBscalar sc) {
   int len = iblist_len (list);
@@ -245,6 +250,8 @@ IBscalar* iblist_append (IBscalar* list, IBscalar sc) {
 
 /**
  * @brief
+ * 
+ * @relates IBscalar
  */
 IBscalar* iblist_prepend (IBscalar* list, IBscalar sc) {
   int len = iblist_len (list);
@@ -258,6 +265,7 @@ IBscalar* iblist_prepend (IBscalar* list, IBscalar sc) {
 
 /**
  * @brief
+ * @relates IBscalar
  */
 IBscalar* iblist_add (IBscalar* list, IBscalar sc) {
   foreach_ibscalar (list) {
@@ -269,6 +277,7 @@ IBscalar* iblist_add (IBscalar* list, IBscalar sc) {
 
 /**
  * @brief
+ * @relates IBscalar
  */
 int iblist_lookup (IBscalar* l, IBscalar s1) {
   if (l != NULL)
@@ -278,6 +287,7 @@ int iblist_lookup (IBscalar* l, IBscalar s1) {
 
 /**
  * @brief
+ * @relates IBscalar
  */
 IBscalar* iblist_copy (IBscalar* l) {
   IBscalar* list = NULL;
@@ -288,6 +298,7 @@ IBscalar* iblist_copy (IBscalar* l) {
 
 /**
  * @brief
+ * @relates IBscalar
  */
 IBscalar* iblist_concat (IBscalar* l1, IBscalar* l2) {
   IBscalar* l3 = iblist_copy (l1);
@@ -297,6 +308,7 @@ IBscalar* iblist_concat (IBscalar* l1, IBscalar* l2) {
 
 /**
  * @brief
+ * @relates IBscalar
  */
 void iblist_print (IBscalar* l, FILE* fp) {
   int i = 0;
@@ -310,6 +322,7 @@ void iblist_print (IBscalar* l, FILE* fp) {
 
 /**
  * @brief
+ * @relates IBvector
  */
 IBvector _init_ibvector (const char* name) {
   struct {
@@ -337,6 +350,7 @@ IBvector _init_ibvector (const char* name) {
 
 /**
  * @brief
+ * @relates IBvector
  */
 int ibvectors_len (IBvector* list) {
   if (!list)
@@ -348,6 +362,7 @@ int ibvectors_len (IBvector* list) {
 
 /**
  * @brief
+ * @relates IBvector
  */
 IBvector* ibvectors_append (IBvector* list, IBvector v) {
   int len = ibvectors_len (list);
@@ -359,6 +374,7 @@ IBvector* ibvectors_append (IBvector* list, IBvector v) {
 
 /**
  * @brief
+ * @relates IBvector
  */
 IBvector* ibvectors_add (IBvector* list, IBvector vv) {
   foreach_ibvector (list) {
@@ -375,6 +391,7 @@ IBvector* ibvectors_add (IBvector* list, IBvector vv) {
 
 /**
  * @brief
+ * @relates IBvector
  */
 IBvector* ibvectors_copy (IBvector* l) {
   IBvector* list = NULL;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "general/error.hpp"
+#include "mpi/CommHandle.hpp"
 #include "models/ibm/IBModel.hpp"
 
 #include <cstdint>
@@ -22,6 +23,7 @@ public:
   struct Entry
   {
     int id;
+    int pid;
     IBModel* model;
   };
 
@@ -37,9 +39,42 @@ public:
     }
 
     const int id = next_id++;
-    entries.push_back({id, &model});
+    entries.push_back({id, -1, &model});
     return id;
   }
+
+  int deregister_model(IBModel& model)
+  {
+    for (auto it = entries.begin(); it != entries.end(); ++it) {
+      if (it->model == &model) {
+        entries.erase(it);
+        return 0;
+      }
+    }
+
+    return -1;
+  }
+
+  int set_model_pid(IBModel& model, int pid)
+  {
+    for (auto& entry : entries) {
+      if (entry.model == &model) {
+        entry.pid = pid;
+        return 0;
+      }
+    }
+
+    return -1;
+  }
+
+#ifdef ELFF_USE_MPI
+  void set_communicator(MPI_Comm comm)
+  {
+    communicator =
+      (comm != MPI_COMM_NULL) ? ELFF::MPI::CommHandle::duplicate(comm)
+                              : ELFF::MPI::CommHandle();
+  }
+#endif
 
   size_t size() const { return entries.size(); }
 
@@ -74,6 +109,9 @@ public:
 
   int write_checkpoint(const char* fname) const
   {
+    if (!should_checkpoint_locally())
+      return 0;
+
     FILE* fp = std::fopen(fname, "wb");
     if (!fp)
       return -1;
@@ -85,6 +123,9 @@ public:
 
   int read_checkpoint(const char* fname)
   {
+    if (!should_checkpoint_locally())
+      return 0;
+
     FILE* fp = std::fopen(fname, "rb");
     if (!fp)
       return -1;
@@ -96,6 +137,9 @@ public:
 
   int write_checkpoint(FILE* fp) const
   {
+    if (!should_checkpoint_locally())
+      return 0;
+
     if (!fp)
       return -1;
 
@@ -145,6 +189,9 @@ public:
 
   int read_checkpoint(FILE* fp)
   {
+    if (!should_checkpoint_locally())
+      return 0;
+
     if (!fp)
       return -1;
 
@@ -218,9 +265,55 @@ private:
     return nullptr;
   }
 
+  Entry* find_entry(IBModel& model)
+  {
+    for (auto& entry : entries) {
+      if (entry.model == &model)
+        return &entry;
+    }
+    return nullptr;
+  }
+
+  int checkpoint_owner_pid() const
+  {
+    int owner_pid = -1;
+
+    for (const auto& entry : entries) {
+      const int entry_pid = entry.pid >= 0 ? entry.pid : 0;
+      if (owner_pid < 0) {
+        owner_pid = entry_pid;
+      } else {
+        ELFF_ASSERT(owner_pid == entry_pid,
+                    "IBRuntime::checkpoint_owner_pid(): mixed model owner "
+                    "pids are not supported for checkpointing.\n");
+      }
+    }
+
+    return owner_pid >= 0 ? owner_pid : 0;
+  }
+
+  int local_rank() const
+  {
+#ifdef ELFF_USE_MPI
+    if (communicator) {
+      int rank = 0;
+      ELFF_ASSERT(MPI_Comm_rank(communicator.get(), &rank) == MPI_SUCCESS,
+                  "IBRuntime::local_rank(): MPI_Comm_rank() failed.\n");
+      return rank;
+    }
+#endif
+    return 0;
+  }
+
+  bool should_checkpoint_locally() const
+  {
+    return local_rank() == checkpoint_owner_pid();
+  }
+
 private:
   std::vector<Entry> entries;
   int next_id;
+  ELFF::MPI::CommHandle communicator;
 };
 
 } // namespace Models

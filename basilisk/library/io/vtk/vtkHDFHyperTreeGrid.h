@@ -53,6 +53,7 @@ void vtk_HDF_hypertreegrid_close (vtkHDFHyperTreeGrid* vtk_hdf_htg) {
  * @param scalar_list List of any basilisk scalar fields
  * @param vector_list List of any basilisk vector fields
  * @param fname The filename to write the vtkhdf (HDF5) file to
+ * @param overwrite If existing files should be overwritten
  *
  * @memberof vtkHDFHyperTreeGrid
  *
@@ -138,7 +139,7 @@ void vtk_HDF_hypertreegrid_close (vtkHDFHyperTreeGrid* vtk_hdf_htg) {
  *  - **Dataset**: "Descriptors"
  *    - **Datatype**: `char`
  *    - **Description**: This is the description of the actual structure of the
- * tree by breadth-first search. \sa @ref hdf_get_descriptors
+ * tree by breadth-first search. 
  *
  *  - **Dataset**: "DescriptorsSize"
  *    - **Datatype**: `int64`

@@ -9,9 +9,7 @@ struct Adapt2 {
   int minlevel;  // minimum level of refinement (default 1)
   scalar* list;  // list of fields to update (default all)
 };
-
-// scalar ib_noise_1[];
-// scalar ib_noise_2[];
+ 
 
 astats adapt_wavelet_ibm (scalar* slist,
                           double* max,
@@ -25,14 +23,13 @@ astats adapt_wavelet2 (scalar* slist,
                        int minlevel = 1,
                        scalar* list = all);
 
-scalar ib_noise_0[];
-
 astats adapt_wavelet_ibm (scalar* slist,
                           double* max,
                           int maxlevel,
                           int minlevel = 1,
                           scalar* list = all) {
-  int iblevel_0 = 0;
+                            
+  scalar ib_noise_0[]; int iblevel_0 = 0;
   // scalar ib_noise_1[]; int iblevel_1;
   // scalar ib_noise_2[]; int iblevel_2;
 

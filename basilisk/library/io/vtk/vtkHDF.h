@@ -593,7 +593,6 @@ void vtk_HDF_read_dataset (const char* dataset_name,
  * @brief Read dataset
  *
  * @param dataset_name The name of the dataset
- * @param data Pointer to the array of data
  * @param dtype_id The HDF5 datatype ID
  * @param group_id The HDF5 group to write the data in
  * @param rank The rank of the dataset (e.g. the size of the dims array)

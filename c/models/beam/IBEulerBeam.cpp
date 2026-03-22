@@ -9,27 +9,53 @@ using namespace ELFF;
 extern "C"
 {
 
-  ib_beam_t ib_beam_new(double length,
+  ib_beam_t ib_beam_new(vertex_t s0,
+                        int bc_type_1,
+                        int bc_type_2,
+                        double length,
                         double EI,
                         double mu,
                         int nodes,
                         double r_penalty)
   {
+    EulerBeamMesh ic_mesh(nodes, length);
+
+    std::vector<std::array<real_t, 3>>& ic_centerline =
+      ic_mesh.get_centerline();
+    std::vector<std::array<real_t, 3>>& ic_slope = ic_mesh.get_slope();
+    std::vector<std::array<real_t, 3>>& ic_velocity =
+      ic_mesh.get_centerline_velocity();
+    std::vector<real_t>& ic_s = ic_mesh.get_curvilinear_axis();
+
+    for (size_t ni = 0; ni < nodes; ++ni) {
+      real_t s = ic_s[ni];
+      ic_centerline[ni][0] += s0.x;
+      ic_centerline[ni][1] += s0.y;
+      ic_centerline[ni][2] += s0.z;
+    }
 
     EulerBeam::EulerBeamBCs bcs = {
       .end = { EulerBeam::left, EulerBeam::right },
-      .type = { EulerBeam::simple_bc, EulerBeam::free_bc }
+      .type = { (EulerBeam::EulerBeamBCType)bc_type_1,
+                (EulerBeam::EulerBeamBCType)bc_type_2 }
     };
 
-    return new IBEulerBeam(static_cast<real_t>(length),
-                           static_cast<real_t>(EI),
-                           static_cast<real_t>(mu),
-                           static_cast<size_t>(nodes),
-                           bcs,
-                           static_cast<real_t>(r_penalty));
+    IBEulerBeam* beam = new IBEulerBeam(static_cast<real_t>(length),
+                                        static_cast<real_t>(EI),
+                                        static_cast<real_t>(mu),
+                                        static_cast<size_t>(nodes),
+                                        bcs,
+                                        static_cast<real_t>(r_penalty));
+
+    beam->apply_initial_condition(ic_mesh);
+
+    return beam;
   }
 
-  ib_beam_t ib_beam_new_theta(double length,
+  ib_beam_t ib_beam_new_theta(vertex_t s0,
+                              int bc_type_1,
+                              int bc_type_2,
+                              double length,
                               double EI,
                               double mu,
                               int nodes,
@@ -37,7 +63,7 @@ extern "C"
                               double theta)
   {
 
-    real_t x0 = 0, y0 = 0;
+    real_t x0 = s0.x, y0 = s0.y, z0 = s0.z;
 
     EulerBeamMesh ic_mesh(nodes, length);
 
@@ -53,7 +79,7 @@ extern "C"
 
       ic_centerline[ni][0] = x0 + (length - s) * std::cos(theta);
       ic_centerline[ni][1] = y0 + (length - s) * std::sin(theta);
-      ic_centerline[ni][2] = 0.;
+      ic_centerline[ni][2] = z0;
 
       // Tangent dX/ds:
       ic_slope[ni][0] = -std::cos(theta);
@@ -68,10 +94,7 @@ extern "C"
     EulerBeam::EulerBeamBCs boundary_conditions = {
       .end = { EulerBeam::left, EulerBeam::right },
       .type = { EulerBeam::free_bc, EulerBeam::simple_bc },
-      .vals = { {
-                  .position = { 0, 0, 0 },
-                },
-                {} }
+      .vals = { { .position = {} }, {.position = {x0,y0,z0}} }
     };
 
     IBEulerBeam* beam = new IBEulerBeam(static_cast<real_t>(length),

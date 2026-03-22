@@ -22,6 +22,38 @@ int ib_runtime_register(ib_runtime_t runtime, ib_model_t model)
   return rt->register_model(*m);
 }
 
+int ib_runtime_deregister(ib_runtime_t runtime, ib_model_t model)
+{
+  if (!runtime || !model)
+    return -1;
+
+  auto* rt = reinterpret_cast<IBRuntime*>(runtime);
+  auto* m = reinterpret_cast<IBModel*>(model);
+  return rt->deregister_model(*m);
+}
+
+int ib_runtime_set_pid(ib_runtime_t runtime, ib_model_t model, int pid)
+{
+  if (!runtime || !model)
+    return -1;
+
+  auto* rt = reinterpret_cast<IBRuntime*>(runtime);
+  auto* m = reinterpret_cast<IBModel*>(model);
+  return rt->set_model_pid(*m, pid);
+}
+
+#ifdef ELFF_USE_MPI
+int ib_runtime_set_communicator(ib_runtime_t runtime, MPI_Comm comm)
+{
+  if (!runtime)
+    return -1;
+
+  auto* rt = reinterpret_cast<IBRuntime*>(runtime);
+  rt->set_communicator(comm);
+  return 0;
+}
+#endif
+
 int ib_runtime_checkpoint(ib_runtime_t runtime, const char* fname)
 {
   if (!runtime || !fname)

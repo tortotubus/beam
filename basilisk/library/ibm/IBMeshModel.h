@@ -1,10 +1,6 @@
 #pragma once
 
-// #include "library/ibm/IBMesh.h"
 
-/**
- * @enum IBMeshModelType;
- */
 enum {
   IB_MODEL_INVALID = -1,
   IB_MODEL_NONE = 0,
@@ -16,7 +12,7 @@ enum {
 /**
  * @struct IBVelocityCoupledModelOps
  *
- * @note \c mesh arguments are really supposed to be IBMesh type. However, qcc
+ * @note @c mesh arguments are really supposed to be IBMesh type. However, qcc
  * does not play nice with forward declaration of struct. In the function it
  * points to, implememters should treat and cast mesh to IBMesh
  */

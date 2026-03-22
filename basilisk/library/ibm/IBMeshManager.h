@@ -15,6 +15,9 @@
  * Type definitions
  */
 
+/**
+ * @struct IBMeshManager
+ */
 typedef struct {
   IBMesh* meshes;
   IBMempool pool;
@@ -32,12 +35,15 @@ typedef struct {
 #endif
 } IBMeshManager;
 
-/**
- * Globals
- */
+// ============================================================================
+// Globals
+// ============================================================================
+
 IBMeshManager ibmm = {0};
 
-/* Function declarations */
+// ============================================================================
+// Function declarations
+// ============================================================================
 
 void ibmeshmanager_init (int mesh_count);
 void ibmeshmanager_free ();
@@ -53,15 +59,15 @@ void ibmeshmanager_update_pid ();
 void ibmeshmanager_boundary (IBscalar* list = iball);
 #endif
 
-/**
- * Macros
- */
+// ============================================================================
+// Macros
+// ============================================================================
 
 #define IBMESHMANAGER_POOL_SIZE_BYTES (1 << 19)
 
 /**
+ * @def foreach_ibmesh
  * @brief Loops through all meshes
- *
  * @relates IBMeshManager
  */
 macro foreach_ibmesh () {
@@ -75,8 +81,8 @@ macro foreach_ibmesh () {
 }
 
 /**
+ * @def foreach_ibnode
  * @brief Loops through all nodes in the node pool
- *
  * @relates IBMeshManager
  */
 macro foreach_ibnode (bool local_only = false) {
@@ -121,8 +127,8 @@ macro foreach_ibnode (bool local_only = false) {
 }
 
 /**
+ * @def foreach_ibnode_per_ibmesh
  * @brief Loops through all nodes of all meshes
- *
  * @relates IBMeshManager
  */
 macro foreach_ibnode_per_ibmesh () {
@@ -152,9 +158,7 @@ macro foreach_ibnode_per_ibmesh () {
 
 /**
  * @brief Initialize the immersed boundary mesh manager
- *
- * @param nm The number of meshes you plan to have
- *
+ * @param mesh_count The number of meshes you plan to have
  * @relates IBMeshManager
  */
 void ibmeshmanager_init (int mesh_count) {
@@ -217,7 +221,6 @@ void ibmeshmanager_init (int mesh_count) {
 
 /**
  * @brief Free all members in the immersed boundary mesh manager.
- *
  * @relates IBMeshManager
  */
 void ibmeshmanager_free () {
@@ -251,7 +254,6 @@ void ibmeshmanager_free () {
 
 /**
  * @brief Creates a new mesh returning the index
- *
  * @relates IBMeshManager
  */
 int ibmeshmanager_add_mesh () {
@@ -266,7 +268,6 @@ int ibmeshmanager_add_mesh () {
 /**
  * @brief Deletes the mesh from the manager, freeing the mesh object, and
  * marking as free its nodes in the pool.
- *
  * @relates IBMeshManager
  */
 void ibmeshmanager_delete_mesh (int mesh_id) {
@@ -283,25 +284,7 @@ void ibmeshmanager_delete_mesh (int mesh_id) {
 }
 
 /**
- * @brief Deletes the mesh from the manager, freeing the mesh object, and
- * marking as free its nodes in the pool.
- *
- * @relates IBMeshManager
- */
-// void ibmeshmanager_delete_all_meshes () {
-//   IBMempool* pool = &ibmm.pool;
-//   foreach_ibmesh (ibmm) {
-//     ibmesh_free (mesh);
-//   }
-//   free (ibmm.meshes);
-//   ibmempool_free (&ibmm.pool);
-//   ibmm.meshes = NULL;
-//   ibmm.nm = 0;
-// }
-
-/**
  * @brief Bulk adds nodes to a given mesh
- *
  * @relates IBMeshManager
  */
 void ibmeshmanager_add_nodes (int mesh_id, int count) {
@@ -313,7 +296,6 @@ void ibmeshmanager_add_nodes (int mesh_id, int count) {
 
 /**
  * @brief Deletes all nodes of a given mesh
- *
  * @relates IBMeshManager
  */
 void ibmeshmanager_delete_all_nodes (int mesh_id) {
@@ -324,7 +306,6 @@ void ibmeshmanager_delete_all_nodes (int mesh_id) {
 
 /**
  * @brief Set the mesh model
- *
  * @relates IBMeshManager
  */
 void ibmeshmanager_set_model (int mesh_id, IBMeshModel model) {
@@ -335,7 +316,6 @@ void ibmeshmanager_set_model (int mesh_id, IBMeshModel model) {
 
 /**
  * @brief
- *
  * @relates IBMeshManager
  */
 void ibmeshmanager_advance_positions (double dt) {

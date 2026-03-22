@@ -10,7 +10,7 @@
 #include <mpi.h>
 
 namespace ELFF {
-namespace io {
+namespace IO {
 namespace C {
 
 /**
@@ -418,5 +418,5 @@ vtk_HDF_collective_write_compressed_dataset(const char* dataset_name,
                                             unsigned int compression_level,
                                             vtkHDF* vtk_hdf);
 } // namespace C
-} // namespace io
+} // namespace IO
 } // namespace ELFF

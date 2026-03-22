@@ -57,6 +57,7 @@ static inline size_t ibmempool_stride (const IBMempool* ibmp)
  * @brief Initialize an IBMempool with a specified pool size and initial capacity.
  *
  * @param pool_bytes Total size in bytes for the memory pool.
+ * @param datasize Total size in bytes of the data
  *
  * @return An initialized IBMempool structure.
  *
@@ -81,7 +82,7 @@ IBMempool ibmempool_init (size_t pool_bytes, size_t datasize) {
 /**
  * @brief Destroy an IBMempool and free all associated resources.
  *
- * @param mp Pointer to the IBMempool to destroy. Must not be NULL.
+ * @param ibmp Pointer to the IBMempool to destroy. Must not be NULL.
  *
  * @details Deallocates the active nodes list and destroys the underlying memory pool.
  * Resets all pointers to NULL and counts to 0. Does not free individual IBNode objects
