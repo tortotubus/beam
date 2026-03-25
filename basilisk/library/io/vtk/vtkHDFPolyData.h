@@ -249,7 +249,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
 
     hsize_t dataset_local_dims[] = {1};
     hsize_t dataset_global_dims[] = {npe()};
-    hsize_t dataset_offset[] = {pid()};
+    hsize_t dataset_offset[] = {(hsize_t) pid()};
     const char* dataset_name = "NumberOfPoints";
     hid_t dataset_datatype = H5T_STD_I64LE;
     hid_t dataset_group = vtk_hdf_pd.vtk_hdf.grp_vtkhdf_id;
@@ -367,7 +367,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
       hid_t dataset_datatype = H5T_STD_I64LE;
       hid_t dataset_group = vtk_hdf_pd.grp_lines_id;
       const int dataset_rank = 1;
-      hid_t dataset_offset[] = {pid ()};
+      hsize_t dataset_offset[] = {(hsize_t) pid ()};
 
       vtk_HDF_collective_write_dataset (dataset_name,
                                         dataset_data,
@@ -409,7 +409,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
       hid_t dataset_datatype = H5T_STD_I64LE;
       hid_t dataset_group = vtk_hdf_pd.grp_lines_id;
       const int dataset_rank = 1;
-      hid_t dataset_offset[] = {pid ()};
+      hsize_t dataset_offset[] = {(hsize_t) pid ()};
 
       vtk_HDF_collective_write_dataset (dataset_name,
                                         dataset_data,
@@ -583,7 +583,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
       hid_t dataset_datatype = H5T_STD_I64LE;
       hid_t dataset_group = vtk_hdf_pd.grp_polygons_id;
       const int dataset_rank = 1;
-      hid_t dataset_offset[] = {pid ()};
+      hsize_t dataset_offset[] = {(hsize_t) pid ()};
 
       vtk_HDF_collective_write_dataset (dataset_name,
                                         dataset_data,
@@ -625,7 +625,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
       hid_t dataset_datatype = H5T_STD_I64LE;
       hid_t dataset_group = vtk_hdf_pd.grp_polygons_id;
       const int dataset_rank = 1;
-      hid_t dataset_offset[] = {pid ()};
+      hsize_t dataset_offset[] = {(hsize_t) pid ()};
 
       vtk_HDF_collective_write_dataset (dataset_name,
                                         dataset_data,
@@ -800,7 +800,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
       hid_t dataset_datatype = H5T_STD_I64LE;
       hid_t dataset_group = vtk_hdf_pd.grp_strips_id;
       const int dataset_rank = 1;
-      hid_t dataset_offset[] = {pid ()};
+      hsize_t dataset_offset[] = {(hsize_t) pid ()};
 
       vtk_HDF_collective_write_dataset (dataset_name,
                                         dataset_data,
@@ -842,7 +842,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
       hid_t dataset_datatype = H5T_STD_I64LE;
       hid_t dataset_group = vtk_hdf_pd.grp_strips_id;
       const int dataset_rank = 1;
-      hid_t dataset_offset[] = {pid ()};
+      hsize_t dataset_offset[] = {(hsize_t) pid ()};
 
       vtk_HDF_collective_write_dataset (dataset_name,
                                         dataset_data,
@@ -1016,7 +1016,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
       hid_t dataset_datatype = H5T_STD_I64LE;
       hid_t dataset_group = vtk_hdf_pd.grp_vertices_id;
       const int dataset_rank = 1;
-      hid_t dataset_offset[] = {pid ()};
+      hsize_t dataset_offset[] = {(hsize_t) pid ()};
 
       vtk_HDF_collective_write_dataset (dataset_name,
                                         dataset_data,
@@ -1058,7 +1058,7 @@ vtkHDFPolyData vtk_HDF_polydata_init_static (const char* fname,
       hid_t dataset_datatype = H5T_STD_I64LE;
       hid_t dataset_group = vtk_hdf_pd.grp_vertices_id;
       const int dataset_rank = 1;
-      hid_t dataset_offset[] = {pid ()};
+      hsize_t dataset_offset[] = {(hsize_t) pid ()};
 
       vtk_HDF_collective_write_dataset (dataset_name,
                                         dataset_data,

@@ -305,9 +305,9 @@ size_t vtk_polydata_number_of_polygons (vtkPolyData* pd) {
  * @memberof vtkPolyData
  */
 void vtk_polydata_free_points (vtkPolyData* pd) {
-  if (pd->points != nullptr) {
+  if (pd->points != NULL) {
     free (pd->points);
-    pd->points = nullptr;
+    pd->points = NULL;
     pd->n_points = 0;
     pd->m_points = 0;
   }
@@ -328,14 +328,14 @@ void vtk_polydata_malloc_points (vtkPolyData* pd, size_t n) {
  * @memberof vtkPolyData
  */
 void vtk_polydata_free_vertices (vtkPolyData* pd) {
-  if (pd->vertices_connectivity != nullptr) {
+  if (pd->vertices_connectivity != NULL) {
     free (pd->vertices_connectivity);
-    pd->vertices_connectivity = nullptr;
+    pd->vertices_connectivity = NULL;
     pd->n_vertices_connectivity = 0;
     pd->m_vertices_connectivity = 0;
 
     free (pd->vertices_offsets);
-    pd->vertices_offsets = nullptr;
+    pd->vertices_offsets = NULL;
     pd->n_vertices_offsets = 0;
     pd->m_vertices_offsets = 0;
   }
@@ -363,14 +363,14 @@ void vtk_polydata_malloc_vertices (vtkPolyData* pd, size_t n) {
  * @memberof vtkPolyData
  */
 void vtk_polydata_free_lines (vtkPolyData* pd) {
-  if (pd->lines_connectivity != nullptr) {
+  if (pd->lines_connectivity != NULL) {
     free (pd->lines_connectivity);
-    pd->lines_connectivity = nullptr;
+    pd->lines_connectivity = NULL;
     pd->m_lines_connectivity = 0;
     pd->n_lines_connectivity = 0;
 
     free (pd->lines_offsets);
-    pd->lines_offsets = nullptr;
+    pd->lines_offsets = NULL;
     pd->m_lines_offsets = 0;
     pd->n_lines_offsets = 0;
   }
@@ -397,14 +397,14 @@ void vtk_polydata_malloc_lines (vtkPolyData* pd, size_t n) {
  * @memberof vtkPolyData
  */
 void vtk_polydata_free_strips (vtkPolyData* pd) {
-  if (pd->strips_connectivity != nullptr) {
+  if (pd->strips_connectivity != NULL) {
     free (pd->strips_connectivity);
-    pd->strips_connectivity = nullptr;
+    pd->strips_connectivity = NULL;
     pd->m_strips_connectivity = 0;
     pd->n_strips_connectivity = 0;
 
     free (pd->strips_offsets);
-    pd->strips_offsets = nullptr;
+    pd->strips_offsets = NULL;
     pd->m_strips_offsets = 0;
     pd->n_strips_offsets = 0;
   }
@@ -432,14 +432,14 @@ void vtk_polydata_malloc_strips (vtkPolyData* pd, size_t n) {
  * @memberof vtkPolyData
  */
 void vtk_polydata_free_polygons (vtkPolyData* pd) {
-  if (pd->polygons_connectivity != nullptr) {
+  if (pd->polygons_connectivity != NULL) {
     free (pd->polygons_connectivity);
-    pd->polygons_connectivity = nullptr;
+    pd->polygons_connectivity = NULL;
     pd->m_polygons_connectivity = 0;
     pd->n_polygons_connectivity = 0;
 
     free (pd->polygons_offsets);
-    pd->polygons_offsets = nullptr;
+    pd->polygons_offsets = NULL;
     pd->m_polygons_offsets = 0;
     pd->n_polygons_offsets = 0;
   }
