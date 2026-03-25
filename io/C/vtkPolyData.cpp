@@ -1,6 +1,8 @@
 #include "elff/io/C/vtkPolyData.hpp"
 
+#include <cassert>
 #include <cstdlib>
+#include <cstring>
 
 namespace ELFF {
 namespace IO {
@@ -16,6 +18,12 @@ bool
 vtk_polydata_connectivity_is_sealed(vtkPolyData* pd)
 {
   return pd->connectivity_state == SEALED;
+}
+
+bool
+vtk_polydata_data_is_sealed(vtkPolyData* pd)
+{
+  return pd->fields_state == SEALED;
 }
 
 bool
@@ -38,6 +46,16 @@ vtk_polydata_on_add_connectivity(vtkPolyData* pd)
   pd->points_state = SEALED;
 
   if (vtk_polydata_connectivity_is_sealed(pd)) {
+    abort();
+  }
+}
+
+void
+vtk_polydata_on_add_data(vtkPolyData* pd)
+{
+  pd->connectivity_state = SEALED;
+
+  if (vtk_polydata_data_is_sealed(pd)) {
     abort();
   }
 }
@@ -72,6 +90,15 @@ vtk_polydata_number_of_polygons(vtkPolyData* pd)
   return pd->n_polygons_offsets - 1;
 }
 
+size_t
+vtk_polydata_number_of_cells(vtkPolyData* pd)
+{
+  return vtk_polydata_number_of_vertices(pd) +
+         vtk_polydata_number_of_lines(pd) +
+         vtk_polydata_number_of_polygons(pd) +
+         vtk_polydata_number_of_strips(pd);
+}
+
 void
 vtk_polydata_free_points(vtkPolyData* pd)
 {
@@ -90,7 +117,7 @@ vtk_polydata_malloc_points(vtkPolyData* pd, size_t n)
 
   pd->m_points = n;
   pd->n_points = 0;
-  pd->points = (float*)malloc(sizeof(float) * pd->m_points * 3);
+  pd->points = static_cast<float*>(malloc(sizeof(float) * pd->m_points * 3));
 }
 
 void
@@ -116,13 +143,13 @@ vtk_polydata_malloc_vertices(vtkPolyData* pd, size_t n)
 
   pd->m_vertices_connectivity = n;
   pd->n_vertices_connectivity = 0;
-  pd->vertices_connectivity =
-    (int64_t*)malloc(sizeof(int64_t) * pd->m_vertices_connectivity);
+  pd->vertices_connectivity = static_cast<int64_t*>(
+    malloc(sizeof(int64_t) * pd->m_vertices_connectivity));
 
   pd->m_vertices_offsets = n + 1;
   pd->n_vertices_offsets = 1;
   pd->vertices_offsets =
-    (int64_t*)malloc(sizeof(int64_t) * pd->m_vertices_offsets);
+    static_cast<int64_t*>(malloc(sizeof(int64_t) * pd->m_vertices_offsets));
   pd->vertices_offsets[0] = 0;
 }
 
@@ -150,11 +177,12 @@ vtk_polydata_malloc_lines(vtkPolyData* pd, size_t n)
   pd->m_lines_connectivity = n;
   pd->n_lines_connectivity = 0;
   pd->lines_connectivity =
-    (int64_t*)malloc(sizeof(int64_t) * pd->m_lines_connectivity);
+    static_cast<int64_t*>(malloc(sizeof(int64_t) * pd->m_lines_connectivity));
 
   pd->m_lines_offsets = n + 1;
   pd->n_lines_offsets = 1;
-  pd->lines_offsets = (int64_t*)malloc(sizeof(int64_t) * pd->m_lines_offsets);
+  pd->lines_offsets =
+    static_cast<int64_t*>(malloc(sizeof(int64_t) * pd->m_lines_offsets));
   pd->lines_offsets[0] = 0;
 }
 
@@ -181,12 +209,13 @@ vtk_polydata_malloc_strips(vtkPolyData* pd, size_t n)
 
   pd->m_strips_connectivity = n;
   pd->n_strips_connectivity = 0;
-  pd->strips_connectivity =
-    (int64_t*)malloc(sizeof(int64_t) * pd->m_strips_connectivity);
+  pd->strips_connectivity = static_cast<int64_t*>(
+    malloc(sizeof(int64_t) * pd->m_strips_connectivity));
 
   pd->m_strips_offsets = n + 1;
   pd->n_strips_offsets = 1;
-  pd->strips_offsets = (int64_t*)malloc(sizeof(int64_t) * pd->m_strips_offsets);
+  pd->strips_offsets =
+    static_cast<int64_t*>(malloc(sizeof(int64_t) * pd->m_strips_offsets));
   pd->strips_offsets[0] = 0;
 }
 
@@ -213,20 +242,19 @@ vtk_polydata_malloc_polygons(vtkPolyData* pd, size_t n)
 
   pd->m_polygons_connectivity = n;
   pd->n_polygons_connectivity = 0;
-  pd->polygons_connectivity =
-    (int64_t*)malloc(sizeof(int64_t) * pd->m_polygons_connectivity);
+  pd->polygons_connectivity = static_cast<int64_t*>(
+    malloc(sizeof(int64_t) * pd->m_polygons_connectivity));
 
   pd->m_polygons_offsets = n + 1;
   pd->n_polygons_offsets = 1;
   pd->polygons_offsets =
-    (int64_t*)malloc(sizeof(int64_t) * pd->m_polygons_offsets);
+    static_cast<int64_t*>(malloc(sizeof(int64_t) * pd->m_polygons_offsets));
   pd->polygons_offsets[0] = 0;
 }
 
 int64_t
 vtk_polydata_add_point(vtkPolyData* pd, float x, float y, float z)
 {
-
   vtk_polydata_on_add_points(pd);
 
   pd->points[(pd->n_points * 3) + 0] = x;
@@ -241,7 +269,6 @@ vtk_polydata_add_point(vtkPolyData* pd, float x, float y, float z)
 int64_t
 vtk_polydata_add_vertex(vtkPolyData* pd, int64_t vertex_point)
 {
-
   vtk_polydata_on_add_connectivity(pd);
 
   if (!vtk_polydata_point_exists(pd, vertex_point)) {
@@ -262,7 +289,6 @@ vtk_polydata_add_line(vtkPolyData* pd,
                       int64_t line_point_1,
                       int64_t line_point_2)
 {
-
   vtk_polydata_on_add_connectivity(pd);
 
   if (!vtk_polydata_point_exists(pd, line_point_1) ||
@@ -282,12 +308,149 @@ vtk_polydata_add_line(vtkPolyData* pd,
   return vtk_polydata_number_of_lines(pd) - 1;
 }
 
+int64_t
+vtk_polydata_add_pointdata_scalar(vtkPolyData* pd, const char* name)
+{
+  vtk_polydata_on_add_data(pd);
+
+  int64_t id = vtk_polydata_malloc_pointdata_scalar(pd);
+
+  vtk_polydata_validate_name(pd, name);
+
+  pd->pointdata_names[id] = static_cast<char*>(malloc(sizeof(char) * strlen(name) + 1));
+  strcpy(pd->pointdata_names[id], name);
+
+  return id;
+}
+
+double*
+vtk_polydata_get_pointdata(vtkPolyData* pd, int64_t field)
+{
+  return vtk_polydata_get_pointdata_data(pd, field);
+}
+
+double*
+vtk_polydata_get_pointdata_data(vtkPolyData* pd, int64_t field)
+{
+  size_t id = static_cast<size_t>(field);
+
+  assert(id < pd->n_pointdata);
+  assert(pd->pointdata_data[id] != nullptr);
+
+  return pd->pointdata_data[id];
+}
+
+int64_t
+vtk_polydata_add_pointdata_vector(vtkPolyData* pd,
+                                  const char* name,
+                                  size_t ncomp)
+{
+  vtk_polydata_on_add_data(pd);
+
+  int64_t id = vtk_polydata_malloc_pointdata_vector(pd, ncomp);
+
+  vtk_polydata_validate_name(pd, name);
+
+  pd->pointdata_names[id] = static_cast<char*>(malloc(sizeof(char) * strlen(name) + 1));
+  strcpy(pd->pointdata_names[id], name);
+
+  return id;
+}
+
+void
+vtk_polydata_malloc_pointdata(vtkPolyData* pd, size_t n)
+{
+  vtk_polydata_free_pointdata(pd);
+
+  pd->m_pointdata = n;
+  pd->n_pointdata = 0;
+
+  pd->pointdata_data = static_cast<double**>(calloc(pd->m_pointdata, sizeof(double*)));
+  pd->pointdata_names = static_cast<char**>(calloc(pd->m_pointdata, sizeof(char*)));
+  pd->pointdata_ncomp = static_cast<size_t*>(calloc(pd->m_pointdata, sizeof(size_t)));
+}
+
+void
+vtk_polydata_free_pointdata(vtkPolyData* pd)
+{
+  for (size_t i = 0; i < pd->n_pointdata; i++) {
+    vtk_polydata_free_pointdata_field(pd, static_cast<int64_t>(i));
+  }
+
+  free(pd->pointdata_data);
+  pd->pointdata_data = nullptr;
+  free(pd->pointdata_names);
+  pd->pointdata_names = nullptr;
+  free(pd->pointdata_ncomp);
+  pd->pointdata_ncomp = nullptr;
+
+  pd->m_pointdata = 0;
+  pd->n_pointdata = 0;
+}
+
+int64_t
+vtk_polydata_malloc_pointdata_scalar(vtkPolyData* pd)
+{
+  assert(pd->n_pointdata < pd->m_pointdata);
+
+  size_t id = pd->n_pointdata;
+  pd->n_pointdata++;
+
+  pd->pointdata_ncomp[id] = 1;
+  pd->pointdata_data[id] =
+    static_cast<double*>(calloc(pd->n_points, sizeof(double)));
+
+  return static_cast<int64_t>(id);
+}
+
+int64_t
+vtk_polydata_malloc_pointdata_vector(vtkPolyData* pd, size_t ncomp)
+{
+  assert(pd->n_pointdata < pd->m_pointdata);
+  assert(ncomp > 0);
+
+  size_t id = pd->n_pointdata;
+  pd->n_pointdata++;
+
+  pd->pointdata_ncomp[id] = ncomp;
+  pd->pointdata_data[id] = static_cast<double*>(
+    calloc(pd->n_points * pd->pointdata_ncomp[id], sizeof(double)));
+
+  return static_cast<int64_t>(id);
+}
+
+void
+vtk_polydata_free_pointdata_field(vtkPolyData* pd, int64_t field)
+{
+  size_t id = static_cast<size_t>(field);
+  assert(id < pd->n_pointdata);
+
+  pd->pointdata_ncomp[id] = 0;
+
+  free(pd->pointdata_names[id]);
+  pd->pointdata_names[id] = nullptr;
+
+  free(pd->pointdata_data[id]);
+  pd->pointdata_data[id] = nullptr;
+}
+
+void
+vtk_polydata_validate_name(vtkPolyData* pd, const char* name)
+{
+  (void)pd;
+  (void)name;
+
+  return;
+}
+
 vtkPolyData
 vtk_polydata_init(size_t n_points,
                   size_t n_vertices,
                   size_t n_lines,
                   size_t n_strips,
-                  size_t n_polygons)
+                  size_t n_polygons,
+                  size_t n_pointdata,
+                  size_t n_celldata)
 {
   vtkPolyData pd = { .points_state = BUILDING,
                      .points = nullptr,
@@ -318,13 +481,25 @@ vtk_polydata_init(size_t n_points,
                      .polygons_offsets = nullptr,
                      .n_polygons_offsets = 0,
                      .m_polygons_offsets = 0,
-                     .fields_state = BUILDING };
+                     .fields_state = BUILDING,
+                     .n_pointdata = 0,
+                     .m_pointdata = 0,
+                     .pointdata_names = nullptr,
+                     .pointdata_ncomp = nullptr,
+                     .pointdata_data = nullptr,
+                     .n_celldata = 0,
+                     .m_celldata = 0,
+                     .celldata_names = nullptr,
+                     .celldata_ncomp = nullptr,
+                     .celldata_data = nullptr };
 
   vtk_polydata_malloc_points(&pd, n_points);
   vtk_polydata_malloc_vertices(&pd, n_vertices);
   vtk_polydata_malloc_lines(&pd, n_lines);
   vtk_polydata_malloc_strips(&pd, n_strips);
   vtk_polydata_malloc_polygons(&pd, n_polygons);
+  vtk_polydata_malloc_pointdata(&pd, n_pointdata);
+  vtk_polydata_malloc_celldata(&pd, n_celldata);
 
   return pd;
 }
@@ -337,6 +512,140 @@ vtk_polydata_free(vtkPolyData* pd)
   vtk_polydata_free_lines(pd);
   vtk_polydata_free_strips(pd);
   vtk_polydata_free_polygons(pd);
+  vtk_polydata_free_pointdata(pd);
+  vtk_polydata_free_celldata(pd);
+}
+
+int64_t
+vtk_polydata_add_celldata_scalar(vtkPolyData* pd, const char* name)
+{
+  vtk_polydata_on_add_data(pd);
+
+  int64_t id = vtk_polydata_malloc_celldata_scalar(pd);
+
+  vtk_polydata_validate_name(pd, name);
+
+  pd->celldata_names[id] =
+    static_cast<char*>(malloc(sizeof(char) * strlen(name) + 1));
+  strcpy(pd->celldata_names[id], name);
+
+  return id;
+}
+
+double*
+vtk_polydata_get_celldata(vtkPolyData* pd, int64_t field)
+{
+  return vtk_polydata_get_celldata_data(pd, field);
+}
+
+double*
+vtk_polydata_get_celldata_data(vtkPolyData* pd, int64_t field)
+{
+  size_t id = static_cast<size_t>(field);
+
+  assert(id < pd->n_celldata);
+  assert(pd->celldata_data[id] != nullptr);
+
+  return pd->celldata_data[id];
+}
+
+int64_t
+vtk_polydata_add_celldata_vector(vtkPolyData* pd,
+                                 const char* name,
+                                 size_t ncomp)
+{
+  vtk_polydata_on_add_data(pd);
+
+  int64_t id = vtk_polydata_malloc_celldata_vector(pd, ncomp);
+
+  vtk_polydata_validate_name(pd, name);
+
+  pd->celldata_names[id] =
+    static_cast<char*>(malloc(sizeof(char) * strlen(name) + 1));
+  strcpy(pd->celldata_names[id], name);
+
+  return id;
+}
+
+void
+vtk_polydata_malloc_celldata(vtkPolyData* pd, size_t n)
+{
+  vtk_polydata_free_celldata(pd);
+
+  pd->m_celldata = n;
+  pd->n_celldata = 0;
+
+  pd->celldata_data =
+    static_cast<double**>(calloc(pd->m_celldata, sizeof(double*)));
+  pd->celldata_names =
+    static_cast<char**>(calloc(pd->m_celldata, sizeof(char*)));
+  pd->celldata_ncomp =
+    static_cast<size_t*>(calloc(pd->m_celldata, sizeof(size_t)));
+}
+
+void
+vtk_polydata_free_celldata(vtkPolyData* pd)
+{
+  for (size_t i = 0; i < pd->n_celldata; i++) {
+    vtk_polydata_free_celldata_field(pd, static_cast<int64_t>(i));
+  }
+
+  free(pd->celldata_data);
+  pd->celldata_data = nullptr;
+  free(pd->celldata_names);
+  pd->celldata_names = nullptr;
+  free(pd->celldata_ncomp);
+  pd->celldata_ncomp = nullptr;
+
+  pd->m_celldata = 0;
+  pd->n_celldata = 0;
+}
+
+int64_t
+vtk_polydata_malloc_celldata_scalar(vtkPolyData* pd)
+{
+  assert(pd->n_celldata < pd->m_celldata);
+
+  size_t id = pd->n_celldata;
+  pd->n_celldata++;
+
+  pd->celldata_ncomp[id] = 1;
+  pd->celldata_data[id] = static_cast<double*>(
+    calloc(vtk_polydata_number_of_cells(pd), sizeof(double)));
+
+  return static_cast<int64_t>(id);
+}
+
+int64_t
+vtk_polydata_malloc_celldata_vector(vtkPolyData* pd, size_t ncomp)
+{
+  assert(pd->n_celldata < pd->m_celldata);
+  assert(ncomp > 0);
+
+  size_t id = pd->n_celldata;
+  pd->n_celldata++;
+
+  pd->celldata_ncomp[id] = ncomp;
+  pd->celldata_data[id] = static_cast<double*>(
+    calloc(vtk_polydata_number_of_cells(pd) * pd->celldata_ncomp[id],
+           sizeof(double)));
+
+  return static_cast<int64_t>(id);
+}
+
+void
+vtk_polydata_free_celldata_field(vtkPolyData* pd, int64_t field)
+{
+  size_t id = static_cast<size_t>(field);
+  assert(id < pd->n_celldata);
+
+  pd->celldata_ncomp[id] = 0;
+
+  free(pd->celldata_names[id]);
+  pd->celldata_names[id] = nullptr;
+
+  free(pd->celldata_data[id]);
+  pd->celldata_data[id] = nullptr;
 }
 
 } // namespace C

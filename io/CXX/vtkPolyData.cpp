@@ -10,7 +10,6 @@ namespace CXX {
 C::vtkPolyData
 vtkPolyData::to_c_struct()
 {
-
   // Points:
   const size_t points_size = this->points.size();
   const size_t n_points = this->number_of_points();
@@ -153,6 +152,48 @@ vtkPolyData::to_c_struct()
                 n_polygons_offsets * sizeof(int64_t));
   }
 
+  const size_t n_pointdata = pointdata_data.size();
+
+  char** pointdata_names = static_cast<char**>(
+    std::calloc(n_pointdata, sizeof(char*)));
+  size_t* pointdata_ncomp = static_cast<size_t*>(
+    std::calloc(n_pointdata, sizeof(size_t)));
+  double** pointdata_data = static_cast<double**>(
+    std::calloc(n_pointdata, sizeof(double*)));
+
+  if ((n_pointdata > 0) &&
+      ((pointdata_names == nullptr) || (pointdata_ncomp == nullptr) ||
+       (pointdata_data == nullptr))) {
+    ELFF_ABORT("malloc failure for pointdata\n");
+  }
+
+  for (size_t i = 0; i < n_pointdata; ++i) {
+    const std::string& field_name = this->pointdata_names[i];
+    pointdata_names[i] = static_cast<char*>(
+      std::malloc((field_name.size() + 1) * sizeof(char)));
+
+    if (!pointdata_names[i]) {
+      ELFF_ABORT("malloc failure for pointdata_names[i]\n");
+    }
+
+    std::memcpy(pointdata_names[i], field_name.c_str(), field_name.size() + 1);
+    pointdata_ncomp[i] = this->pointdata_ncomp[i];
+
+    const size_t field_size = this->pointdata_data[i].size();
+    pointdata_data[i] = static_cast<double*>(
+      std::malloc(field_size * sizeof(double)));
+
+    if ((field_size > 0) && !pointdata_data[i]) {
+      ELFF_ABORT("malloc failure for pointdata_data[i]\n");
+    }
+
+    if (field_size > 0) {
+      std::memcpy(pointdata_data[i],
+                  this->pointdata_data[i].data(),
+                  field_size * sizeof(double));
+    }
+  }
+
   // Create the struct
   C::vtkPolyData c_str = { .points_state = C::SEALED,
                            .points = points,
@@ -183,7 +224,17 @@ vtkPolyData::to_c_struct()
                            .polygons_offsets = polygons_offsets,
                            .n_polygons_offsets = n_polygons_offsets,
                            .m_polygons_offsets = n_polygons_offsets,
-                           .fields_state = C::SEALED };
+                           .fields_state = C::SEALED,
+                           .n_pointdata = n_pointdata,
+                           .m_pointdata = n_pointdata,
+                           .pointdata_names = pointdata_names,
+                           .pointdata_ncomp = pointdata_ncomp,
+                           .pointdata_data = pointdata_data,
+                           .n_celldata = 0,
+                           .m_celldata = 0,
+                           .celldata_names = nullptr,
+                           .celldata_ncomp = nullptr,
+                           .celldata_data = nullptr };
 
   return c_str;
 }
@@ -267,6 +318,12 @@ vtkPolyData::number_of_polygons() const
   return polygons_offsets.size() - 1;
 }
 
+const size_t
+vtkPolyData::number_of_pointdata() const
+{
+  return pointdata_data.size();
+}
+
 void
 vtkPolyData::reserve_points(size_t n)
 {
@@ -299,6 +356,65 @@ vtkPolyData::reserve_polygons(size_t n)
 {
   polygons_connectivity.reserve(n);
   polygons_offsets.reserve(n + 1);
+}
+
+int64_t
+vtkPolyData::add_pointdata_scalar(const std::string& name)
+{
+  return add_pointdata_vector(name, 1);
+}
+
+int64_t
+vtkPolyData::add_pointdata_vector(const std::string& name, size_t ncomp)
+{
+  on_add_field_data();
+
+  if (ncomp == 0) {
+    ELFF_ABORT("Point-data vector must have at least one component.\n");
+  }
+
+  pointdata_names.push_back(name);
+  pointdata_ncomp.push_back(ncomp);
+  pointdata_data.emplace_back(number_of_points() * ncomp, 0.);
+
+  return static_cast<int64_t>(pointdata_data.size() - 1);
+}
+
+std::vector<double>&
+vtkPolyData::get_pointdata(int64_t field)
+{
+  const size_t id = static_cast<size_t>(field);
+
+  if (id >= pointdata_data.size()) {
+    ELFF_ABORT("Point-data field does not exist.\n");
+  }
+
+  return pointdata_data[id];
+}
+
+void
+vtkPolyData::set_pointdata_vector3(int64_t field,
+                                   size_t point_id,
+                                   const std::array<double, 3>& value)
+{
+  const size_t id = static_cast<size_t>(field);
+
+  if (id >= pointdata_data.size()) {
+    ELFF_ABORT("Point-data field does not exist.\n");
+  }
+
+  if (pointdata_ncomp[id] != 3) {
+    ELFF_ABORT("Point-data field is not 3-component.\n");
+  }
+
+  if (point_id >= number_of_points()) {
+    ELFF_ABORT("Point-data point index out of range.\n");
+  }
+
+  auto& data = pointdata_data[id];
+  data[(point_id * 3) + 0] = value[0];
+  data[(point_id * 3) + 1] = value[1];
+  data[(point_id * 3) + 2] = value[2];
 }
 
 int64_t

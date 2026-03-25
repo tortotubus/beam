@@ -63,6 +63,17 @@ EulerBeamMesh::to_vtk_polydata()
   for (size_t i = 0; i < nodes - 1; i++)
     pd.add_line(i, i + 1);
 
+  const int64_t centerline_velocity_field =
+    pd.add_pointdata_vector("centerline_velocity", 3);
+
+  for (size_t i = 0; i < nodes; ++i) {
+    pd.set_pointdata_vector3(centerline_velocity_field,
+                             i,
+                             { static_cast<double>(centerline_velocity[i][0]),
+                               static_cast<double>(centerline_velocity[i][1]),
+                               static_cast<double>(centerline_velocity[i][2]) });
+  }
+
   return pd;
 }
 

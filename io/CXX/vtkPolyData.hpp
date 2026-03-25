@@ -5,6 +5,8 @@
 
 #include "elff/io/C/vtkPolyData.hpp"
 
+#include <array>
+#include <string>
 #include <vector>
 
 namespace ELFF {
@@ -46,6 +48,9 @@ protected:
   std::vector<int64_t> polygons_offsets;
 
   State fields_state;
+  std::vector<std::string> pointdata_names;
+  std::vector<size_t> pointdata_ncomp;
+  std::vector<std::vector<double>> pointdata_data;
 
   /**
    * @brief Returns true if the points are sealed
@@ -130,6 +135,11 @@ public:
   const size_t number_of_polygons() const;
 
   /**
+   * @brief Returns the number of point-data fields
+   */
+  const size_t number_of_pointdata() const;
+
+  /**
    * @brief Pre-allocation for points data
    */
   void reserve_points(size_t n);
@@ -153,6 +163,28 @@ public:
    * @brief Pre-allocation for polygons
    */
   void reserve_polygons(size_t n);
+
+  /**
+   * @brief Add a scalar point-data field
+   */
+  int64_t add_pointdata_scalar(const std::string& name);
+
+  /**
+   * @brief Add a vector point-data field
+   */
+  int64_t add_pointdata_vector(const std::string& name, size_t ncomp);
+
+  /**
+   * @brief Get mutable storage for a point-data field
+   */
+  std::vector<double>& get_pointdata(int64_t field);
+
+  /**
+   * @brief Set one tuple of a 3-component vector point-data field
+   */
+  void set_pointdata_vector3(int64_t field,
+                             size_t point_id,
+                             const std::array<double, 3>& value);
 
   /**
    * @brief Add a new point to the dataset

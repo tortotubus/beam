@@ -1,4 +1,5 @@
 enable_testing()
+include(GoogleTest)
 
 file(GLOB BENCHMARK_TEST_SOURCES benchmark/*.cpp benchmark/*.hpp)
 add_executable(elff_benchmark_tests ${BENCHMARK_TEST_SOURCES})
@@ -24,4 +25,18 @@ if(ELFF_BUILD_THIRD_PARTY_GTEST)
     )
 else()
     gtest_discover_tests(elff_benchmark_tests)
+endif()
+
+file(GLOB_RECURSE UNIT_TEST_SOURCES CONFIGURE_DEPENDS unit/*.cpp unit/*.hpp)
+add_executable(elff_unit_tests ${UNIT_TEST_SOURCES})
+target_include_directories(elff_unit_tests PRIVATE ${CMAKE_SOURCE_DIR})
+target_link_libraries(elff_unit_tests PRIVATE ELFF GTest::gtest_main)
+
+if(ELFF_BUILD_THIRD_PARTY_GTEST)
+    add_test(
+        NAME vtkHDFPolyDataStaticWriterTest
+        COMMAND elff_unit_tests --gtest_filter=vtkHDFPolyDataStaticWriterTest.*
+    )
+else()
+    gtest_discover_tests(elff_unit_tests)
 endif()

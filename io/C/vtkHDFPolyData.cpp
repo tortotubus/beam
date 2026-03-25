@@ -4,11 +4,318 @@ namespace ELFF {
 namespace IO {
 namespace C {
 
+namespace {
+
+int
+vtk_HDF_polydata_field_rank(size_t ncomp)
+{
+  return (ncomp == 1) ? 1 : 2;
+}
+
+void
+vtk_HDF_polydata_field_layout(size_t tuple_count,
+                              size_t ncomp,
+                              int* rank,
+                              hsize_t dims[2],
+                              hsize_t max_dims[2],
+                              hsize_t chunk_dims[2])
+{
+  *rank = vtk_HDF_polydata_field_rank(ncomp);
+
+  dims[0] = static_cast<hsize_t>(tuple_count);
+  max_dims[0] = H5S_UNLIMITED;
+  chunk_dims[0] = 4000;
+
+  if (*rank == 2) {
+    dims[1] = static_cast<hsize_t>(ncomp);
+    max_dims[1] = static_cast<hsize_t>(ncomp);
+    chunk_dims[1] = static_cast<hsize_t>(ncomp);
+  }
+}
+
+int64_t
+vtk_HDF_polydata_dataset_extent_0(const char* dataset_name,
+                                  hid_t group_id,
+                                  int expected_rank,
+                                  vtkHDF* vtk_hdf)
+{
+  vtk_hdf->dset_id = H5Dopen2(group_id, dataset_name, H5P_DEFAULT);
+  vtk_HDF_check_object(vtk_hdf, vtk_hdf->dset_id);
+
+  vtk_hdf->dset_space_id = H5Dget_space(vtk_hdf->dset_id);
+  vtk_HDF_check_object(vtk_hdf, vtk_hdf->dset_space_id);
+
+  const int rank = H5Sget_simple_extent_ndims(vtk_hdf->dset_space_id);
+  if (rank != expected_rank) {
+    ELFF_ABORT("Rank mismatch while reading transient polydata field extent.\n");
+  }
+
+  hsize_t dims[2] = { 0, 0 };
+  hsize_t max_dims[2] = { 0, 0 };
+  H5Sget_simple_extent_dims(vtk_hdf->dset_space_id, dims, max_dims);
+
+  H5Sclose(vtk_hdf->dset_space_id);
+  H5Dclose(vtk_hdf->dset_id);
+
+  return static_cast<int64_t>(dims[0]);
+}
+
+void
+vtk_HDF_polydata_write_transient_celldata(vtkHDFPolyData* vtk_hdf_pd,
+                                          vtkPolyData* vtk_pd)
+{
+  const size_t n_cells = vtk_polydata_number_of_cells(vtk_pd);
+
+  for (size_t i = 0; i < vtk_pd->n_celldata; ++i) {
+    const char* dataset_name = vtk_pd->celldata_names[i];
+    double* dataset_data =
+      vtk_polydata_get_celldata_data(vtk_pd, static_cast<int64_t>(i));
+    hid_t dataset_datatype = H5T_IEEE_F64LE;
+    hid_t dataset_group = vtk_hdf_pd->grp_celldata_id;
+    int dataset_rank = 1;
+    hsize_t dataset_dims[2] = { 0, 0 };
+    hsize_t dataset_max_dims[2] = { 0, 0 };
+    hsize_t dataset_chunk_dims[2] = { 0, 0 };
+
+    vtk_HDF_polydata_field_layout(n_cells,
+                                  vtk_pd->celldata_ncomp[i],
+                                  &dataset_rank,
+                                  dataset_dims,
+                                  dataset_max_dims,
+                                  dataset_chunk_dims);
+
+    vtk_HDF_write_chunked_dataset(dataset_name,
+                                  dataset_data,
+                                  dataset_datatype,
+                                  dataset_group,
+                                  dataset_rank,
+                                  dataset_dims,
+                                  dataset_max_dims,
+                                  dataset_chunk_dims,
+                                  &vtk_hdf_pd->vtk_hdf);
+  }
+}
+
+void
+vtk_HDF_polydata_write_transient_celldata_offsets(vtkHDFPolyData* vtk_hdf_pd,
+                                                  vtkPolyData* vtk_pd)
+{
+  for (size_t i = 0; i < vtk_pd->n_celldata; ++i) {
+    const char* dataset_name = vtk_pd->celldata_names[i];
+    int64_t dataset_data[] = { 0 };
+    hid_t dataset_datatype = H5T_STD_I64LE;
+    hid_t dataset_group = vtk_hdf_pd->grp_celldata_offsets_id;
+    hsize_t dataset_dims[] = { 1 };
+    hsize_t dataset_max_dims[] = { H5S_UNLIMITED };
+    hsize_t dataset_chunk_dims[] = { 4000 };
+
+    vtk_HDF_write_chunked_dataset(dataset_name,
+                                  dataset_data,
+                                  dataset_datatype,
+                                  dataset_group,
+                                  1,
+                                  dataset_dims,
+                                  dataset_max_dims,
+                                  dataset_chunk_dims,
+                                  &vtk_hdf_pd->vtk_hdf);
+  }
+}
+
+void
+vtk_HDF_polydata_append_transient_celldata_offsets(vtkHDFPolyData* vtk_hdf_pd,
+                                                   vtkPolyData* vtk_pd)
+{
+  for (size_t i = 0; i < vtk_pd->n_celldata; ++i) {
+    const char* dataset_name = vtk_pd->celldata_names[i];
+    const int dataset_rank =
+      vtk_HDF_polydata_field_rank(vtk_pd->celldata_ncomp[i]);
+    int64_t dataset_data[] = {
+      vtk_HDF_polydata_dataset_extent_0(dataset_name,
+                                        vtk_hdf_pd->grp_celldata_id,
+                                        dataset_rank,
+                                        &vtk_hdf_pd->vtk_hdf)
+    };
+    hid_t dataset_datatype = H5T_STD_I64LE;
+    hid_t dataset_group = vtk_hdf_pd->grp_celldata_offsets_id;
+    hsize_t dataset_dims[] = { 1 };
+
+    vtk_HDF_append_chunked_dataset(dataset_name,
+                                   dataset_data,
+                                   dataset_datatype,
+                                   dataset_group,
+                                   1,
+                                   dataset_dims,
+                                   &vtk_hdf_pd->vtk_hdf);
+  }
+}
+
+void
+vtk_HDF_polydata_append_transient_celldata(vtkHDFPolyData* vtk_hdf_pd,
+                                           vtkPolyData* vtk_pd)
+{
+  const size_t n_cells = vtk_polydata_number_of_cells(vtk_pd);
+
+  for (size_t i = 0; i < vtk_pd->n_celldata; ++i) {
+    const char* dataset_name = vtk_pd->celldata_names[i];
+    double* dataset_data =
+      vtk_polydata_get_celldata_data(vtk_pd, static_cast<int64_t>(i));
+    hid_t dataset_datatype = H5T_IEEE_F64LE;
+    hid_t dataset_group = vtk_hdf_pd->grp_celldata_id;
+    int dataset_rank = 1;
+    hsize_t dataset_dims[2] = { 0, 0 };
+    hsize_t dataset_max_dims[2] = { 0, 0 };
+    hsize_t dataset_chunk_dims[2] = { 0, 0 };
+
+    vtk_HDF_polydata_field_layout(n_cells,
+                                  vtk_pd->celldata_ncomp[i],
+                                  &dataset_rank,
+                                  dataset_dims,
+                                  dataset_max_dims,
+                                  dataset_chunk_dims);
+
+    vtk_HDF_append_chunked_dataset(dataset_name,
+                                   dataset_data,
+                                   dataset_datatype,
+                                   dataset_group,
+                                   dataset_rank,
+                                   dataset_dims,
+                                   &vtk_hdf_pd->vtk_hdf);
+  }
+}
+
+void
+vtk_HDF_polydata_write_transient_pointdata(vtkHDFPolyData* vtk_hdf_pd,
+                                           vtkPolyData* vtk_pd)
+{
+  const size_t n_points = vtk_polydata_number_of_points(vtk_pd);
+
+  for (size_t i = 0; i < vtk_pd->n_pointdata; ++i) {
+    const char* dataset_name = vtk_pd->pointdata_names[i];
+    double* dataset_data =
+      vtk_polydata_get_pointdata_data(vtk_pd, static_cast<int64_t>(i));
+    hid_t dataset_datatype = H5T_IEEE_F64LE;
+    hid_t dataset_group = vtk_hdf_pd->grp_pointdata_id;
+    int dataset_rank = 1;
+    hsize_t dataset_dims[2] = { 0, 0 };
+    hsize_t dataset_max_dims[2] = { 0, 0 };
+    hsize_t dataset_chunk_dims[2] = { 0, 0 };
+
+    vtk_HDF_polydata_field_layout(n_points,
+                                  vtk_pd->pointdata_ncomp[i],
+                                  &dataset_rank,
+                                  dataset_dims,
+                                  dataset_max_dims,
+                                  dataset_chunk_dims);
+
+    vtk_HDF_write_chunked_dataset(dataset_name,
+                                  dataset_data,
+                                  dataset_datatype,
+                                  dataset_group,
+                                  dataset_rank,
+                                  dataset_dims,
+                                  dataset_max_dims,
+                                  dataset_chunk_dims,
+                                  &vtk_hdf_pd->vtk_hdf);
+  }
+}
+
+void
+vtk_HDF_polydata_write_transient_pointdata_offsets(vtkHDFPolyData* vtk_hdf_pd,
+                                                   vtkPolyData* vtk_pd)
+{
+  for (size_t i = 0; i < vtk_pd->n_pointdata; ++i) {
+    const char* dataset_name = vtk_pd->pointdata_names[i];
+    int64_t dataset_data[] = { 0 };
+    hid_t dataset_datatype = H5T_STD_I64LE;
+    hid_t dataset_group = vtk_hdf_pd->grp_pointdata_offsets_id;
+    hsize_t dataset_dims[] = { 1 };
+    hsize_t dataset_max_dims[] = { H5S_UNLIMITED };
+    hsize_t dataset_chunk_dims[] = { 4000 };
+
+    vtk_HDF_write_chunked_dataset(dataset_name,
+                                  dataset_data,
+                                  dataset_datatype,
+                                  dataset_group,
+                                  1,
+                                  dataset_dims,
+                                  dataset_max_dims,
+                                  dataset_chunk_dims,
+                                  &vtk_hdf_pd->vtk_hdf);
+  }
+}
+
+void
+vtk_HDF_polydata_append_transient_pointdata_offsets(vtkHDFPolyData* vtk_hdf_pd,
+                                                    vtkPolyData* vtk_pd)
+{
+  for (size_t i = 0; i < vtk_pd->n_pointdata; ++i) {
+    const char* dataset_name = vtk_pd->pointdata_names[i];
+    const int dataset_rank =
+      vtk_HDF_polydata_field_rank(vtk_pd->pointdata_ncomp[i]);
+    int64_t dataset_data[] = {
+      vtk_HDF_polydata_dataset_extent_0(dataset_name,
+                                        vtk_hdf_pd->grp_pointdata_id,
+                                        dataset_rank,
+                                        &vtk_hdf_pd->vtk_hdf)
+    };
+    hid_t dataset_datatype = H5T_STD_I64LE;
+    hid_t dataset_group = vtk_hdf_pd->grp_pointdata_offsets_id;
+    hsize_t dataset_dims[] = { 1 };
+
+    vtk_HDF_append_chunked_dataset(dataset_name,
+                                   dataset_data,
+                                   dataset_datatype,
+                                   dataset_group,
+                                   1,
+                                   dataset_dims,
+                                   &vtk_hdf_pd->vtk_hdf);
+  }
+}
+
+void
+vtk_HDF_polydata_append_transient_pointdata(vtkHDFPolyData* vtk_hdf_pd,
+                                            vtkPolyData* vtk_pd)
+{
+  const size_t n_points = vtk_polydata_number_of_points(vtk_pd);
+
+  for (size_t i = 0; i < vtk_pd->n_pointdata; ++i) {
+    const char* dataset_name = vtk_pd->pointdata_names[i];
+    double* dataset_data =
+      vtk_polydata_get_pointdata_data(vtk_pd, static_cast<int64_t>(i));
+    hid_t dataset_datatype = H5T_IEEE_F64LE;
+    hid_t dataset_group = vtk_hdf_pd->grp_pointdata_id;
+    int dataset_rank = 1;
+    hsize_t dataset_dims[2] = { 0, 0 };
+    hsize_t dataset_max_dims[2] = { 0, 0 };
+    hsize_t dataset_chunk_dims[2] = { 0, 0 };
+
+    vtk_HDF_polydata_field_layout(n_points,
+                                  vtk_pd->pointdata_ncomp[i],
+                                  &dataset_rank,
+                                  dataset_dims,
+                                  dataset_max_dims,
+                                  dataset_chunk_dims);
+
+    vtk_HDF_append_chunked_dataset(dataset_name,
+                                   dataset_data,
+                                   dataset_datatype,
+                                   dataset_group,
+                                   dataset_rank,
+                                   dataset_dims,
+                                   &vtk_hdf_pd->vtk_hdf);
+  }
+}
+
+} // namespace
+
 void
 vtk_HDF_polydata_close(vtkHDFPolyData* vtk_hdf_pd)
 {
   if (vtk_hdf_pd->grp_celldata_id >= 0)
     H5Gclose(vtk_hdf_pd->grp_celldata_id);
+
+  if (vtk_hdf_pd->grp_pointdata_id >= 0)
+    H5Gclose(vtk_hdf_pd->grp_pointdata_id);
 
   if (vtk_hdf_pd->grp_vertices_id >= 0)
     H5Gclose(vtk_hdf_pd->grp_vertices_id);
@@ -496,6 +803,72 @@ vtk_HDF_polydata_init_static(const char* fname,
                             1,
                             dataset_dims,
                             &vtk_hdf_pd.vtk_hdf);
+    }
+  }
+
+  {
+    /*
+     * Dataset: /VTKHDF/CellData
+     */
+    for (int64_t i = 0; i < static_cast<int64_t>(vtk_pd->n_celldata); i++) {
+      double* dataset_data = vtk_polydata_get_celldata_data(vtk_pd, i);
+      int dataset_rank = (vtk_pd->celldata_ncomp[i] == 1) ? 1 : 2;
+      hsize_t* dataset_dims =
+        static_cast<hsize_t*>(malloc(dataset_rank * sizeof(hsize_t)));
+
+      if (dataset_rank == 1) {
+        dataset_dims[0] = vtk_polydata_number_of_cells(vtk_pd);
+      } else {
+        dataset_dims[0] = vtk_polydata_number_of_cells(vtk_pd);
+        dataset_dims[1] = vtk_pd->celldata_ncomp[i];
+      }
+
+      char* dataset_name = vtk_pd->celldata_names[i];
+      hid_t dataset_datatype = H5T_IEEE_F64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_celldata_id;
+
+      vtk_HDF_write_dataset(dataset_name,
+                            dataset_data,
+                            dataset_datatype,
+                            dataset_group,
+                            dataset_rank,
+                            dataset_dims,
+                            &vtk_hdf_pd.vtk_hdf);
+
+      free(dataset_dims);
+    }
+  }
+
+  {
+    /*
+     * Dataset: /VTKHDF/PointData
+     */
+    for (int64_t i = 0; i < static_cast<int64_t>(vtk_pd->n_pointdata); i++) {
+      double* dataset_data = vtk_polydata_get_pointdata_data(vtk_pd, i);
+      int dataset_rank = (vtk_pd->pointdata_ncomp[i] == 1) ? 1 : 2;
+      hsize_t* dataset_dims =
+        static_cast<hsize_t*>(malloc(dataset_rank * sizeof(hsize_t)));
+
+      if (dataset_rank == 1) {
+        dataset_dims[0] = vtk_polydata_number_of_points(vtk_pd);
+      } else {
+        dataset_dims[0] = vtk_polydata_number_of_points(vtk_pd);
+        dataset_dims[1] = vtk_pd->pointdata_ncomp[i];
+      }
+
+      char* dataset_name = vtk_pd->pointdata_names[i];
+      hid_t dataset_datatype = H5T_IEEE_F64LE;
+      hid_t dataset_group = vtk_hdf_pd.grp_pointdata_id;
+
+      vtk_HDF_write_dataset(dataset_name,
+                            dataset_data,
+                            dataset_datatype,
+                            dataset_group,
+                            dataset_rank,
+                            dataset_dims,
+                            &vtk_hdf_pd.vtk_hdf);
+
+      free(dataset_dims);
     }
   }
   return vtk_hdf_pd;
@@ -1199,9 +1572,9 @@ vtk_HDF_polydata_init_transient(const char* fname, bool overwrite, vtkPolyData* 
     /*
      * Dataset: /VTKHDF/Steps/Values
      */
-    {
-      const char* dataset_name = "Values";
-      float dataset_data[] = { time };
+  {
+    const char* dataset_name = "Values";
+    float dataset_data[] = { time };
       hid_t dataset_datatype = H5T_IEEE_F32LE;
       hid_t dataset_group = vtk_hdf_pd.grp_steps_id;
       hsize_t dataset_dims[] = { 1 };
@@ -1219,6 +1592,11 @@ vtk_HDF_polydata_init_transient(const char* fname, bool overwrite, vtkPolyData* 
                                     &vtk_hdf_pd.vtk_hdf);
     }
   }
+
+  vtk_HDF_polydata_write_transient_celldata_offsets(&vtk_hdf_pd, vtk_pd);
+  vtk_HDF_polydata_write_transient_celldata(&vtk_hdf_pd, vtk_pd);
+  vtk_HDF_polydata_write_transient_pointdata_offsets(&vtk_hdf_pd, vtk_pd);
+  vtk_HDF_polydata_write_transient_pointdata(&vtk_hdf_pd, vtk_pd);
 
   return vtk_hdf_pd;
 }
@@ -1485,6 +1863,11 @@ vtk_HDF_polydata_append_transient(const char* fname,
                                      &vtk_hdf_pd.vtk_hdf);
     }
   }
+
+  vtk_HDF_polydata_append_transient_celldata_offsets(&vtk_hdf_pd, vtk_pd);
+  vtk_HDF_polydata_append_transient_celldata(&vtk_hdf_pd, vtk_pd);
+  vtk_HDF_polydata_append_transient_pointdata_offsets(&vtk_hdf_pd, vtk_pd);
+  vtk_HDF_polydata_append_transient_pointdata(&vtk_hdf_pd, vtk_pd);
 
   /*
    * Dataset: /VTKHDF/Points
