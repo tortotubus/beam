@@ -1,3 +1,5 @@
+#pragma once
+
 #include "library/ibm/IBNode.h"
 #include "library/ibm/IBMempool.h"
 #include "library/ibm/IBMesh.h"

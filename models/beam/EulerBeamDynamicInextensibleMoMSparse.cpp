@@ -1,4 +1,4 @@
-#include "models/beam/EulerBeamDynamicInextensibleMoMSparse.hpp"
+#include "elff/models/beam/EulerBeamDynamicInextensibleMoMSparse.hpp"
 
 namespace ELFF {
 namespace Models {

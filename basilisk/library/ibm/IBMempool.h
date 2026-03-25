@@ -1,3 +1,5 @@
+#pragma once
+
 #include "grid/mempool.h"
 #include "library/ibm/IBFields.h"
 #include "library/ibm/IBNodeList.h"

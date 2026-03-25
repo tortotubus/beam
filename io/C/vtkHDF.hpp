@@ -1,7 +1,7 @@
 #pragma once
 
-#include "config/config.hpp"
-#include "general/error.hpp"
+#include "elff/config/config.hpp"
+#include "elff/general/error.hpp"
 
 #include <cstring>
 #include <string>

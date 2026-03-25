@@ -1,8 +1,8 @@
 #pragma once
 
-#include "general/error.hpp"
-#include "mpi/CommHandle.hpp"
-#include "models/ibm/IBModel.hpp"
+#include "elff/general/error.hpp"
+#include "elff/mpi/CommHandle.hpp"
+#include "elff/models/ibm/IBModel.hpp"
 
 #include <cstdint>
 #include <cstdio>

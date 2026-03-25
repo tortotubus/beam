@@ -1,7 +1,7 @@
-#include "c/models/beam/IBEulerBeam.h"
+#include "elff/c/models/beam/IBEulerBeam.h"
 
-#include "config/config.hpp"
-#include "models/beam/IBEulerBeam.hpp"
+#include "elff/config/config.hpp"
+#include "elff/models/beam/IBEulerBeam.hpp"
 
 using namespace ELFF::Models;
 using namespace ELFF;

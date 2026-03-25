@@ -1,4 +1,4 @@
-#include "models/beam/EulerBeamStaticInextensibleAugKKT.hpp"
+#include <elff/models/beam/EulerBeamStaticInextensibleAugKKT.hpp>
 #include <gtest/gtest.h>
 
 #include "EulerBeamStaticInextensibleReferences.hpp"

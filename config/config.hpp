@@ -20,7 +20,7 @@
 #ifdef ELFF_CONFIG_FILE
 #include ELFF_CONFIG_FILE
 #else
-#include "_config.hpp"
+#include "elff/config/_config.hpp"
 #endif
 
 

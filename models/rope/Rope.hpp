@@ -1,7 +1,7 @@
 #pragma once
 
-#include "config/config.hpp"
-#include "models/rope/RopeMesh.hpp"
+#include "elff/config/config.hpp"
+#include "elff/models/rope/RopeMesh.hpp"
 
 #include <array>
 #include <vector>

@@ -1,4 +1,4 @@
-#include "vtkHDFPolyData.hpp"
+#include "elff/io/C/vtkHDFPolyData.hpp"
 
 namespace ELFF {
 namespace IO {

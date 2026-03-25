@@ -1,9 +1,9 @@
 #pragma once
 
-#include "config/config.hpp"
-#include "general/error.hpp"
+#include "elff/config/config.hpp"
+#include "elff/general/error.hpp"
 
-#include "io/C/vtkPolyData.hpp"
+#include "elff/io/C/vtkPolyData.hpp"
 
 #include <vector>
 

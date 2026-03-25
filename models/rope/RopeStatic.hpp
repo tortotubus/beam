@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Rope.hpp"
-#include "fem/Shapes.hpp"
+#include "elff/models/rope/Rope.hpp"
+#include "elff/fem/Shapes.hpp"
 
 #include <array>
 #include <vector>

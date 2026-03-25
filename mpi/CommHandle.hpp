@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config/config.hpp"
+#include "elff/config/config.hpp"
 
 #ifdef ELFF_USE_MPI
 #include <mpi.h>

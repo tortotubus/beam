@@ -16,7 +16,7 @@ function(elff_basilisk_mpi_add_executable SOURCE_FILE)
       -D_MPI=1
       -DTRACE=3
       "${source_name}.c"
-      -I"${CMAKE_SOURCE_DIR}/c"
+      -I"${CMAKE_BINARY_DIR}/include"
       -I"${CMAKE_SOURCE_DIR}/basilisk" 
       -source
     DEPENDS ${SOURCE_FILE} ${basilisk_headers}
@@ -48,7 +48,7 @@ function(elff_basilisk_mpi_add_executable SOURCE_FILE)
 
   target_link_libraries(${source_name}
     PUBLIC
-      elff
+      ELFF
       m
   )
 

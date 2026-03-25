@@ -1,7 +1,7 @@
 #pragma once
 
-#include "vtkHDF.hpp"
-#include "vtkPolyData.hpp"
+#include "elff/io/C/vtkHDF.hpp"
+#include "elff/io/C/vtkPolyData.hpp"
 
 namespace ELFF {
 namespace IO {

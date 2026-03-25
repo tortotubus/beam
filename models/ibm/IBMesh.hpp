@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "config/config.hpp"
+#include "elff/config/config.hpp"
 
 namespace ELFF {
 namespace Models {

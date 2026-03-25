@@ -1,6 +1,6 @@
 #pragma once
 
-#include "EulerBeamStaticInextensibleMoM.hpp"
+#include "elff/models/beam/EulerBeamStaticInextensibleMoM.hpp"
 
 #include <array>
 #include <vector>

@@ -1,4 +1,4 @@
-#include "models/beam/EulerBeamMesh.hpp"
+#include "elff/models/beam/EulerBeamMesh.hpp"
 
 namespace ELFF {
 namespace Models {

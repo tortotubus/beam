@@ -1,2 +1,2 @@
-#include "IBForceCoupled.hpp"
+#include "elff/models/ibm/IBForceCoupled.hpp"
 

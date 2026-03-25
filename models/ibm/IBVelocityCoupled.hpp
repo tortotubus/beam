@@ -1,10 +1,10 @@
 #pragma once
 
-#include "config/config.hpp"
-#include "general/error.hpp"
+#include "elff/config/config.hpp"
+#include "elff/general/error.hpp"
 
-#include "models/ibm/IBMesh.hpp"
-#include "models/ibm/IBModel.hpp"
+#include "elff/models/ibm/IBMesh.hpp"
+#include "elff/models/ibm/IBModel.hpp"
 
 #include <vector>
 

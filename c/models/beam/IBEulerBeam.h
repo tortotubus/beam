@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../ibm/IBMesh.h"
+#include "elff/c/models/ibm/IBMesh.h"
 
 #ifdef __cplusplus
 extern "C"

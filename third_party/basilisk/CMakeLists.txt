@@ -1,10 +1,7 @@
 
 include(ExternalProject)
 include(GNUInstallDirs)
-
-message(STATUS "ELFF_BASILISK_PREFIX=${ELFF_BASILISK_PREFIX}")
-
-
+ 
 if (ELFF_USE_SUBMODULES)
   ExternalProject_Add(basilisk_ep
     UPDATE_COMMAND ""

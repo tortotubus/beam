@@ -11,7 +11,7 @@
 
 #pragma once
 
-#include "../config/config.hpp"
+#include "elff/config/config.hpp"
 #include <iostream>
 
 namespace ELFF

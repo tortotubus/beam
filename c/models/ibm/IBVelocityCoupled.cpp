@@ -1,8 +1,8 @@
 
 #include <stdlib.h>
 
-#include "c/models/ibm/IBVelocityCoupled.h"
-#include "models/ibm/IBVelocityCoupled.hpp"
+#include "elff/c/models/ibm/IBVelocityCoupled.h"
+#include "elff/models/ibm/IBVelocityCoupled.hpp"
 
 using namespace ELFF::Models;
 

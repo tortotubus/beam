@@ -1,8 +1,8 @@
 #pragma once
 
-#include "config/config.hpp"
-#include "general/error.hpp"
-#include "io/CXX/vtkPolyData.hpp"
+#include "elff/config/config.hpp"
+#include "elff/general/error.hpp"
+#include "elff/io/CXX/vtkPolyData.hpp"
 
 #include <cstdio>
 #include <cstdlib>

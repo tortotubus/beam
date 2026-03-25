@@ -6,7 +6,7 @@
 #include "library/ibm/IBOutput.h"
 #include "library/io/output-vtk.h"
 
-#define basenamestr "huang_two_fibres_Re300_Mu0001_T0003_d0.3"
+#define basenamestr "mpi_huang_two_fibres_Re300_Mu0001_T0003_d3"
 
 #define L_fluid 16.
 #define maxlevel 10
@@ -117,7 +117,7 @@ statsfile(i++)
     snprintf(fname, sizeof(fname), "%s/tips.txt", basenamestr);
     fp = fopen(fname, "a");
     fprintf(fp, "%d %g %g %g %g %g\n", i, t, x_tip[0], y_tip[0], x_tip[1], y_tip[1]);
-    fprintf(stderr, "%d %g %g %g %g %g\n", i, t, x_tip[0], y_tip[0], x_tip[1], y_tip[1]);
+    fprintf(stderr, "[basilisk] %d %g %g %g %g %g\n", i, t, x_tip[0], y_tip[0], x_tip[1], y_tip[1]);
     fclose(fp);
   }
 }

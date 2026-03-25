@@ -1,7 +1,7 @@
-#include "c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 
-#include "models/ibm/IBModel.hpp"
-#include "models/ibm/IBRuntime.hpp"
+#include "elff/models/ibm/IBModel.hpp"
+#include "elff/models/ibm/IBRuntime.hpp"
 
 using namespace ELFF::Models;
 

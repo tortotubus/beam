@@ -1,6 +1,6 @@
 #pragma once
 
-#include "models/beam/EulerBeamStaticInextensibleMoMSparse.hpp"
+#include "elff/models/beam/EulerBeamStaticInextensibleMoMSparse.hpp"
 
 using namespace Eigen;
 

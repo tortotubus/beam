@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
-#include "models/beam/IBEulerBeam.h"
-#include "models/ibm/IBForceCoupled.h"
+#include "elff/c/models/beam/IBEulerBeam.h"
+#include "elff/c/models/ibm/IBForceCoupled.h"
 
 static ib_force_coupled_t beam;
 

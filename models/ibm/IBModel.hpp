@@ -2,7 +2,7 @@
 
 #include <vector>
 #include <cstdint>
-#include "config/config.hpp"
+#include "elff/config/config.hpp"
 
 namespace ELFF {
 namespace Models {

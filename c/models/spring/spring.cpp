@@ -1,6 +1,6 @@
-#include "spring.h"
+#include "elff/c/models/spring/spring.h"
 
-#include "models/spring/Spring.hpp"
+#include "elff/models/spring/Spring.hpp"
 
 using namespace ELFF;
 

@@ -1,8 +1,8 @@
 
-#include "models/beam/IBEulerBeam.h"
-#include "models/ibm/IBForceCoupled.h"
-#include "library/ibm/IBMeshModel.h"
+#include "elff/c/models/beam/IBEulerBeam.h"
+#include "elff/c/models/ibm/IBForceCoupled.h"
 
+#include "library/ibm/IBMeshModel.h"
 #include "library/elff/runtime.h"
 
 // ============================================================================

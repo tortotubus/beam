@@ -3,8 +3,8 @@
 // #include <beam/LinAlg/Matrix.hpp>
 // #include <beam/LinAlg/Vector.hpp>
 
-#include "EulerBeam.hpp"
-#include "fem/Shapes.hpp"
+#include "elff/models/beam/EulerBeam.hpp"
+#include "elff/fem/Shapes.hpp"
 
 #include <cstdio> // for popen, pclose, fprintf
 #include <iostream>

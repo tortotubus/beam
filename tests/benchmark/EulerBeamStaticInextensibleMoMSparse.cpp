@@ -1,4 +1,4 @@
-#include "models/beam/EulerBeamStaticInextensibleMoMSparse.hpp"
+#include <elff/models/beam/EulerBeamStaticInextensibleMoMSparse.hpp>
 #include <gtest/gtest.h>
 
 #include "EulerBeamStaticInextensibleReferences.hpp"

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "library/ibm/IBNodeList.h"
 
 /**

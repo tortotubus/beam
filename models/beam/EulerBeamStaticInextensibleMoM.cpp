@@ -1,4 +1,4 @@
-#include "models/beam/EulerBeamStaticInextensibleMoM.hpp"
+#include "elff/models/beam/EulerBeamStaticInextensibleMoM.hpp"
 
 #include <iostream>
 

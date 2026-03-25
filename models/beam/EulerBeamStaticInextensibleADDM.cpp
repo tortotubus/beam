@@ -1,4 +1,4 @@
-#include "models/beam/EulerBeamStaticInextensibleADDM.hpp"
+#include "elff/models/beam/EulerBeamStaticInextensibleADDM.hpp"
 
 namespace ELFF {
 namespace Models {

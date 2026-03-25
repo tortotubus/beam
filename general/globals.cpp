@@ -14,8 +14,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#include "../config/config.hpp"
-#include "globals.hpp"
+#include "elff/config/config.hpp"
+#include "elff/general/globals.hpp"
 #include <iostream>
 #include <sstream>
 #include <iomanip>

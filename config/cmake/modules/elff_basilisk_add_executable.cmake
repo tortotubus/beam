@@ -15,13 +15,15 @@ function(elff_basilisk_add_executable SOURCE_FILE)
     COMMAND $<TARGET_FILE:basilisk::qcc>
       -DTRACE=3
       "${source_name}.c"
-      -I"${CMAKE_SOURCE_DIR}/c"
       -I"${CMAKE_SOURCE_DIR}/basilisk" 
+      -I"${CMAKE_BINARY_DIR}/include"
       -source
     DEPENDS ${SOURCE_FILE} ${basilisk_headers}
     BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/_${source_name}.c"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" 
   )
+
+  message(STATUS "${CMAKE_BINARY_DIR}/include")
   
   add_executable(${source_name} "_${source_name}.c")
 
@@ -42,7 +44,7 @@ function(elff_basilisk_add_executable SOURCE_FILE)
 
   target_link_libraries(${source_name}
     PUBLIC
-      elff
+      ELFF
       m
   )
 

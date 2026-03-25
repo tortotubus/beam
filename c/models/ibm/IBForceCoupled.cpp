@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
-#include "c/models/ibm/IBForceCoupled.h"
-#include "models/ibm/IBForceCoupled.hpp"
+#include "elff/c/models/ibm/IBForceCoupled.h"
+#include "elff/models/ibm/IBForceCoupled.hpp"
 
 using namespace ELFF::Models;
 

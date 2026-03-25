@@ -1,7 +1,7 @@
 #pragma once
 
-#include "config/config.hpp"
-#include "models/beam/EulerBeamMesh.hpp"
+#include "elff/config/config.hpp"
+#include "elff/models/beam/EulerBeamMesh.hpp"
 
 #include <array>
 #include <vector>

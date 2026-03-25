@@ -1,4 +1,4 @@
-#include "models/beam/IBEulerBeam.hpp"
+#include "elff/models/beam/IBEulerBeam.hpp"
 
 namespace ELFF {
 namespace Models {

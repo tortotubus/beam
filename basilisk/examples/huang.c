@@ -1,4 +1,5 @@
 #include "grid/quadtree.h" 
+
 #include "library/ibm/IBMeshManager.h"
 #include "library/ibm/navier-stokes/unserious/centered-split-rich.h"
 #include "library/elff/elff.h"
@@ -112,18 +113,20 @@ statsfile(i++)
   }
 }
 
-scalar omega[];
 
 event
 output(t += 0.05; t <= 50)
 {
+
+  scalar omega[];
+
   vorticity(u, omega);
 #if TREE
   output_hdf_htg({omega,p}, {u,ibmf}, basenamestr);
 #else
   output_hdf_imagedata({omega,p}, {u,ibmf}, basenamestr);
 #endif
-  output_hdf_pd(NULL, (IBvector[]){eulvel, nforce, nvel}, basenamestr);
+  output_hdf_pd(NULL, (IBvector[]){eulvel, nforce, nvel, {{-1}}}, basenamestr);
 }
 
 #if TREE

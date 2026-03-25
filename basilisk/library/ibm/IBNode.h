@@ -1,3 +1,5 @@
+#pragma once
+
 #include "library/ibm/IBConfig.h"
 #include "library/ibm/IBMacros.h"
 

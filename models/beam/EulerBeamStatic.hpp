@@ -5,10 +5,10 @@
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
 
-#include "config/config.hpp"
+#include "elff/config/config.hpp"
 
-#include "models/beam/EulerBeam.hpp"
-#include "fem/Shapes.hpp"
+#include "elff/models/beam/EulerBeam.hpp"
+#include "elff/fem/Shapes.hpp"
 
 using namespace Eigen;
 

@@ -1,4 +1,4 @@
-#include "models/rope/RopeMesh.hpp"
+#include "elff/models/rope/RopeMesh.hpp"
 
 namespace ELFF {
 namespace Models {

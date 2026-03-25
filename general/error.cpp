@@ -1,5 +1,5 @@
-#include "error.hpp"
-#include "globals.hpp"
+#include "elff/general/error.hpp"
+#include "elff/general/globals.hpp"
 // #include "array.hpp"
 #include <cstdlib>
 #include <iostream>

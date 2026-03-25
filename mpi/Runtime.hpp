@@ -1,8 +1,8 @@
 #pragma once
 
-#include "config/config.hpp"
-#include "CommHandle.hpp"
-#include "Policy.hpp"
+#include "elff/config/config.hpp"
+#include "elff/mpi/CommHandle.hpp"
+#include "elff/mpi/Policy.hpp"
 
 #include <cstddef>
 #include <memory>

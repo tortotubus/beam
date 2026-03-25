@@ -5,7 +5,7 @@
 #endif
 
 #include "library/io/output-dump.h"
-#include "models/ibm/IBRuntime.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 
 // ============================================================================
 // Globals

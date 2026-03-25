@@ -6,8 +6,8 @@
 #include <iomanip>
 #include <string>
 
-#include "io/CXX/vtkHDFPolyData.hpp"
-#include "models/beam/EulerBeamDynamicInextensibleMoM.hpp"
+#include <elff/io/CXX/vtkHDFPolyData.hpp>
+#include <elff/models/beam/EulerBeamDynamicInextensibleMoM.hpp>
 
 namespace ELFF {
 

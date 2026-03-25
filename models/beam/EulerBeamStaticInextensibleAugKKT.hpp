@@ -1,7 +1,7 @@
 #pragma once
 
-#include "EulerBeam.hpp"
-#include "fem/Shapes.hpp"
+#include "elff/models/beam/EulerBeam.hpp"
+#include "elff/fem/Shapes.hpp"
 
 #include <cmath>
 #include <cstdio> // for popen, pclose, fprintf
