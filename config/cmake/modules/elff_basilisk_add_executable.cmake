@@ -22,8 +22,6 @@ function(elff_basilisk_add_executable SOURCE_FILE)
     BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/_${source_name}.c"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" 
   )
-
-  message(STATUS "${CMAKE_BINARY_DIR}/include")
   
   add_executable(${source_name} "_${source_name}.c")
 

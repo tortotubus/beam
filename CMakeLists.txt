@@ -230,7 +230,10 @@ endif()
 #
 if(ELFF_BUILD_TESTS)
   # Find GTest
-  find_package(GTest REQUIRED)
+  if (ELFF_BUILD_THIRD_PARTY_GTEST)
+  else()
+    find_package(GTest REQUIRED)
+  endif()
 
   enable_testing()
   add_subdirectory(tests)
