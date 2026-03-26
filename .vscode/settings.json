@@ -18,5 +18,6 @@
   },
   "cmake.debugConfig": {
     "miDebuggerPath": "/nix/store/n0cf9vad3va0js6606gcra8xhsnr0js7-gdb-16.3/bin/gdb"
-  }
+  },
+  "cmake.ctestArgs": ["-V"]
 }

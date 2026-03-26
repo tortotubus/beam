@@ -1,6 +1,5 @@
 #include "elff/general/error.hpp"
-#include "elff/general/globals.hpp"
-// #include "array.hpp"
+#include "elff/general/globals.hpp" 
 #include <cstdlib>
 #include <iostream>
 
@@ -47,7 +46,7 @@ ErrorAction get_error_action()
    return elff_error_action;
 }
 
-namespace internal
+namespace Internal
 {
 // defined in globals.cpp
 extern bool elff_out_initialized, elff_err_initialized;
@@ -60,7 +59,7 @@ void elff_backtrace(int mode, int depth)
 
 void elff_error(const char *msg)
 {
-   std::ostream &merr = internal::elff_err_initialized ? ELFF::err : std::cerr;
+   std::ostream &merr = Internal::elff_err_initialized ? ELFF::err : std::cerr;
    if (msg)
    {
       // NOTE: By default, each call of the "operator <<" method of the
@@ -82,7 +81,7 @@ void elff_error(const char *msg)
 
 void elff_warning(const char *msg)
 {
-   std::ostream &mout = internal::elff_out_initialized ? ELFF::out : std::cout;
+   std::ostream &mout = Internal::elff_out_initialized ? ELFF::out : std::cout;
    if (msg)
    {
       mout << "\n\n" << msg << std::endl;

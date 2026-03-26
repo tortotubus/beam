@@ -1,7 +1,5 @@
 #include "elff/models/beam/EulerBeamStaticInextensibleMoM.hpp"
 
-#include <iostream>
-
 #include <Eigen/IterativeLinearSolvers>
 #include <unsupported/Eigen/AutoDiff>
 
@@ -97,14 +95,14 @@ EulerBeamStaticInextensibleMoM::solve(std::array<real_t, 3> load)
     real_t res_norm = residual.norm();
 
     if (res_norm < tol_outer) {
-      std::cout << iter_outer << ": ||r|| = " << res_norm;
-      std::cout << "\t ||S|| = " << S_norm << std::endl;
+      ELFF_LOG(iter_outer << ": ||r|| = " << res_norm << "\t ||S|| = "
+                          << S_norm);
       break;
     } else if (iter_outer == max_iter_outer - 1) {
       ELFF_ABORT("EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
     } else {
-      std::cout << iter_outer << ": ||r|| = " << res_norm;
-      std::cout << "\t ||S|| = " << S_norm << std::endl;
+      ELFF_LOG(iter_outer << ": ||r|| = " << res_norm << "\t ||S|| = "
+                          << S_norm);
     }
 
     solver.compute(jacobian);
@@ -137,14 +135,14 @@ EulerBeamStaticInextensibleMoM::solve(std::vector<std::array<real_t, 3>> load)
     real_t res_norm = residual.norm();
 
     if (res_norm < tol_outer) {
-      std::cout << iter_outer << ": ||r|| = " << res_norm;
-      std::cout << "\t ||S|| = " << S_norm << std::endl;
+      ELFF_LOG(iter_outer << ": ||r|| = " << res_norm << "\t ||S|| = "
+                          << S_norm);
       break;
     } else if (iter_outer == max_iter_outer - 1) {
       ELFF_ABORT("EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
     } else {
-      std::cout << iter_outer << ": ||r|| = " << res_norm;
-      std::cout << "\t ||S|| = " << S_norm << std::endl;
+      ELFF_LOG(iter_outer << ": ||r|| = " << res_norm << "\t ||S|| = "
+                          << S_norm);
     }
 
     solver.compute(jacobian);

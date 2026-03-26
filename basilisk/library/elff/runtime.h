@@ -6,6 +6,7 @@
 
 #include "library/io/output-dump.h"
 #include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/general/output.h"
 
 // ============================================================================
 // Globals
@@ -53,6 +54,7 @@ static inline ib_runtime_t elff_runtime_get () {
   }
 
   assert (elff_runtime);
+  elff_set_out_prefix("    [elff] ");
   return elff_runtime;
 }
 

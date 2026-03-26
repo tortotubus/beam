@@ -121,7 +121,7 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Huang)
 
   real_t EI = 0.01;
   real_t mu = 1;
-  real_t r_penalty = 1e5;
+  real_t r_penalty = 1e4;
 
   real_t dt = 0.02;
   real_t t = 0;

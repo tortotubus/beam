@@ -90,6 +90,7 @@ set(ELFF_BUILD_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 set(ELFF_PUBLIC_INCLUDE_ROOT "${ELFF_BUILD_INCLUDE_DIR}/elff")
 
 set(ELFF_DIRS 
+  c/general
   c/models/beam
   c/models/ibm
   config 

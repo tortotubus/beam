@@ -11,11 +11,10 @@ TEST(EulerBeamStaticInextensibleMoMSparseTest, BisshoppAndDrucker)
 {
 
   real_t length = 1., EI = 1., area = 1., r_pentalty = 1e5;
-  size_t nodes = 40;
+  size_t nodes = 512;
 
   real_t tip_force_y = -1;
 
-  double comparison_tol = 1e-5;
 
   EulerBeam::EulerBeamBCs boundary_conditions = {
     .end = { EulerBeam::left, EulerBeam::right },
@@ -26,6 +25,14 @@ TEST(EulerBeamStaticInextensibleMoMSparseTest, BisshoppAndDrucker)
 
   EulerBeamStaticInextensibleMoMSparse static_beam(
     length, EI, nodes, boundary_conditions, r_pentalty);
+
+  double comparison_tol = 1e-6;
+
+  static_beam.set_lambda_tol(7e-6);
+  static_beam.set_lambda_iter(100000);
+
+  static_beam.set_res_tol(7e-6);
+  static_beam.set_res_iter(1000000);
 
   static_beam.solve();
   EulerBeamMesh& mesh = static_beam.get_mesh();

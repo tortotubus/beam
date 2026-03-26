@@ -1,18 +1,3 @@
-// Copyright (c) 2010-2025, Lawrence Livermore National Security, LLC. Produced
-// at the Lawrence Livermore National Laboratory. All Rights reserved. See files
-// LICENSE and NOTICE for details. LLNL-CODE-806117.
-//
-// This file is part of the BEAM library. For more information and source code
-// availability visit https://beam.org.
-//
-// BEAM is free software; you can redistribute it and/or modify it under the
-// terms of the BSD-3 license. We welcome feedback and contributions, see file
-// CONTRIBUTING.md for details.
-
-#ifdef _WIN32
-// Turn off CRT deprecation warnings for getenv
-#define _CRT_SECURE_NO_WARNINGS
-#endif
 
 #include "elff/config/config.hpp"
 #include "elff/general/globals.hpp"
@@ -27,22 +12,110 @@ namespace ELFF
 OutStream out(std::cout);
 OutStream err(std::cerr);
 
-namespace internal
+namespace Internal
 {
 bool elff_out_initialized = false;
 bool elff_err_initialized = false;
+}
+
+bool PrefixStreamBuf::WritePrefix()
+{
+   if (m_dest == nullptr || m_prefix.empty() || !m_at_line_start)
+   {
+      return true;
+   }
+
+   const std::streamsize written =
+      m_dest->sputn(m_prefix.data(), static_cast<std::streamsize>(m_prefix.size()));
+   if (written != static_cast<std::streamsize>(m_prefix.size()))
+   {
+      return false;
+   }
+
+   m_at_line_start = false;
+   return true;
+}
+
+int PrefixStreamBuf::overflow(int ch)
+{
+   if (ch == traits_type::eof())
+   {
+      return traits_type::not_eof(ch);
+   }
+
+   if (m_dest == nullptr)
+   {
+      return traits_type::eof();
+   }
+
+   if (!WritePrefix())
+   {
+      return traits_type::eof();
+   }
+
+   const int result = m_dest->sputc(static_cast<char>(ch));
+   if (result == traits_type::eof())
+   {
+      return traits_type::eof();
+   }
+
+   m_at_line_start = (ch == '\n');
+   return result;
+}
+
+std::streamsize PrefixStreamBuf::xsputn(const char *s, std::streamsize count)
+{
+   if (m_dest == nullptr)
+   {
+      return 0;
+   }
+
+   std::streamsize written = 0;
+   for (; written < count; ++written)
+   {
+      if (overflow(static_cast<unsigned char>(s[written])) == traits_type::eof())
+      {
+         break;
+      }
+   }
+   return written;
+}
+
+int PrefixStreamBuf::sync()
+{
+   return (m_dest == nullptr || m_dest->pubsync() == 0) ? 0 : -1;
 }
 
 void OutStream::Init()
 {
    if (this == &ELFF::out)
    {
-      internal::elff_out_initialized = true;
+      Internal::elff_out_initialized = true;
    }
    else if (this == &ELFF::err)
    {
-      internal::elff_err_initialized = true;
+      Internal::elff_err_initialized = true;
    }
+}
+
+void SetOutPrefix(const std::string &prefix)
+{
+   ELFF::out.SetPrefix(prefix);
+}
+
+void ClearOutPrefix()
+{
+   ELFF::out.ClearPrefix();
+}
+
+void SetErrPrefix(const std::string &prefix)
+{
+   ELFF::err.SetPrefix(prefix);
+}
+
+void ClearErrPrefix()
+{
+   ELFF::err.ClearPrefix();
 }
 
 std::string MakeParFilename(const std::string &prefix, const int myid,
@@ -53,22 +126,6 @@ std::string MakeParFilename(const std::string &prefix, const int myid,
    return fname.str();
 }
 
-
-// #ifdef ELFF_USE_MPI
-
-// MPI_Comm ELFF_COMM_WORLD = MPI_COMM_WORLD;
-
-// MPI_Comm GetGlobalMPI_Comm()
-// {
-//    return ELFF_COMM_WORLD;
-// }
-
-// void SetGlobalMPI_Comm(MPI_Comm comm)
-// {
-//    ELFF_COMM_WORLD = comm;
-// }
-
-// #endif
 
 const char *GetEnv(const char* name)
 {

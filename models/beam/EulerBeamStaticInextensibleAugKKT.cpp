@@ -81,7 +81,7 @@ EulerBeamStaticInextensibleAugKKT::solve(std::array<real_t, 3> load)
     const real_t res_norm = residual.norm();
 
     if (res_norm < tol) {
-      std::cout << "Converged in " << it << " iters.\n";
+      ELFF_LOG("Converged in " << it << " iters.");
       break;
     } else if (it == max_iter) {
       ELFF_ABORT(

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <iostream>
-
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
 
@@ -129,8 +127,8 @@ public:
     if (cg.info() != Success)
       ELFF_ABORT("CG did not converge");
 
-    std::cout << "CG iters: " << cg.iterations()
-              << ", final error est.: " << cg.error() << "\n";
+    ELFF_LOG("CG iters: " << cg.iterations()
+                          << ", final error est.: " << cg.error());
 
     update_mesh();
   }
@@ -156,8 +154,8 @@ public:
     if (cg.info() != Success)
       ELFF_ABORT("CG did not converge");
 
-    std::cout << "CG iters: " << cg.iterations()
-              << ", final error est.: " << cg.error() << "\n";
+    ELFF_LOG("CG iters: " << cg.iterations()
+                          << ", final error est.: " << cg.error());
 
     update_mesh();
   }

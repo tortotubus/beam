@@ -68,37 +68,43 @@ EulerBeamDynamicInextensibleMoMSparse::solve_newmark(
 
   u_prev = u;
 
-  real_t S_norm = 0;
+  real_t S_norm = 0., res_norm = 0., l2_err = 0.;
+  size_t iter_outer;
 
-  for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
+  for (iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
     assemble_system_newmark(dt, load, beta, gamma);
     apply_boundary_conditions();
 
-    real_t res_norm = residual.norm();
+    res_norm = residual.norm();
 
-    if (res_norm < tol_outer) {
+    if (res_norm < tol_inner && S_norm < tol_outer) {
       break;
     } else if (iter_outer == max_iter_outer - 1) {
-      ELFF_ABORT(
-        "EulerBeamDynamicInextensibleMoMSparse::solve() did not converge.\n");
+      ELFF_LOG(iter_outer << " " << res_norm << " " << " " << S_norm << " "
+                          << l2_err);
+      // ELFF_WARNING(
+      //   "EulerBeamDynamicInextensibleMoMSparse::solve() did not converge.\n");
     }
 
     solver.setTolerance(tol_inner);
+    solver.setMaxIterations(static_cast<int>(max_iter_inner));
     solver.compute(jacobian);
 
     VectorXd delta_u = solver.solve(-residual);
 
     if (solver.info() != Success) {
-      ELFF_ABORT(
-        "EulerBeamDynamicInextensibleMoMSparse::solve(): linear solve failed.\n");
+      ELFF_ABORT("EulerBeamDynamicInextensibleMoMSparse::solve(): linear solve "
+                 "failed.\n");
     }
 
     u += delta_u;
 
     S_norm = update_lambda();
+    l2_err = compute_inextensibility_error_l2();
   }
 
-  (void) S_norm;
+  ELFF_LOG(iter_outer << " " << res_norm << " " << " " << S_norm << " "
+                      << l2_err);
 
   size_t nodes = mesh.get_nodes();
 
@@ -130,11 +136,10 @@ EulerBeamDynamicInextensibleMoMSparse::solve_newmark(
 }
 
 void
-EulerBeamDynamicInextensibleMoMSparse::solve_newmark(
-  real_t dt,
-  std::array<real_t, 3> load,
-  real_t beta,
-  real_t gamma)
+EulerBeamDynamicInextensibleMoMSparse::solve_newmark(real_t dt,
+                                                     std::array<real_t, 3> load,
+                                                     real_t beta,
+                                                     real_t gamma)
 {
   ConjugateGradient<SparseMatrix<real_t>, Lower | Upper> solver;
 
@@ -172,13 +177,14 @@ EulerBeamDynamicInextensibleMoMSparse::solve_newmark(
     }
 
     solver.setTolerance(tol_inner);
+    solver.setMaxIterations(static_cast<int>(max_iter_inner));
     solver.compute(jacobian);
 
     VectorXd delta_u = solver.solve(-residual);
 
     if (solver.info() != Success) {
-      ELFF_ABORT(
-        "EulerBeamDynamicInextensibleMoMSparse::solve(): linear solve failed.\n");
+      ELFF_ABORT("EulerBeamDynamicInextensibleMoMSparse::solve(): linear solve "
+                 "failed.\n");
     }
 
     u += delta_u;
@@ -186,7 +192,7 @@ EulerBeamDynamicInextensibleMoMSparse::solve_newmark(
     S_norm = update_lambda();
   }
 
-  (void) S_norm;
+  (void)S_norm;
 
   update_mesh();
 

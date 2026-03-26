@@ -84,6 +84,46 @@ public:
    */
   virtual void apply_initial_condition();
 
+  /**
+   * @brief Get the constraint/inextensibility tolerance.
+   */
+  real_t get_lambda_tol() const { return tol_outer; }
+
+  /**
+   * @brief Set the constraint/inextensibility tolerance.
+   */
+  void set_lambda_tol(real_t tol) { tol_outer = tol; }
+
+  /**
+   * @brief Get the residual tolerance used by the linearized solve.
+   */
+  real_t get_res_tol() const { return tol_inner; }
+
+  /**
+   * @brief Set the residual tolerance used by the linearized solve.
+   */
+  void set_res_tol(real_t tol) { tol_inner = tol; }
+
+  /**
+   * @brief Get the maximum number of outer constraint updates.
+   */
+  size_t get_lambda_iter() const { return max_iter_outer; }
+
+  /**
+   * @brief Set the maximum number of outer constraint updates.
+   */
+  void set_lambda_iter(size_t iter) { max_iter_outer = iter; }
+
+  /**
+   * @brief Get the maximum number of inner residual iterations.
+   */
+  size_t get_res_iter() const { return max_iter_inner; }
+
+  /**
+   * @brief Set the maximum number of inner residual iterations.
+   */
+  void set_res_iter(size_t iter) { max_iter_inner = iter; }
+
 protected:
   /**
    * @brief Spatial dimension of the beam formulation.
@@ -340,6 +380,22 @@ protected:
    * @return Norm of the multiplier correction
    */
   real_t update_lambda(real_t omega = 1.0);
+
+  /**
+   * @brief Computes the L2 norm of the inextensibility defect.
+   *
+   * This evaluates \f$S = |\partial_s \mathbf{r}|^2 - 1\f$ at the element
+   * quadrature points and returns \f$\sqrt{\int S^2\,ds}\f$.
+   */
+  real_t compute_inextensibility_error_l2() const;
+
+  /**
+   * @brief Computes the maximum quadrature-point inextensibility defect.
+   *
+   * This evaluates \f$|S|\f$ at the element quadrature points and returns the
+   * maximum observed value.
+   */
+  real_t compute_inextensibility_error_linf() const;
 
   /**
    * @brief Updates the beam mesh from the current solution state.

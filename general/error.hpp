@@ -1,17 +1,8 @@
 #pragma once
 
-// Copyright (c) 2010-2025, Lawrence Livermore National Security, LLC. Produced
-// at the Lawrence Livermore National Laboratory. All Rights reserved. See files
-// LICENSE and NOTICE for details. LLNL-CODE-806117.
-//
-// This file is part of the BEAM library. For more information and source code
-// availability visit https://beam.org.
-//
-// BEAM is free software; you can redistribute it and/or modify it under the
-// terms of the BSD-3 license. We welcome feedback and contributions, see file
-// CONTRIBUTING.md for details.
 
 #include "elff/config/config.hpp"
+#include "elff/general/globals.hpp"
 #include <iomanip>
 #include <sstream>
 
@@ -79,11 +70,11 @@ void elff_warning(const char *msg = NULL);
 // Common error message and abort macro
 #define _ELFF_MESSAGE(msg, fn)                                          \
    {                                                                    \
-      std::ostringstream beamMsgStream;                                 \
-      beamMsgStream << std::setprecision(16);                           \
-      beamMsgStream << std::setiosflags(std::ios_base::scientific);     \
-      beamMsgStream << msg << ELFF_LOCATION;                            \
-      ELFF::fn(beamMsgStream.str().c_str());                            \
+      std::ostringstream elffMsgStream;                                 \
+      elffMsgStream << std::setprecision(16);                           \
+      elffMsgStream << std::setiosflags(std::ios_base::scientific);     \
+      elffMsgStream << msg << ELFF_LOCATION;                            \
+      ELFF::fn(elffMsgStream.str().c_str());                            \
    }
 
 // Outputs lots of useful information and aborts.
@@ -135,9 +126,20 @@ void elff_warning(const char *msg = NULL);
 // Generate a warning message - always generated, regardless of ELFF_DEBUG.
 #define ELFF_WARNING(msg) _ELFF_MESSAGE("BEAM Warning: " << msg, elff_warning)
 
+// Generic runtime-controlled log output.
+// This routes through ELFF::out, so callers can silence it with:
+//   ELFF::out.Disable();
+#define ELFF_LOG(msg)                          \
+   do                                          \
+   {                                           \
+      if (ELFF::out.IsEnabled())               \
+      {                                        \
+         ELFF::out << msg << '\n';             \
+      }                                        \
+   } while (0)
+
 // Macro that checks (in ELFF_DEBUG mode) that i is in the range [imin,imax).
 #define ELFF_ASSERT_INDEX_IN_RANGE(i,imin,imax) \
    ELFF_ASSERT((imin) <= (i) && (i) < (imax), \
    "invalid index " #i << " = " << (i) << \
    ", valid range is [" << (imin) << ',' << (imax) << ')')
-

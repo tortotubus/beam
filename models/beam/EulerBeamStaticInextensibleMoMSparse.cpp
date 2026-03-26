@@ -1,5 +1,8 @@
 #include "elff/models/beam/EulerBeamStaticInextensibleMoMSparse.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 namespace ELFF {
 namespace Models {
 
@@ -24,10 +27,10 @@ EulerBeamStaticInextensibleMoMSparse::EulerBeamStaticInextensibleMoMSparse(
   , offset_l()
   , ndof(ndof_x + ndof_y + ndof_z)
   , r_penalty(r_penalty)
-  , max_iter_inner(1000)
-  , max_iter_outer(1000)
-  , tol_inner(1e-5)
-  , tol_outer(1e-5)
+  , max_iter_inner(10000)
+  , max_iter_outer(10000)
+  , tol_inner(5e-5)
+  , tol_outer(5e-2)
   , residual(VectorXd::Zero(ndof))
   , lambda(VectorXd::Zero(ndof_l))
   , jacobian(SparseMatrix<real_t>(ndof, ndof))
@@ -58,10 +61,10 @@ EulerBeamStaticInextensibleMoMSparse::EulerBeamStaticInextensibleMoMSparse(
   , offset_l()
   , ndof(ndof_x + ndof_y + ndof_z)
   , r_penalty(r_penalty)
-  , max_iter_inner(1000)
-  , max_iter_outer(1000)
-  , tol_inner(1e-6)
-  , tol_outer(1e-6)
+  , max_iter_inner(10000)
+  , max_iter_outer(10000)
+  , tol_inner(5e-5)
+  , tol_outer(5e-2)
   , residual(VectorXd::Zero(ndof))
   , lambda(VectorXd::Zero(ndof_l))
   , jacobian(SparseMatrix<real_t>(ndof, ndof))
@@ -82,26 +85,31 @@ EulerBeamStaticInextensibleMoMSparse::solve()
 void
 EulerBeamStaticInextensibleMoMSparse::solve(std::array<real_t, 3> load)
 {
-  real_t S_norm = 0;
+  real_t S_norm = 0, res_norm = 0;
+  size_t iter_outer = 0;
 
   ConjugateGradient<SparseMatrix<real_t>,
                     Lower | Upper,
                     IncompleteCholesky<real_t>>
     solver;
 
-  for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
+  for (iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
     assemble_system(load);
     apply_boundary_conditions();
 
-    const real_t res_norm = residual.norm();
+    res_norm = residual.norm();
 
-    if (res_norm < tol_outer) {
+
+    if (res_norm < tol_inner && S_norm < tol_outer) {
       break;
     } else if (iter_outer == max_iter_outer - 1) {
-      ELFF_ABORT("EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
+      ELFF_LOG(iter_outer << " : ||r|| = " << res_norm << "\t" << "||S|| = " << S_norm);
+      ELFF_ABORT(
+        "EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
     }
 
     solver.setTolerance(tol_inner);
+    solver.setMaxIterations(static_cast<int>(max_iter_inner));
     solver.compute(jacobian);
 
     if (solver.info() != Success) {
@@ -115,7 +123,7 @@ EulerBeamStaticInextensibleMoMSparse::solve(std::array<real_t, 3> load)
     S_norm = update_lambda();
   }
 
-  (void) S_norm;
+  ELFF_LOG(iter_outer << " : ||r|| = " << res_norm << "\t" << "||S|| = " << S_norm);
   update_mesh();
 }
 
@@ -126,26 +134,30 @@ EulerBeamStaticInextensibleMoMSparse::solve(
   ELFF_ASSERT(load.size() == nodes,
               "Size of load vector must equal number of nodes.");
 
-  real_t S_norm = 0;
+  real_t S_norm = 0, res_norm = 0;
+  size_t iter_outer = 0;
 
   ConjugateGradient<SparseMatrix<real_t>,
                     Lower | Upper,
                     IncompleteCholesky<real_t>>
     solver;
 
-  for (size_t iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
+  for (iter_outer = 0; iter_outer < max_iter_outer; iter_outer++) {
     assemble_system(load);
     apply_boundary_conditions();
 
     const real_t res_norm = residual.norm();
 
-    if (res_norm < tol_outer) {
+    if (res_norm < tol_inner && S_norm < tol_outer) {
       break;
     } else if (iter_outer == max_iter_outer - 1) {
-      ELFF_ABORT("EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
+      ELFF_LOG(iter_outer << " : ||r|| = " << res_norm << "\t" << "||S|| = " << S_norm);
+      ELFF_ABORT(
+        "EulerBeamStaticInexntensibleMoM::solve() did not converge.\n");
     }
 
     solver.setTolerance(tol_inner);
+    solver.setMaxIterations(static_cast<int>(max_iter_inner));
     solver.compute(jacobian);
 
     if (solver.info() != Success) {
@@ -159,7 +171,7 @@ EulerBeamStaticInextensibleMoMSparse::solve(
     S_norm = update_lambda();
   }
 
-  (void) S_norm;
+  ELFF_LOG(iter_outer << " : ||r|| = " << res_norm << "\t" << "||S|| = " << S_norm);
   update_mesh();
 }
 
@@ -219,18 +231,12 @@ EulerBeamStaticInextensibleMoMSparse::get_element_dof_indices(size_t e) const
   const size_t n0 = e;
   const size_t n1 = e + 1;
 
-  return { offset_x + 2 * n0 + 0,
-           offset_x + 2 * n0 + 1,
-           offset_x + 2 * n1 + 0,
-           offset_x + 2 * n1 + 1,
-           offset_y + 2 * n0 + 0,
-           offset_y + 2 * n0 + 1,
-           offset_y + 2 * n1 + 0,
-           offset_y + 2 * n1 + 1,
-           offset_z + 2 * n0 + 0,
-           offset_z + 2 * n0 + 1,
-           offset_z + 2 * n1 + 0,
-           offset_z + 2 * n1 + 1 };
+  return {
+    offset_x + 2 * n0 + 0, offset_x + 2 * n0 + 1, offset_x + 2 * n1 + 0,
+    offset_x + 2 * n1 + 1, offset_y + 2 * n0 + 0, offset_y + 2 * n0 + 1,
+    offset_y + 2 * n1 + 0, offset_y + 2 * n1 + 1, offset_z + 2 * n0 + 0,
+    offset_z + 2 * n0 + 1, offset_z + 2 * n1 + 0, offset_z + 2 * n1 + 1
+  };
 }
 
 Matrix<real_t, 12, 1>
@@ -253,7 +259,7 @@ EulerBeamStaticInextensibleMoMSparse::get_element_lambda(size_t e) const
 real_t
 EulerBeamStaticInextensibleMoMSparse::update_lambda(real_t omega)
 {
-  (void) omega;
+  (void)omega;
 
   const real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
   const real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
@@ -332,8 +338,118 @@ EulerBeamStaticInextensibleMoMSparse::update_lambda(real_t omega)
     }
   }
 
-  lambda = lambda_n;
+  lambda += omega * lambda_n;
   return lambda_n.norm();
+}
+
+real_t
+EulerBeamStaticInextensibleMoMSparse::compute_inextensibility_error_l2() const
+{
+  const real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+  const real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+
+  real_t error_sq = 0.0;
+
+  for (size_t e = 0; e < elements; ++e) {
+    const std::vector<size_t> elem_nodes = { e, e + 1 };
+    const std::vector<size_t> idx_x = { offset_x + 2 * elem_nodes[0],
+                                        offset_x + 2 * elem_nodes[0] + 1,
+                                        offset_x + 2 * elem_nodes[1],
+                                        offset_x + 2 * elem_nodes[1] + 1 };
+    const std::vector<size_t> idx_y = { offset_y + 2 * elem_nodes[0],
+                                        offset_y + 2 * elem_nodes[0] + 1,
+                                        offset_y + 2 * elem_nodes[1],
+                                        offset_y + 2 * elem_nodes[1] + 1 };
+    const std::vector<size_t> idx_z = { offset_z + 2 * elem_nodes[0],
+                                        offset_z + 2 * elem_nodes[0] + 1,
+                                        offset_z + 2 * elem_nodes[1],
+                                        offset_z + 2 * elem_nodes[1] + 1 };
+
+    const std::array<real_t, 4> ux = {
+      u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
+    };
+    const std::array<real_t, 4> uy = {
+      u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
+    };
+    const std::array<real_t, 4> uz = {
+      u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]]
+    };
+
+    for (size_t qi = 0; qi < 3; ++qi) {
+      const real_t xi = xi_q[qi];
+      const real_t w = w_q[qi];
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+
+      real_t xp = 0.0;
+      real_t yp = 0.0;
+      real_t zp = 0.0;
+
+      for (size_t i = 0; i < 4; ++i) {
+        xp += dH[i] * ux[i];
+        yp += dH[i] * uy[i];
+        zp += dH[i] * uz[i];
+      }
+
+      const real_t S = xp * xp + yp * yp + zp * zp - 1.0;
+      error_sq += S * S * w * ds;
+    }
+  }
+
+  return std::sqrt(error_sq);
+}
+
+real_t
+EulerBeamStaticInextensibleMoMSparse::compute_inextensibility_error_linf() const
+{
+  const real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+
+  real_t max_error = 0.0;
+
+  for (size_t e = 0; e < elements; ++e) {
+    const std::vector<size_t> elem_nodes = { e, e + 1 };
+    const std::vector<size_t> idx_x = { offset_x + 2 * elem_nodes[0],
+                                        offset_x + 2 * elem_nodes[0] + 1,
+                                        offset_x + 2 * elem_nodes[1],
+                                        offset_x + 2 * elem_nodes[1] + 1 };
+    const std::vector<size_t> idx_y = { offset_y + 2 * elem_nodes[0],
+                                        offset_y + 2 * elem_nodes[0] + 1,
+                                        offset_y + 2 * elem_nodes[1],
+                                        offset_y + 2 * elem_nodes[1] + 1 };
+    const std::vector<size_t> idx_z = { offset_z + 2 * elem_nodes[0],
+                                        offset_z + 2 * elem_nodes[0] + 1,
+                                        offset_z + 2 * elem_nodes[1],
+                                        offset_z + 2 * elem_nodes[1] + 1 };
+
+    const std::array<real_t, 4> ux = {
+      u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
+    };
+    const std::array<real_t, 4> uy = {
+      u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
+    };
+    const std::array<real_t, 4> uz = {
+      u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]]
+    };
+
+    for (size_t qi = 0; qi < 3; ++qi) {
+      const real_t xi = xi_q[qi];
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+
+      real_t xp = 0.0;
+      real_t yp = 0.0;
+      real_t zp = 0.0;
+
+      for (size_t i = 0; i < 4; ++i) {
+        xp += dH[i] * ux[i];
+        yp += dH[i] * uy[i];
+        zp += dH[i] * uz[i];
+      }
+
+      const real_t S = xp * xp + yp * yp + zp * zp - 1.0;
+      max_error = std::max(max_error, std::abs(S));
+    }
+  }
+
+  return max_error;
 }
 
 void
@@ -419,7 +535,8 @@ EulerBeamStaticInextensibleMoMSparse::assemble_system(
     const auto idx = get_element_dof_indices(e);
     const auto lambda_elem = get_element_lambda(e);
     const Matrix<real_t, 12, 1> u_elem = get_element_state(idx);
-    const std::array<std::array<real_t, 3>, 2> load_elem = { load[e], load[e + 1] };
+    const std::array<std::array<real_t, 3>, 2> load_elem = { load[e],
+                                                             load[e + 1] };
 
     ADVec u_ad;
     for (int a = 0; a < 12; ++a) {
