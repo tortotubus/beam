@@ -1,24 +1,20 @@
 
-
-#include <gtest/gtest.h>
-
-#include <format>
-#include <iomanip>
-#include <string>
-
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
-#include <elff/models/beam/EulerBeamDynamicInextensibleMoM.hpp>
+#include <elff/models/beam/EulerBeamDynamicInextensibleAugKKT.hpp>
+#include <elff/models/beam/EulerBeamStaticInextensibleAugKKT.hpp>
+#include <gtest/gtest.h>
+#include <string>
 
 namespace ELFF {
 
 using namespace IO::CXX;
 using namespace Models;
 
-TEST(EulerBeamDynamicInextensibleMoMTest, Glowinski)
+TEST(EulerBeamDynamicInextensibleAugKKTTest, Glowinski)
 {
 
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
-  real_t length = 32.6, EI = 700., mu = 7.67, r_pentalty = 1e5;
+  real_t length = 32.6, EI = 700., mu = 7.67, r_penalty = 1e3;
   std::array<real_t, 3> load = { 0, -9.81 * mu, 0 };
 
   real_t dt = 1e-2;
@@ -28,6 +24,9 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Glowinski)
 
   real_t dt_save = 0.1;
   size_t Nt_save = size_t(ceil(dt_save / dt));
+  (void)t;
+  (void)dt_save;
+  (void)Nt_save;
 
   size_t nodes = 61;
 
@@ -42,20 +41,24 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Glowinski)
               } }
   };
 
-  EulerBeamStaticInextensibleMoM static_beam(
-    length, EI, nodes, boundary_conditions, r_pentalty);
+  EulerBeamStaticInextensibleAugKKT static_beam(
+    length, EI, nodes, boundary_conditions, r_penalty);
   static_beam.apply_initial_condition();
-  static_beam.solve(load); 
+
+  ELFF_LOG("Static Solve:");
+  static_beam.solve(load);
 
   boundary_conditions.type[1] = EulerBeam::free_bc;
 
-  EulerBeamDynamicInextensibleMoM dynamic_beam(
-    length, EI, mu, nodes, boundary_conditions, r_pentalty);
+  EulerBeamDynamicInextensibleAugKKT dynamic_beam(
+    length, EI, mu, nodes, boundary_conditions, r_penalty);
+
   dynamic_beam.apply_initial_condition(static_beam.get_mesh());
 
+  ELFF_LOG("Dynamic Solve:");
   for (size_t ti = 0; ti < Nt; ti++) {
 
-    std::string filename = "glowinski_mom.vtkhdf";
+    std::string filename = "glowinski_augkkt_sparse.vtkhdf";
 
     if (ti == 0) {
       vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();
@@ -71,7 +74,7 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Glowinski)
   }
 };
 
-TEST(EulerBeamDynamicInextensibleMoMTest, Huang)
+TEST(EulerBeamDynamicInextensibleAugKKTTest, Huang)
 {
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
 
@@ -96,7 +99,6 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Huang)
     ic_centerline[ni][1] = y0 + (length - s) * std::sin(kappa);
     ic_centerline[ni][2] = 0.;
 
-    // Tangent dX/ds:
     ic_slope[ni][0] = -std::cos(kappa);
     ic_slope[ni][1] = -std::sin(kappa);
     ic_slope[ni][2] = 0.;
@@ -106,8 +108,6 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Huang)
     ic_velocity[ni][2] = 0.;
   }
 
-  ic_mesh.plot_gnuplot("Initial condition");
-
   EulerBeam::EulerBeamBCs boundary_conditions = {
     .end = { EulerBeam::left, EulerBeam::right },
     .type = { EulerBeam::free_bc, EulerBeam::simple_bc },
@@ -115,7 +115,6 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Huang)
                 .position = { 0, 0, 0 },
               },
               {
-                //
               } }
   };
 
@@ -127,17 +126,18 @@ TEST(EulerBeamDynamicInextensibleMoMTest, Huang)
   real_t t = 0;
   real_t tf = 0.8;
   size_t Nt = size_t(ceil(tf / dt));
+  (void)t;
 
   std::array<real_t, 3> load = { 10, 0, 0 };
 
-  EulerBeamDynamicInextensibleMoM dynamic_beam(
+  EulerBeamDynamicInextensibleAugKKT dynamic_beam(
     length, EI, mu, nodes, boundary_conditions, r_penalty);
 
   dynamic_beam.apply_initial_condition(ic_mesh);
 
   for (size_t ti = 0; ti < Nt; ti++) {
 
-    std::string filename = "huang_mom.vtkhdf";
+    std::string filename = "huang_augkkt_sparse.vtkhdf";
 
     if (ti == 0) {
       vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();

@@ -1,4 +1,5 @@
 #include "elff/models/beam/EulerBeamMesh.hpp"
+#include "elff/general/error.hpp"
 
 namespace ELFF {
 namespace Models {
@@ -21,7 +22,8 @@ EulerBeamMesh::plot_gnuplot(std::string title)
 {
   FILE* pipe = popen("gnuplot -persist", "w");
   if (!pipe) {
-    ELFF_ABORT("Failed to open pipe to gnuplot");
+    ELFF_WARNING("Failed to open pipe to gnuplot");
+    return;
   }
 
   // Configure the plot

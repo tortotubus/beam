@@ -1,4 +1,5 @@
 #include "elff/models/beam/EulerBeamStaticInextensibleADDM.hpp"
+#include "elff/models/beam/EulerBeam.hpp"
 
 namespace ELFF {
 namespace Models {
@@ -34,7 +35,7 @@ EulerBeamStaticInextensibleADDM::EulerBeamStaticInextensibleADDM(
   , yp(VectorXd::Zero(nodes + elements))
   , zp(VectorXd::Zero(nodes + elements))
   , max_outer(100000)
-  , tol_outer(1e-7)
+  , tol_outer(1e-10)
 {
   apply_initial_condition();
   assemble_A();
@@ -73,8 +74,8 @@ EulerBeamStaticInextensibleADDM::EulerBeamStaticInextensibleADDM(
   , xp(VectorXd::Zero(nodes + elements))
   , yp(VectorXd::Zero(nodes + elements))
   , zp(VectorXd::Zero(nodes + elements))
-  , max_outer(100000)
-  , tol_outer(1e-7)
+  , max_outer(10000)
+  , tol_outer(1e-5)
 {
   apply_initial_condition(mesh);
   assemble_A();
@@ -83,6 +84,55 @@ EulerBeamStaticInextensibleADDM::EulerBeamStaticInextensibleADDM(
 }
 
 EulerBeamStaticInextensibleADDM::~EulerBeamStaticInextensibleADDM() = default;
+
+void
+EulerBeamStaticInextensibleADDM::collect_boundary_dofs(
+  std::vector<size_t>& idx,
+  std::vector<real_t>& xvals,
+  std::vector<real_t>& yvals,
+  std::vector<real_t>& zvals) const
+{
+  const size_t nodes = mesh.get_nodes();
+
+  for (size_t bi = 0; bi < 2; ++bi) {
+    const EulerBeamBCEnd bcend = boundary_conditions.end[bi];
+    const EulerBeamBCType bctype = boundary_conditions.type[bi];
+    const EulerBeamBCVals bcvals = boundary_conditions.vals[bi];
+
+    size_t ni = 0;
+    switch (bcend) {
+      case left:
+        ni = 0;
+        break;
+      case right:
+        ni = nodes - 1;
+        break;
+    }
+
+    switch (bctype) {
+      case free_bc:
+      case point_force_bc:
+      case point_torque_bc:
+        break;
+      case simple_bc:
+        idx.push_back(2 * ni + 0);
+        xvals.push_back(bcvals.position[0]);
+        yvals.push_back(bcvals.position[1]);
+        zvals.push_back(bcvals.position[2]);
+        break;
+      case clamped_bc:
+        idx.push_back(2 * ni + 0);
+        xvals.push_back(bcvals.position[0]);
+        yvals.push_back(bcvals.position[1]);
+        zvals.push_back(bcvals.position[2]);
+        idx.push_back(2 * ni + 1);
+        xvals.push_back(bcvals.slope[0]);
+        yvals.push_back(bcvals.slope[1]);
+        zvals.push_back(bcvals.slope[2]);
+        break;
+    }
+  }
+}
 
 void
 EulerBeamStaticInextensibleADDM::solve()
@@ -181,7 +231,8 @@ EulerBeamStaticInextensibleADDM::apply_initial_condition_xy()
 }
 
 void
-EulerBeamStaticInextensibleADDM::apply_initial_condition_xy(EulerBeamMesh& bmesh)
+EulerBeamStaticInextensibleADDM::apply_initial_condition_xy(
+  EulerBeamMesh& bmesh)
 {
   const size_t nodes = bmesh.get_nodes();
   ELFF_ASSERT(nodes == mesh.get_nodes(),
@@ -217,7 +268,8 @@ EulerBeamStaticInextensibleADDM::compute_slopes_collocation()
   }
 
   for (size_t ei = 0; ei < elements; ei++) {
-    const std::array<real_t, 4> dH = ELFF::FEM::CubicHermite<real_t>::derivs(0.5, h);
+    const std::array<real_t, 4> dH =
+      ELFF::FEM::CubicHermite<real_t>::derivs(0.5, h);
 
     const size_t edofs[4] = {
       2 * (ei + 0) + 0, 2 * (ei + 0) + 1, 2 * (ei + 1) + 0, 2 * (ei + 1) + 1
@@ -242,7 +294,8 @@ EulerBeamStaticInextensibleADDM::apply_initial_condition_pq()
       case 2: {
         const real_t xprime = xp[ci];
         const real_t yprime = yp[ci];
-        const real_t den = std::max(1e-14, sqrt(xprime * xprime + yprime * yprime));
+        const real_t den =
+          std::max(1e-14, sqrt(xprime * xprime + yprime * yprime));
         p[ci] = xprime / den;
         q[ci] = yprime / den;
       } break;
@@ -258,56 +311,29 @@ EulerBeamStaticInextensibleADDM::apply_initial_condition_pq()
       } break;
     }
   }
-  apply_boundary_condition_pq();
-}
-
-void
-EulerBeamStaticInextensibleADDM::apply_boundary_condition_pq()
-{
-  const size_t nodes = mesh.get_nodes();
-  for (size_t bi = 0; bi < 2; bi++) {
-    if (boundary_conditions.type[bi] == clamped_bc) {
-      switch (boundary_conditions.end[bi]) {
-        case left:
-          p(0) = boundary_conditions.vals[bi].slope[0];
-          q(0) = boundary_conditions.vals[bi].slope[1];
-          r(0) = boundary_conditions.vals[bi].slope[2];
-          break;
-        case right:
-          p(nodes - 1) = boundary_conditions.vals[bi].slope[0];
-          q(nodes - 1) = boundary_conditions.vals[bi].slope[1];
-          r(nodes - 1) = boundary_conditions.vals[bi].slope[2];
-          break;
-      }
-    }
-  }
 }
 
 void
 EulerBeamStaticInextensibleADDM::apply_boundary_condition_lambda()
 {
   const size_t nodes = mesh.get_nodes();
-
   for (size_t bi = 0; bi < 2; ++bi) {
     const EulerBeamBCType bctype = boundary_conditions.type[bi];
+    if (bctype == free_bc || bctype == simple_bc || bctype == clamped_bc) {
+      size_t ci = 0;
+      switch (boundary_conditions.end[bi]) {
+        case left:
+          ci = 0;
+          break;
+        case right:
+          ci = nodes - 1;
+          break;
+      }
 
-    if (bctype != free_bc && bctype != simple_bc) {
-      continue;
+      lambda_x(ci) = 0.;
+      lambda_y(ci) = 0.;
+      lambda_z(ci) = 0.;
     }
-
-    size_t ci = 0;
-    switch (boundary_conditions.end[bi]) {
-      case left:
-        ci = 0;
-        break;
-      case right:
-        ci = nodes - 1;
-        break;
-    }
-
-    lambda_x(ci) = 0.;
-    lambda_y(ci) = 0.;
-    lambda_z(ci) = 0.;
   }
 }
 
@@ -342,8 +368,6 @@ EulerBeamStaticInextensibleADDM::update_pq()
       } break;
     }
   }
-
-  apply_boundary_condition_pq();
 }
 
 void
@@ -351,62 +375,17 @@ EulerBeamStaticInextensibleADDM::apply_boundary_condition_A()
 {
   A = A_unconstrained;
 
-  const size_t nodes = mesh.get_nodes();
+  std::vector<size_t> idx;
+  std::vector<real_t> xvals, yvals, zvals;
+  collect_boundary_dofs(idx, xvals, yvals, zvals);
 
-  for (size_t bi = 0; bi < 2; ++bi) {
-    const EulerBeamBCEnd bcend = boundary_conditions.end[bi];
-    size_t ni = 0;
-
-    std::vector<size_t> idx;
-    std::vector<real_t> xvals;
-    std::vector<real_t> yvals;
-    std::vector<real_t> zvals;
-
-    switch (bcend) {
-      case left:
-        ni = 0;
-        break;
-      case right:
-        ni = nodes - 1;
-        break;
-    }
-
-    const EulerBeamBCType bctype = boundary_conditions.type[bi];
-    const EulerBeamBCVals bcvals = boundary_conditions.vals[bi];
-
-    switch (bctype) {
-      case free_bc:
-        idx = {};
-        xvals = {};
-        yvals = {};
-        zvals = {};
-        break;
-      case simple_bc:
-        idx = { 2 * ni + 0 };
-        xvals = { bcvals.position[0] };
-        yvals = { bcvals.position[1] };
-        zvals = { bcvals.position[2] };
-        break;
-      case clamped_bc:
-        idx = { 2 * ni + 0 };
-        xvals = { bcvals.position[0] };
-        yvals = { bcvals.position[1] };
-        zvals = { bcvals.position[2] };
-        break;
-      case point_force_bc:
-      case point_torque_bc:
-        idx = {};
-        xvals = {};
-        yvals = {};
-        zvals = {};
-        break;
-    }
-
-    for (size_t i = 0; i < xvals.size(); i++) {
-      A.row(idx[i]).setZero();
-      A.col(idx[i]).setZero();
-      A(idx[i], idx[i]) = 1.;
-    }
+  // Eliminate sequentially against the running modified A
+  // so that coupled constrained DOFs are handled correctly
+  for (size_t i = 0; i < idx.size(); i++) {
+    const size_t d = idx[i];
+    A.row(d).setZero();
+    A.col(d).setZero();
+    A(d, d) = 1.;
   }
 }
 
@@ -520,89 +499,60 @@ EulerBeamStaticInextensibleADDM::assemble_f(std::array<real_t, 3> load)
       f_z(edofs[a]) += fze[a];
     }
   }
+
+  // Point force and torque BCs add directly to f
+  const size_t nodes_count = mesh.get_nodes();
+  for (size_t bi = 0; bi < 2; ++bi) {
+    const EulerBeamBCEnd bcend = boundary_conditions.end[bi];
+    const EulerBeamBCType bctype = boundary_conditions.type[bi];
+    const EulerBeamBCVals bcvals = boundary_conditions.vals[bi];
+
+    size_t ni = 0;
+    switch (bcend) {
+      case left:  ni = 0; break;
+      case right: ni = nodes_count - 1; break;
+    }
+
+    if (bctype == point_force_bc) {
+      f_x(2 * ni + 0) += bcvals.force[0];
+      f_y(2 * ni + 0) += bcvals.force[1];
+      f_z(2 * ni + 0) += bcvals.force[2];
+    } else if (bctype == point_torque_bc) {
+      f_x(2 * ni + 1) += bcvals.torque[0];
+      f_y(2 * ni + 1) += bcvals.torque[1];
+      f_z(2 * ni + 1) += bcvals.torque[2];
+    }
+  }
 }
 
 void
 EulerBeamStaticInextensibleADDM::apply_boundary_condition_f()
 {
-  const size_t nodes = mesh.get_nodes();
+  std::vector<size_t> idx;
+  std::vector<real_t> xvals, yvals, zvals;
+  collect_boundary_dofs(idx, xvals, yvals, zvals);
 
-  for (size_t bi = 0; bi < 2; ++bi) {
-    const EulerBeamBCEnd bcend = boundary_conditions.end[bi];
-    size_t ni = 0;
+  // Sequential elimination against running modified A
+  // so coupled constrained DOFs (e.g. position and slope at same node)
+  // are handled correctly
+  MatrixXd A_elim = A_unconstrained;
 
-    std::vector<size_t> idx;
-    std::vector<real_t> xvals;
-    std::vector<real_t> yvals;
-    std::vector<real_t> zvals;
+  for (size_t i = 0; i < idx.size(); i++) {
+    const size_t d = idx[i];
+    const VectorXd col = A_elim.col(d);
 
-    switch (bcend) {
-      case left:
-        ni = 0;
-        break;
-      case right:
-        ni = nodes - 1;
-        break;
-    }
+    f_x.noalias() -= col * xvals[i];
+    f_y.noalias() -= col * yvals[i];
+    f_z.noalias() -= col * zvals[i];
 
-    const EulerBeamBCType bctype = boundary_conditions.type[bi];
-    const EulerBeamBCVals bcvals = boundary_conditions.vals[bi];
+    f_x(d) = xvals[i];
+    f_y(d) = yvals[i];
+    f_z(d) = zvals[i];
 
-    switch (bctype) {
-      case free_bc:
-        idx = {};
-        xvals = {};
-        yvals = {};
-        zvals = {};
-        break;
-      case simple_bc:
-        idx = { 2 * ni + 0 };
-        xvals = { bcvals.position[0] };
-        yvals = { bcvals.position[1] };
-        zvals = { bcvals.position[2] };
-        break;
-      case clamped_bc:
-        idx = { 2 * ni + 0 };
-        xvals = { bcvals.position[0] };
-        yvals = { bcvals.position[1] };
-        zvals = { bcvals.position[2] };
-        break;
-      case point_force_bc:
-        idx = { 2 * ni + 0 };
-        xvals = { bcvals.force[0] };
-        yvals = { bcvals.force[1] };
-        zvals = { bcvals.force[2] };
-        break;
-      case point_torque_bc:
-        idx = { 2 * ni + 0 };
-        xvals = { bcvals.torque[0] };
-        yvals = { bcvals.torque[1] };
-        zvals = { bcvals.torque[2] };
-        break;
-    }
-
-    switch (bctype) {
-      case point_force_bc:
-        for (size_t i = 0; i < xvals.size(); i++) {
-          f_x(idx[i]) += xvals[i];
-          f_y(idx[i]) += yvals[i];
-          f_z(idx[i]) += zvals[i];
-        }
-        break;
-      default:
-        for (size_t i = 0; i < xvals.size(); i++) {
-          const VectorXd A_col = A_unconstrained.col(idx[i]);
-
-          f_x.noalias() -= A_col * xvals[i];
-          f_y.noalias() -= A_col * yvals[i];
-          f_z.noalias() -= A_col * zvals[i];
-
-          f_x(idx[i]) = xvals[i];
-          f_y(idx[i]) = yvals[i];
-          f_z(idx[i]) = zvals[i];
-        }
-        break;
-    }
+    // Update A_elim so subsequent eliminations use the correct column
+    A_elim.row(d).setZero();
+    A_elim.col(d).setZero();
+    A_elim(d, d) = 1.;
   }
 }
 

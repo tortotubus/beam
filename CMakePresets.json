@@ -16,7 +16,7 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
         "ELFF_BUILD_DOC": "Off",
-        "ELFF_BUILD_TESTS": "Off"
+        "ELFF_BUILD_TESTS": "On"
       }
     },
     {

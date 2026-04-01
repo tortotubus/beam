@@ -1,24 +1,20 @@
 
 
-#include <gtest/gtest.h>
-
-#include <format>
-#include <iomanip>
-#include <string>
-
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
-#include <elff/models/beam/EulerBeamDynamicInextensibleMoMSparse.hpp>
+#include <elff/models/beam/EulerBeamDynamicInextensibleIndex1.hpp>
+#include <gtest/gtest.h>
+#include <string>
 
 namespace ELFF {
 
 using namespace IO::CXX;
 using namespace Models;
 
-TEST(EulerBeamDynamicInextensibleMoMSparseTest, Glowinski)
+TEST(EulerBeamDynamicInextensibleIndex1Test, Glowinski)
 {
 
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
-  real_t length = 32.6, EI = 700., mu = 7.67, r_pentalty = 1e6;
+  real_t length = 32.6, EI = 700., mu = 7.67, r_penalty = 1e5;
   std::array<real_t, 3> load = { 0, -9.81 * mu, 0 };
 
   real_t dt = 1e-2;
@@ -42,20 +38,25 @@ TEST(EulerBeamDynamicInextensibleMoMSparseTest, Glowinski)
               } }
   };
 
-  EulerBeamStaticInextensibleMoMSparse static_beam(
-    length, EI, nodes, boundary_conditions, r_pentalty);
+  EulerBeamInextensibleMoM static_beam(
+    length, EI, nodes, boundary_conditions, r_penalty);
   static_beam.apply_initial_condition();
-  static_beam.solve(load); 
+
+  ELFF_LOG("Static Solve:");
+  static_beam.solve(load);
+
 
   boundary_conditions.type[1] = EulerBeam::free_bc;
 
-  EulerBeamDynamicInextensibleMoMSparse dynamic_beam(
-    length, EI, mu, nodes, boundary_conditions, r_pentalty);
+  EulerBeamDynamicInextensibleIndex1 dynamic_beam(
+    length, EI, mu, nodes, boundary_conditions);
+
   dynamic_beam.apply_initial_condition(static_beam.get_mesh());
 
+  ELFF_LOG("Dynamic Solve:");
   for (size_t ti = 0; ti < Nt; ti++) {
 
-    std::string filename = "glowinski_mom_sparse.vtkhdf";
+    std::string filename = "glowinski_index1.vtkhdf";
 
     if (ti == 0) {
       vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();
@@ -71,8 +72,7 @@ TEST(EulerBeamDynamicInextensibleMoMSparseTest, Glowinski)
   }
 };
 
-
-TEST(EulerBeamDynamicInextensibleMoMSparseTest, Huang)
+TEST(EulerBeamDynamicInextensibleIndex1Test, Huang)
 {
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
 
@@ -120,7 +120,6 @@ TEST(EulerBeamDynamicInextensibleMoMSparseTest, Huang)
 
   real_t EI = 0.01;
   real_t mu = 1;
-  real_t r_penalty = 1e5;
 
   real_t dt = 0.02;
   real_t t = 0;
@@ -129,14 +128,14 @@ TEST(EulerBeamDynamicInextensibleMoMSparseTest, Huang)
 
   std::array<real_t, 3> load = { 10, 0, 0 };
 
-  EulerBeamDynamicInextensibleMoMSparse dynamic_beam(
-    length, EI, mu, nodes, boundary_conditions, r_penalty);
+  EulerBeamDynamicInextensibleIndex1 dynamic_beam(
+    length, EI, mu, nodes, boundary_conditions);
 
   dynamic_beam.apply_initial_condition(ic_mesh);
 
   for (size_t ti = 0; ti < Nt; ti++) {
 
-    std::string filename = "huang_mom_sparse.vtkhdf";
+    std::string filename = "huang_index1.vtkhdf";
 
     if (ti == 0) {
       vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();
@@ -151,6 +150,5 @@ TEST(EulerBeamDynamicInextensibleMoMSparseTest, Huang)
     dynamic_beam.solve(dt, load);
   }
 };
-
 
 }

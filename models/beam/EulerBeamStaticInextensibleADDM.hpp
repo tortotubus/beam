@@ -1,16 +1,7 @@
 #pragma once
 
-// #include <beam/LinAlg/Matrix.hpp>
-// #include <beam/LinAlg/Vector.hpp>
-
-#include "elff/models/beam/EulerBeam.hpp"
 #include "elff/fem/Shapes.hpp"
-
-#include <cstdio> // for popen, pclose, fprintf
-#include <iostream>
-#include <stdlib.h>
-#include <utility>
-#include <vector>
+#include "elff/models/beam/EulerBeam.hpp"
 
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
@@ -44,35 +35,25 @@ namespace Models {
  * \f[
  *    \mathcal{L}_R(x,y,p,q,\lambda_x,\mu) = J(x,y) + \int_0^L
  * \left[\lambda_x(p-x')
- * + \mu(q-y')\right] ds + \frac{r}{2} \int_0^L \left[(p-x')^2 + (q-y')^2\right]
- * ds.
+ * + \mu(q-y')\right] ds + \frac{r}{2} \int_0^L \left[(p-x')^2 +
+ * (q-y')^2\right] ds.
  * \f]
  */
-
 class EulerBeamStaticInextensibleADDM : public EulerBeam
 {
-
 public:
   EulerBeamStaticInextensibleADDM(real_t length,
-                                  real_t EI,
-                                  size_t nodes,
-                                  EulerBeamBCs bcs,
-                                  real_t r_penalty);
+                                   real_t EI,
+                                   size_t nodes,
+                                   EulerBeamBCs bcs,
+                                   real_t r_penalty);
 
   ~EulerBeamStaticInextensibleADDM();
 
-  /**
-   *
-   */
   virtual void solve() override;
-
-  /**
-   *
-   */
   virtual void solve(std::array<real_t, 3> load) override;
 
   virtual void apply_initial_condition();
-
   virtual void apply_initial_condition(EulerBeamMesh& bmesh) override;
 
   const VectorXd& get_lambda_x() const;
@@ -90,7 +71,6 @@ protected:
   MatrixXd A_unconstrained;
   VectorXd x, y, z;
   VectorXd f_x, f_y, f_z;
-
   LLT<MatrixXd> llt;
 
   VectorXd lambda_x, lambda_y, lambda_z;
@@ -101,45 +81,32 @@ protected:
   real_t tol_outer;
 
   EulerBeamStaticInextensibleADDM(real_t length,
-                                  real_t EI,
-                                  real_t mu,
-                                  size_t nodes,
-                                  EulerBeamBCs bcs,
-                                  real_t r_penalty);
+                                   real_t EI,
+                                   real_t mu,
+                                   size_t nodes,
+                                   EulerBeamBCs bcs,
+                                   real_t r_penalty);
 
   void update_mesh();
-
+  void collect_boundary_dofs(std::vector<size_t>& idx,
+                              std::vector<real_t>& xvals,
+                              std::vector<real_t>& yvals,
+                              std::vector<real_t>& zvals) const;
   void apply_initial_condition_xy();
-
   void apply_initial_condition_xy(EulerBeamMesh& bmesh);
-
   void compute_slopes_collocation();
-
   void apply_initial_condition_pq();
-
-  void apply_boundary_condition_pq();
-
   void apply_boundary_condition_lambda();
-
   virtual void update_pq();
-
   void apply_boundary_condition_A();
-
   void assemble_A();
-
   void decompose_A();
-
   void assemble_f(std::array<real_t, 3> load);
-
   void apply_boundary_condition_f();
-
   virtual void update_xy(std::array<real_t, 3> load);
-
   virtual void update_multipliers();
-
   bool is_converged(bool recompute_slopes = true);
 };
 
-
-} // namespace Models 
-} // namespace ELFF 
+} // namespace Models
+} // namespace ELFF

@@ -7,7 +7,7 @@ void
 IBEulerBeam::EBMeshToIBMeshNext()
 {
   // Update the E-B Mesh
-  EulerBeamDynamicInextensibleMoMSparse::update_mesh();
+  EulerBeamInextensiblePenalty::update_mesh();
 
   // Get refernce to IB Mesh
   auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
@@ -33,7 +33,7 @@ void
 IBEulerBeam::EBMeshToIBMeshCurrent()
 {
   // Update the E-B Mesh
-  EulerBeamDynamicInextensibleMoMSparse::update_mesh();
+  EulerBeamInextensiblePenalty::update_mesh();
 
   // Get refernce to IB Mesh
   auto& ib_points = IBForceCoupled::mesh.GetPoints();
@@ -61,7 +61,7 @@ IBEulerBeam::IBEulerBeam(real_t length,
                          size_t nodes,
                          EulerBeamBCs bcs,
                          real_t r_penalty)
-  : EulerBeamDynamicInextensibleMoMSparse(length, EI, mu, nodes, bcs, r_penalty)
+  : EulerBeamInextensiblePenalty(length, EI, mu, nodes, bcs, r_penalty)
   , IBForceCoupled(nodes)
 {
   EBMeshToIBMeshCurrent();
@@ -71,7 +71,7 @@ IBEulerBeam::IBEulerBeam(real_t length,
 void
 IBEulerBeam::apply_initial_condition(EulerBeamMesh& mesh)
 {
-  EulerBeamDynamicInextensibleMoMSparse::apply_initial_condition(mesh);
+  EulerBeamInextensiblePenalty::apply_initial_condition(mesh);
   EBMeshToIBMeshCurrent();
 }
 
@@ -87,14 +87,14 @@ IBEulerBeam::ComputeNextPoints(std::vector<IBMesh::IBVertex> force, real_t dt)
     load[ni][2] = force[ni].z;
   }
 
-  EulerBeamDynamicInextensibleMoMSparse::solve(dt, load);
+  EulerBeamInextensiblePenalty::solve(dt, load);
 
   auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
   auto& ib_velocity = IBForceCoupled::mesh_next.GetVelocity();
 
-  auto& eb_points = EulerBeamDynamicInextensibleMoMSparse::mesh.get_centerline();
+  auto& eb_points = EulerBeamInextensiblePenalty::mesh.get_centerline();
   auto& eb_velocity =
-    EulerBeamDynamicInextensibleMoMSparse::mesh.get_centerline_velocity();
+    EulerBeamInextensiblePenalty::mesh.get_centerline_velocity();
 
   for (size_t ni = 0; ni < nodes; ni++) {
     ib_points[ni].x = eb_points[ni][0];
@@ -119,10 +119,10 @@ IBEulerBeam::pack_state(IBModelState& s) const
   s.ints.push_back(state_version);
   s.ints.push_back(static_cast<int64_t>(nodes));
   s.ints.push_back(static_cast<int64_t>(ndof));
-  s.ints.push_back(static_cast<int64_t>(ndof_l));
+  // s.ints.push_back(static_cast<int64_t>(ndof_l));
   s.ints.push_back(static_cast<int64_t>(time_iter));
 
-  s.reals.reserve(1 + 3 * ndof + ndof_l);
+  s.reals.reserve(1 + 3 * ndof);
   s.reals.push_back(t);
 
   auto pack_vec = [&](const VectorXd& v) {
@@ -131,7 +131,7 @@ IBEulerBeam::pack_state(IBModelState& s) const
   };
 
   pack_vec(u);
-  pack_vec(lambda);
+  // pack_vec(lambda);
   pack_vec(v_prev);
   pack_vec(a_prev);
 }
@@ -149,10 +149,10 @@ IBEulerBeam::unpack_state(const IBModelState& s)
               "IBEulerBeam::unpack_state(): node count mismatch.\n");
   ELFF_ASSERT(static_cast<size_t>(s.ints[2]) == ndof,
               "IBEulerBeam::unpack_state(): ndof mismatch.\n");
-  ELFF_ASSERT(static_cast<size_t>(s.ints[3]) == ndof_l,
-              "IBEulerBeam::unpack_state(): constraint dof mismatch.\n");
+  // ELFF_ASSERT(static_cast<size_t>(s.ints[3]) == ndof_l,
+  //             "IBEulerBeam::unpack_state(): constraint dof mismatch.\n");
 
-  const size_t expected_reals = 1 + 3 * ndof + ndof_l;
+  const size_t expected_reals = 1 + 3 * ndof;
   ELFF_ASSERT(s.reals.size() == expected_reals,
               "IBEulerBeam::unpack_state(): invalid real buffer size.\n");
 
@@ -165,7 +165,7 @@ IBEulerBeam::unpack_state(const IBModelState& s)
   };
 
   unpack_vec(u);
-  unpack_vec(lambda);
+  // unpack_vec(lambda);
   unpack_vec(v_prev);
   unpack_vec(a_prev);
 
@@ -174,7 +174,7 @@ IBEulerBeam::unpack_state(const IBModelState& s)
   // Reconstruct step history and all geometric/IB views from the restored
   // converged state.
   u_prev = u;
-  EulerBeamDynamicInextensibleMoMSparse::update_mesh();
+  EulerBeamInextensiblePenalty::update_mesh();
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }

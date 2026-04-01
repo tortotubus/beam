@@ -51,6 +51,7 @@
               doxygen
               apptainer
               criterion
+              gnuplot_qt
             ];
           };
         });

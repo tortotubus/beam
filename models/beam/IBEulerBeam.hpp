@@ -1,7 +1,7 @@
 #pragma once
 
 #include "elff/models/ibm/IBForceCoupled.hpp"
-#include "elff/models/beam/EulerBeamDynamicInextensibleMoMSparse.hpp"
+#include "elff/models/beam/EulerBeamInextensiblePenalty.hpp"
 
 
 namespace ELFF {
@@ -12,7 +12,7 @@ namespace Models {
  */
 class IBEulerBeam
   : public IBForceCoupled
-  , public EulerBeamDynamicInextensibleMoMSparse
+  , public EulerBeamInextensiblePenalty
 {
 private:
   /**

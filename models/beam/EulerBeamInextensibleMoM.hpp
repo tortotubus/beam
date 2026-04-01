@@ -1,20 +1,15 @@
 #pragma once
 
-// #include <beam/LinAlg/Matrix.hpp>
-// #include <beam/LinAlg/Vector.hpp>
-
 #include "elff/models/beam/EulerBeam.hpp"
 #include "elff/fem/Shapes.hpp"
 
-#include <cstdio> // for popen, pclose, fprintf
-#include <iostream>
-#include <stdlib.h>
-#include <utility>
-#include <vector>
+#include <cstdio>
+#include <stdlib.h> 
 
 #include <Eigen/Dense>
 #include <Eigen/IterativeLinearSolvers>
 #include <Eigen/SparseCholesky> // for SimplicialLLT
+#include <Eigen/SparseLU>
 #include <unsupported/Eigen/AutoDiff>
 
 using namespace Eigen;
@@ -23,14 +18,14 @@ namespace ELFF {
 namespace Models {
 
 /**
- * @brief Static inextensible Euler beam solved with a sparse
+ * @brief Inextensible Euler beam solved with a sparse
  * method-of-multipliers formulation.
  *
- * This variant assembles the nonlinear tangent matrix into a sparse global
- * system and is intended for larger beam discretizations where dense storage
- * becomes expensive.
+ * The same finite-element formulation is used for both static equilibrium
+ * solves and dynamic Newmark time stepping. The dynamic overloads are enabled
+ * when the beam is constructed with a positive mass density `mu`.
  */
-class EulerBeamStaticInextensibleMoMSparse : public EulerBeam
+class EulerBeamInextensibleMoM : public EulerBeam
 {
 public:
   /**
@@ -42,16 +37,33 @@ public:
    * @param bcs Boundary conditions at the beam ends
    * @param r_penalty Penalty parameter used in the inextensibility constraint
    */
-  EulerBeamStaticInextensibleMoMSparse(real_t length,
-                                       real_t EI,
-                                       size_t nodes,
-                                       EulerBeam::EulerBeamBCs bcs,
-                                       real_t r_penalty);
+  EulerBeamInextensibleMoM(real_t length,
+                           real_t EI,
+                           size_t nodes,
+                           EulerBeam::EulerBeamBCs bcs,
+                           real_t r_penalty);
+
+  /**
+   * @brief Constructs a dynamic inextensible sparse beam model.
+   *
+   * @param length Beam length
+   * @param EI Flexural rigidity
+   * @param mu Mass per unit length
+   * @param nodes Number of discretization nodes
+   * @param bcs Boundary conditions at the beam ends
+   * @param r_penalty Penalty parameter used in the inextensibility constraint
+   */
+  EulerBeamInextensibleMoM(real_t length,
+                           real_t EI,
+                           real_t mu,
+                           size_t nodes,
+                           EulerBeam::EulerBeamBCs bcs,
+                           real_t r_penalty);
 
   /**
    * @brief Destroys the sparse beam model and releases any owned resources.
    */
-  ~EulerBeamStaticInextensibleMoMSparse();
+  ~EulerBeamInextensibleMoM();
 
   /**
    * @brief Solves the static beam problem with no external load.
@@ -73,6 +85,22 @@ public:
   void solve(std::vector<std::array<real_t, 3>> load) override;
 
   /**
+   * @brief Advances the beam one time step under uniform loading.
+   *
+   * @param dt Time-step size
+   * @param load Uniform distributed load vector
+   */
+  void solve(real_t dt, std::array<real_t, 3> load) override;
+
+  /**
+   * @brief Advances the beam one time step under nodal loading.
+   *
+   * @param dt Time-step size
+   * @param load Load vector specified at the mesh nodes
+   */
+  void solve(real_t dt, std::vector<std::array<real_t, 3>> load) override;
+
+  /**
    * @brief Initializes the solver state from a supplied beam mesh.
    *
    * @param bmesh Beam mesh containing the initial geometry
@@ -85,44 +113,22 @@ public:
   virtual void apply_initial_condition();
 
   /**
-   * @brief Get the constraint/inextensibility tolerance.
+   * @brief Returns the current Lagrange multiplier state.
    */
-  real_t get_lambda_tol() const { return tol_outer; }
+  const VectorXd& get_lambda() const { return lambda; }
 
   /**
-   * @brief Set the constraint/inextensibility tolerance.
+   * @brief Replaces the current Lagrange multiplier state.
+   *
+   * @param lambda_in Multiplier vector to use as the current iterate
    */
-  void set_lambda_tol(real_t tol) { tol_outer = tol; }
-
-  /**
-   * @brief Get the residual tolerance used by the linearized solve.
-   */
-  real_t get_res_tol() const { return tol_inner; }
-
-  /**
-   * @brief Set the residual tolerance used by the linearized solve.
-   */
-  void set_res_tol(real_t tol) { tol_inner = tol; }
-
-  /**
-   * @brief Get the maximum number of outer constraint updates.
-   */
-  size_t get_lambda_iter() const { return max_iter_outer; }
-
-  /**
-   * @brief Set the maximum number of outer constraint updates.
-   */
-  void set_lambda_iter(size_t iter) { max_iter_outer = iter; }
-
-  /**
-   * @brief Get the maximum number of inner residual iterations.
-   */
-  size_t get_res_iter() const { return max_iter_inner; }
-
-  /**
-   * @brief Set the maximum number of inner residual iterations.
-   */
-  void set_res_iter(size_t iter) { max_iter_inner = iter; }
+  void set_lambda(const VectorXd& lambda_in)
+  {
+    ELFF_ASSERT(lambda_in.size() == lambda.size(),
+                "Size of lambda vector must equal ndof_l.\n");
+    lambda = lambda_in;
+    apply_lambda_boundary_conditions();
+  }
 
 protected:
   /**
@@ -158,11 +164,11 @@ protected:
   /**
    * @brief Inner and outer nonlinear-iteration limits.
    */
-  size_t max_iter_inner, max_iter_outer;
+  size_t max_iter_inner, max_iter_outer, min_iter_inner, min_iter_outer;
   /**
    * @brief Inner and outer nonlinear solver tolerances.
    */
-  real_t tol_inner, tol_outer;
+  real_t tol_linear, tol_primal, tol_constraint;
 
   /**
    * @brief Current residual vector and Lagrange multiplier state.
@@ -176,23 +182,10 @@ protected:
    * @brief Global state vector for beam displacements and slopes.
    */
   VectorXd u;
-
   /**
-   * @brief Constructs the shared base state for dynamic derived classes.
-   *
-   * @param length Beam length
-   * @param EI Flexural rigidity
-   * @param mu Mass per unit length
-   * @param nodes Number of discretization nodes
-   * @param bcs Boundary conditions at the beam ends
-   * @param r_penalty Penalty parameter used in the inextensibility constraint
+   * @brief State from the previous dynamic time step.
    */
-  EulerBeamStaticInextensibleMoMSparse(real_t length,
-                                       real_t EI,
-                                       real_t mu,
-                                       size_t nodes,
-                                       EulerBeam::EulerBeamBCs bcs,
-                                       real_t r_penalty);
+  VectorXd u_prev, v_prev, a_prev;
 
   /**
    * @brief Assembles the residual for uniform loading.
@@ -223,8 +216,7 @@ protected:
    * @param idx Global degree-of-freedom indices for the element
    * @return Local 12-entry state vector for the element
    */
-  Matrix<real_t, 12, 1> get_element_state(
-    const std::array<size_t, 12>& idx) const;
+  Matrix<real_t, 12, 1> get_element_state(const std::array<size_t, 12>& idx) const;
 
   /**
    * @brief Extracts the local Lagrange-multiplier values for an element.
@@ -382,6 +374,43 @@ protected:
   real_t update_lambda(real_t omega = 1.0);
 
   /**
+   * @brief Recomputes the multiplier field from the current displacement
+   * state using the non-dual-ascent update used by the dynamic MoM solve.
+   *
+   * @param omega Relaxation parameter for the multiplier update
+   * @return Norm of the recomputed multiplier iterate
+   */
+  real_t update_lambda_dynamic(real_t omega = 1.0);
+
+  /**
+   * @brief Updates the Lagrange multiplier iterate with a consistent Galerkin
+   * mass solve.
+   *
+   * @param omega Relaxation parameter for the multiplier update
+   * @return Norm of the multiplier correction
+   */
+  real_t update_lambda2(real_t omega = 1.0);
+
+  /**
+   * @brief Updates the Lagrange multiplier from an elementwise-constant defect
+   * projection.
+   *
+   * This computes a piecewise-constant multiplier correction on each element
+   * and then projects it back to the existing nodal multiplier vector.
+   *
+   * @param omega Relaxation parameter for the multiplier update
+   * @return Norm of the nodal multiplier correction
+   */
+  real_t update_lambda3(real_t omega = 1.0);
+
+  /**
+   * @brief Resets the Lagrange multiplier iterate.
+   * 
+   * @return Norm of the multiplier correction
+   */
+  real_t reset_lambda(real_t omega = 1.0);
+
+  /**
    * @brief Computes the L2 norm of the inextensibility defect.
    *
    * This evaluates \f$S = |\partial_s \mathbf{r}|^2 - 1\f$ at the element
@@ -401,6 +430,46 @@ protected:
    * @brief Updates the beam mesh from the current solution state.
    */
   void update_mesh();
+
+  /**
+   * @brief Solves one Newmark step for uniform loading.
+   *
+   * @param dt Time-step size
+   * @param load Uniform distributed load vector
+   * @param beta Newmark beta parameter
+   * @param gamma Newmark gamma parameter
+   */
+  void solve_newmark(real_t dt,
+                     std::array<real_t, 3> load,
+                     real_t beta,
+                     real_t gamma);
+
+  /**
+   * @brief Solves one Newmark step for nodal loading.
+   *
+   * @param dt Time-step size
+   * @param load Load vector specified at the mesh nodes
+   * @param beta Newmark beta parameter
+   * @param gamma Newmark gamma parameter
+   */
+  void solve_newmark(real_t dt,
+                     std::vector<std::array<real_t, 3>> load,
+                     real_t beta,
+                     real_t gamma);
+
+  /**
+   * @brief Initializes the acceleration state at the start of a simulation.
+   *
+   * @param load Uniform distributed load vector
+   */
+  void initialize_acceleration(std::array<real_t, 3> load);
+
+  /**
+   * @brief Initializes the acceleration state at the start of a simulation.
+   *
+   * @param load Load vector specified at the mesh nodes
+   */
+  void initialize_acceleration(std::vector<std::array<real_t, 3>> load);
 
   /**
    * @brief Assembles the nonlinear system for uniform loading.
@@ -426,6 +495,76 @@ protected:
    */
 
   void apply_boundary_conditions();
+
+  /**
+   * @brief Applies boundary conditions directly to the multiplier field.
+   *
+   * For now, free ends enforce zero endpoint multiplier values while leaving
+   * any enriched interior multiplier DOFs untouched.
+   */
+  void apply_lambda_boundary_conditions();
+
+  /**
+   * @brief Assembles the Newmark system for uniform loading.
+   *
+   * @param dt Time-step size
+   * @param load Uniform distributed load vector
+   * @param beta Newmark beta parameter
+   * @param gamma Newmark gamma parameter
+   */
+  void assemble_system_newmark(real_t dt,
+                               std::array<real_t, 3> load,
+                               real_t beta,
+                               real_t gamma);
+
+  /**
+   * @brief Assembles the Newmark system for nodal loading.
+   *
+   * @param dt Time-step size
+   * @param load Load vector specified at the mesh nodes
+   * @param beta Newmark beta parameter
+   * @param gamma Newmark gamma parameter
+   */
+  void assemble_system_newmark(real_t dt,
+                               std::vector<std::array<real_t, 3>> load,
+                               real_t beta,
+                               real_t gamma);
+
+  /**
+   * @brief Adds the Newmark inertial residual and tangent contributions.
+   *
+   * @param dt Time-step size
+   * @param beta Newmark beta parameter
+   */
+  void add_newmark_inertial_terms(real_t dt, real_t beta);
+
+  /**
+   * @brief Updates the stored Newmark velocity and acceleration from the
+   * converged displacement.
+   *
+   * @param dt Time-step size
+   * @param beta Newmark beta parameter
+   * @param gamma Newmark gamma parameter
+   * @param v_old Velocity state from the previous time step
+   * @param a_old Acceleration state from the previous time step
+   */
+  void update_newmark_state_from_displacement(real_t dt,
+                                              real_t beta,
+                                              real_t gamma,
+                                              const VectorXd& v_old,
+                                              const VectorXd& a_old);
+
+  /**
+   * @brief Enforces translational velocity and acceleration boundary
+   * conditions on the stored Newmark state.
+   */
+  void apply_dynamic_state_boundary_conditions();
+
+  /**
+   * @brief Applies a lumped-mass velocity projection driven by the
+   * velocity-level inextensibility defect.
+   */
+  void project_velocity_onto_constraint_manifold();
 
   /**
    * @brief Assemble the residual vector for the nonlinear system
