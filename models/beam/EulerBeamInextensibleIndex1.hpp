@@ -19,10 +19,10 @@ namespace Models {
  * This class is a standalone dynamic beam implementation. Static solve
  * overloads are intentionally left unimplemented.
  */
-class EulerBeamDynamicInextensibleIndex1 : public EulerBeam
+class EulerBeamInextensibleIndex1 : public EulerBeam
 {
 public:
-  EulerBeamDynamicInextensibleIndex1(real_t                  length,
+  EulerBeamInextensibleIndex1(real_t                  length,
                                      real_t                  EI,
                                      real_t                  mu,
                                      size_t                  n_nodes,

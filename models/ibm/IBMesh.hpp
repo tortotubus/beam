@@ -13,9 +13,15 @@ namespace Models {
 class IBMesh
 {
 public:
+  /**
+   * @brief One immersed-boundary mesh vertex stored as a 3D Cartesian point.
+   *
+   * The same lightweight coordinate container is reused for IB positions,
+   * velocities, and forces throughout the mesh interface.
+   */
   struct IBVertex
   {
-    real_t x, y, z;
+    real_t x, y, z; ///< Cartesian vector components.
   };
 
 protected:

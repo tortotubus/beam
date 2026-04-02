@@ -11,20 +11,41 @@
 namespace ELFF {
 namespace Models {
 
+/**
+ * @brief Serializable snapshot of all models registered with an IB runtime.
+ *
+ * The runtime exports checkpoint data as parallel vectors of runtime-assigned
+ * model identifiers and the corresponding packed model states.
+ */
 struct IBRuntimeState
 {
-  std::vector<int> ids;
-  std::vector<IBModelState> states;
+  std::vector<int> ids; ///< Runtime-assigned model identifiers.
+  std::vector<IBModelState>
+    states; ///< Serialized state for each registered model.
 };
 
+/**
+ * @brief Registry and checkpoint coordinator for immersed-boundary models.
+ *
+ * `IBRuntime` tracks registered @ref IBModel instances, assigns stable integer
+ * identifiers, and provides in-memory or file-based checkpoint import/export
+ * for the registered model set. In MPI builds it can also restrict checkpoint
+ * I/O to the rank designated as the owner of the registered models.
+ */
 class IBRuntime
 {
 public:
+  /**
+   * @brief One registered immersed-boundary model tracked by the runtime.
+   *
+   * Each entry binds the runtime's stable model identifier to the owning
+   * process id used for checkpoint coordination and the live model instance.
+   */
   struct Entry
   {
-    int id;
-    int pid;
-    IBModel* model;
+    int id; ///< Runtime-assigned identifier for the model.
+    int pid; ///< Optional owning process id for checkpoint routing.
+    IBModel* model; ///< Pointer to the registered model instance.
   };
 
   IBRuntime()
@@ -246,11 +267,17 @@ public:
   }
 
 private:
+  /**
+   * @brief Fixed binary header written at the start of each checkpoint file.
+   *
+   * The header stores the file signature, on-disk format version, and the
+   * number of serialized models that follow in the checkpoint payload.
+   */
   struct FileHeader
   {
-    uint64_t magic;
-    int32_t version;
-    int64_t nmodels;
+    uint64_t magic;   ///< File signature used to identify IBRuntime checkpoints.
+    int32_t version;  ///< Checkpoint format version.
+    int64_t nmodels;  ///< Number of serialized model entries in the file.
   };
 
   static constexpr uint64_t file_magic = 0x494252554E54494DULL; // "IBRUNTIM"

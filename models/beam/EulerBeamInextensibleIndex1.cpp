@@ -1,7 +1,7 @@
 // ============================================================
-// EulerBeamDynamicInextensibleIndex1.cpp
+// EulerBeamInextensibleIndex1.cpp
 // ============================================================
-#include "elff/models/beam/EulerBeamDynamicInextensibleIndex1.hpp"
+#include "elff/models/beam/EulerBeamInextensibleIndex1.hpp"
 
 namespace ELFF {
 namespace Models {
@@ -14,7 +14,7 @@ constexpr std::array<real_t, 3>  w_q = { 0.2777777778, 0.4444444444, 0.277777777
 // -----------------------------------------------------------------------
 // Constructor
 // -----------------------------------------------------------------------
-EulerBeamDynamicInextensibleIndex1::EulerBeamDynamicInextensibleIndex1(
+EulerBeamInextensibleIndex1::EulerBeamInextensibleIndex1(
   real_t                  length,
   real_t                  EI,
   real_t                  mu,
@@ -53,30 +53,30 @@ EulerBeamDynamicInextensibleIndex1::EulerBeamDynamicInextensibleIndex1(
 // -----------------------------------------------------------------------
 // Initial conditions
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::solve()
+void EulerBeamInextensibleIndex1::solve()
 {
-  ELFF_ABORT("EulerBeamDynamicInextensibleIndex1 does not implement a static solve.\n");
+  ELFF_ABORT("EulerBeamInextensibleIndex1 does not implement a static solve.\n");
 }
 
-void EulerBeamDynamicInextensibleIndex1::solve(std::array<real_t, 3> load)
+void EulerBeamInextensibleIndex1::solve(std::array<real_t, 3> load)
 {
   static_cast<void>(load);
-  ELFF_ABORT("EulerBeamDynamicInextensibleIndex1 does not implement a static solve.\n");
+  ELFF_ABORT("EulerBeamInextensibleIndex1 does not implement a static solve.\n");
 }
 
-void EulerBeamDynamicInextensibleIndex1::solve(
+void EulerBeamInextensibleIndex1::solve(
   std::vector<std::array<real_t, 3>> load)
 {
   static_cast<void>(load);
-  ELFF_ABORT("EulerBeamDynamicInextensibleIndex1 does not implement a static solve.\n");
+  ELFF_ABORT("EulerBeamInextensibleIndex1 does not implement a static solve.\n");
 }
 
-void EulerBeamDynamicInextensibleIndex1::apply_initial_condition()
+void EulerBeamInextensibleIndex1::apply_initial_condition()
 {
   apply_initial_condition(mesh);
 }
 
-void EulerBeamDynamicInextensibleIndex1::apply_initial_condition(
+void EulerBeamInextensibleIndex1::apply_initial_condition(
   EulerBeamMesh& bmesh)
 {
   ELFF_ASSERT(nodes == bmesh.get_nodes(),
@@ -110,7 +110,7 @@ void EulerBeamDynamicInextensibleIndex1::apply_initial_condition(
 // -----------------------------------------------------------------------
 // Public solve entry points
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::solve(real_t              dt,
+void EulerBeamInextensibleIndex1::solve(real_t              dt,
                                                 std::array<real_t, 3> load)
 {
   if (!(dt > 0.0))
@@ -136,11 +136,11 @@ void EulerBeamDynamicInextensibleIndex1::solve(real_t              dt,
   SparseLU<SparseMatrix<real_t>, COLAMDOrdering<int>> solver;
   solver.compute(saddle_mat);
   if (solver.info() != Success)
-    ELFF_ABORT("EulerBeamDynamicInextensibleIndex1::solve: LU factorization failed\n");
+    ELFF_ABORT("EulerBeamInextensibleIndex1::solve: LU factorization failed\n");
 
   const VectorXd sol = solver.solve(saddle_rhs);
   if (solver.info() != Success)
-    ELFF_ABORT("EulerBeamDynamicInextensibleIndex1::solve: back-solve failed\n");
+    ELFF_ABORT("EulerBeamInextensibleIndex1::solve: back-solve failed\n");
 
   // Extract displacement and physical tension
   u      = sol.head(ndof);
@@ -170,7 +170,7 @@ void EulerBeamDynamicInextensibleIndex1::solve(real_t              dt,
   t += dt;
 }
 
-void EulerBeamDynamicInextensibleIndex1::solve(
+void EulerBeamInextensibleIndex1::solve(
   real_t                              dt,
   std::vector<std::array<real_t, 3>> load)
 {
@@ -196,11 +196,11 @@ void EulerBeamDynamicInextensibleIndex1::solve(
   SparseLU<SparseMatrix<real_t>, COLAMDOrdering<int>> solver;
   solver.compute(saddle_mat);
   if (solver.info() != Success)
-    ELFF_ABORT("EulerBeamDynamicInextensibleIndex1::solve: LU factorization failed\n");
+    ELFF_ABORT("EulerBeamInextensibleIndex1::solve: LU factorization failed\n");
 
   const VectorXd sol = solver.solve(saddle_rhs);
   if (solver.info() != Success)
-    ELFF_ABORT("EulerBeamDynamicInextensibleIndex1::solve: back-solve failed\n");
+    ELFF_ABORT("EulerBeamInextensibleIndex1::solve: back-solve failed\n");
 
   u      = sol.head(ndof);
   lambda = sol.tail(ndof_l);
@@ -230,7 +230,7 @@ void EulerBeamDynamicInextensibleIndex1::solve(
 // Elastic stiffness (constant, assembled once)
 //   K_elastic = EI * int H_a'' H_b'' ds   (same for x, y, z - decoupled)
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::assemble_elastic_stiffness()
+void EulerBeamInextensibleIndex1::assemble_elastic_stiffness()
 {
   using Tpl = Triplet<real_t>;
   std::vector<Tpl> triplets;
@@ -277,7 +277,7 @@ void EulerBeamDynamicInextensibleIndex1::assemble_elastic_stiffness()
 //
 // B has size ndof_l x ndof.  g has size ndof_l.
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::assemble_B_and_g(
+void EulerBeamInextensibleIndex1::assemble_B_and_g(
   SparseMatrix<real_t>& B,
   VectorXd&             g) const
 {
@@ -344,7 +344,7 @@ void EulerBeamDynamicInextensibleIndex1::assemble_B_and_g(
 // Position constraint residual vector (used for drift detection)
 //   c_a = int eta_a * (||r'||^2 - 1) ds
 // -----------------------------------------------------------------------
-VectorXd EulerBeamDynamicInextensibleIndex1::assemble_constraint_residual_vector()
+VectorXd EulerBeamInextensibleIndex1::assemble_constraint_residual_vector()
   const
 {
   VectorXd c = VectorXd::Zero(ndof_l);
@@ -385,7 +385,7 @@ VectorXd EulerBeamDynamicInextensibleIndex1::assemble_constraint_residual_vector
 // -----------------------------------------------------------------------
 // External force assembly - uniform body load
 // -----------------------------------------------------------------------
-VectorXd EulerBeamDynamicInextensibleIndex1::assemble_f_ext(
+VectorXd EulerBeamInextensibleIndex1::assemble_f_ext(
   std::array<real_t, 3> load) const
 {
   VectorXd f = VectorXd::Zero(ndof);
@@ -432,7 +432,7 @@ VectorXd EulerBeamDynamicInextensibleIndex1::assemble_f_ext(
 // -----------------------------------------------------------------------
 // External force assembly - nodal load vector
 // -----------------------------------------------------------------------
-VectorXd EulerBeamDynamicInextensibleIndex1::assemble_f_ext(
+VectorXd EulerBeamInextensibleIndex1::assemble_f_ext(
   const std::vector<std::array<real_t, 3>>& load) const
 {
   VectorXd f = VectorXd::Zero(ndof);
@@ -491,7 +491,7 @@ VectorXd EulerBeamDynamicInextensibleIndex1::assemble_f_ext(
 // K_eff = K_elastic + coeff * M_lumped  (coeff = 1/beta/dt^2)
 // u_tilde = u^n + dt*v^n + dt^2*(0.5-beta)*a^n
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::assemble_saddle_system(
+void EulerBeamInextensibleIndex1::assemble_saddle_system(
   real_t                      dt,
   real_t                      beta,
   const VectorXd&             f_ext,
@@ -566,7 +566,7 @@ void EulerBeamDynamicInextensibleIndex1::assemble_saddle_system(
 // Lambda at free ends: zero the lambda row, set diagonal to 1, RHS = 0.
 // At free ends the physical tension is zero (natural BC for tension).
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::apply_saddle_boundary_conditions()
+void EulerBeamInextensibleIndex1::apply_saddle_boundary_conditions()
 {
   // Collect displacement-constrained DOFs and their prescribed values
   std::vector<std::pair<size_t, real_t>> disp_bcs;
@@ -638,7 +638,7 @@ void EulerBeamDynamicInextensibleIndex1::apply_saddle_boundary_conditions()
 //   a^{n+1} = coeff * (u^{n+1} - u_tilde)
 //   v^{n+1} = v^n + dt*((1-gamma)*a^n + gamma*a^{n+1})
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::update_newmark_state(real_t dt,
+void EulerBeamInextensibleIndex1::update_newmark_state(real_t dt,
                                                                real_t beta,
                                                                real_t gamma)
 {
@@ -653,7 +653,7 @@ void EulerBeamDynamicInextensibleIndex1::update_newmark_state(real_t dt,
 // -----------------------------------------------------------------------
 // Zero velocity and acceleration at kinematically constrained DOFs
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::apply_dynamic_state_boundary_conditions()
+void EulerBeamInextensibleIndex1::apply_dynamic_state_boundary_conditions()
 {
   for (size_t bi = 0; bi < 2; ++bi) {
     const EulerBeamBCType bctype = boundary_conditions.type[bi];
@@ -688,7 +688,7 @@ void EulerBeamDynamicInextensibleIndex1::apply_dynamic_state_boundary_conditions
 //
 // where c_a = int eta_a*(||r'||^2-1)ds and B_pos = 2*B.
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::project_position_onto_constraint()
+void EulerBeamInextensibleIndex1::project_position_onto_constraint()
 {
   for (size_t iter = 0; iter < max_projection_iter; ++iter) {
     const VectorXd c      = assemble_constraint_residual_vector();
@@ -750,7 +750,7 @@ void EulerBeamDynamicInextensibleIndex1::project_position_onto_constraint()
 //   Solve  B*B^T * mu = B*v_prev
 //   v_prev -= B^T * mu
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::project_velocity_onto_constraint(
+void EulerBeamInextensibleIndex1::project_velocity_onto_constraint(
   const SparseMatrix<real_t>& B)
 {
   const VectorXd dot_c      = B * v_prev;
@@ -780,7 +780,7 @@ void EulerBeamDynamicInextensibleIndex1::project_velocity_onto_constraint(
 // -----------------------------------------------------------------------
 // Mesh update
 // -----------------------------------------------------------------------
-void EulerBeamDynamicInextensibleIndex1::update_mesh()
+void EulerBeamInextensibleIndex1::update_mesh()
 {
   std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
   std::vector<std::array<real_t, 3>>& slope = mesh.get_slope();
