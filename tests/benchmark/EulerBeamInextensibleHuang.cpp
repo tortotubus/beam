@@ -69,7 +69,7 @@ TEST(EulerBeamInextensibleHuangTest, Huang)
 
   const real_t EI = 0.01;
   const real_t mu = 1.0;
-  const real_t dt = 0.002;
+  const real_t dt = 0.02;
   const real_t tf = 0.8;
   const size_t Nt = static_cast<size_t>(std::ceil(tf / dt));
 

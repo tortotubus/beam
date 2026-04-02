@@ -178,6 +178,8 @@ protected:
    * @brief Sparse global tangent matrix.
    */
   SparseMatrix<real_t> jacobian;
+  SparseMatrix<real_t> mass;
+  SparseMatrix<real_t> bending_matrix;
   /**
    * @brief Global state vector for beam displacements and slopes.
    */
@@ -186,6 +188,10 @@ protected:
    * @brief State from the previous dynamic time step.
    */
   VectorXd u_prev, v_prev, a_prev;
+  std::array<real_t, 3> load_prev;
+  std::vector<std::array<real_t, 3>> nodal_load_prev;
+  bool have_prev_uniform_load;
+  bool have_prev_nodal_load;
 
   /**
    * @brief Assembles the residual for uniform loading.
@@ -239,7 +245,8 @@ protected:
   Matrix<T, 12, 1> assemble_element_residual_template(
     const Matrix<T, 12, 1>& u_elem,
     const std::array<real_t, 2>& lambda_elem,
-    const std::array<real_t, 3>& load) const
+    const std::array<real_t, 3>& load,
+    real_t                       bending_scale = 1.0) const
   {
     Matrix<T, 12, 1> residual = Matrix<T, 12, 1>::Zero();
 
@@ -276,9 +283,9 @@ protected:
       const T S = xp * xp + yp * yp + zp * zp - 1.0;
 
       for (size_t a = 0; a < 4; ++a) {
-        residual(a) += EI * xpp * ddH[a] * w * ds;
-        residual(4 + a) += EI * ypp * ddH[a] * w * ds;
-        residual(8 + a) += EI * zpp * ddH[a] * w * ds;
+        residual(a) += bending_scale * EI * xpp * ddH[a] * w * ds;
+        residual(4 + a) += bending_scale * EI * ypp * ddH[a] * w * ds;
+        residual(8 + a) += bending_scale * EI * zpp * ddH[a] * w * ds;
 
         residual(a) -= load[0] * H[a] * w * ds;
         residual(4 + a) -= load[1] * H[a] * w * ds;
@@ -307,7 +314,8 @@ protected:
   Matrix<T, 12, 1> assemble_element_residual_template(
     const Matrix<T, 12, 1>& u_elem,
     const std::array<real_t, 2>& lambda_elem,
-    const std::array<std::array<real_t, 3>, 2>& load_elem) const
+    const std::array<std::array<real_t, 3>, 2>& load_elem,
+    real_t                                      bending_scale = 1.0) const
   {
     Matrix<T, 12, 1> residual = Matrix<T, 12, 1>::Zero();
 
@@ -347,9 +355,9 @@ protected:
       const T S = xp * xp + yp * yp + zp * zp - 1.0;
 
       for (size_t a = 0; a < 4; ++a) {
-        residual(a) += EI * xpp * ddH[a] * w * ds;
-        residual(4 + a) += EI * ypp * ddH[a] * w * ds;
-        residual(8 + a) += EI * zpp * ddH[a] * w * ds;
+        residual(a) += bending_scale * EI * xpp * ddH[a] * w * ds;
+        residual(4 + a) += bending_scale * EI * ypp * ddH[a] * w * ds;
+        residual(8 + a) += bending_scale * EI * zpp * ddH[a] * w * ds;
 
         residual(a) -= fx * H[a] * w * ds;
         residual(4 + a) -= fy * H[a] * w * ds;
@@ -371,44 +379,21 @@ protected:
    * @param omega Relaxation parameter for the multiplier update
    * @return Norm of the multiplier correction
    */
-  real_t update_lambda(real_t omega = 1.0);
+  real_t update_lambda(real_t omega = 1.);
 
   /**
-   * @brief Recomputes the multiplier field from the current displacement
-   * state using the non-dual-ascent update used by the dynamic MoM solve.
+   * @brief Updates the multiplier iterate for dynamic Newmark solves.
    *
-   * @param omega Relaxation parameter for the multiplier update
-   * @return Norm of the recomputed multiplier iterate
-   */
-  real_t update_lambda_dynamic(real_t omega = 1.0);
-
-  /**
-   * @brief Updates the Lagrange multiplier iterate with a consistent Galerkin
-   * mass solve.
+   * Uses the same defect projection as the static update but with an added
+   * pseudo-time regularization tied to the step size so the dual correction is
+   * less aggressive during transient solves.
    *
+   * @param dt Time-step size
    * @param omega Relaxation parameter for the multiplier update
    * @return Norm of the multiplier correction
    */
-  real_t update_lambda2(real_t omega = 1.0);
+  real_t update_lambda_newmark(real_t dt, real_t omega = 0.1);
 
-  /**
-   * @brief Updates the Lagrange multiplier from an elementwise-constant defect
-   * projection.
-   *
-   * This computes a piecewise-constant multiplier correction on each element
-   * and then projects it back to the existing nodal multiplier vector.
-   *
-   * @param omega Relaxation parameter for the multiplier update
-   * @return Norm of the nodal multiplier correction
-   */
-  real_t update_lambda3(real_t omega = 1.0);
-
-  /**
-   * @brief Resets the Lagrange multiplier iterate.
-   * 
-   * @return Norm of the multiplier correction
-   */
-  real_t reset_lambda(real_t omega = 1.0);
 
   /**
    * @brief Computes the L2 norm of the inextensibility defect.
@@ -470,20 +455,24 @@ protected:
    * @param load Load vector specified at the mesh nodes
    */
   void initialize_acceleration(std::vector<std::array<real_t, 3>> load);
+  void assemble_mass_matrix();
+  void assemble_bending_matrix();
 
   /**
    * @brief Assembles the nonlinear system for uniform loading.
    *
    * @param load Uniform distributed load vector
    */
-  void assemble_system(std::array<real_t, 3> load);
+  void assemble_system(std::array<real_t, 3> load,
+                       real_t                bending_scale = 1.0);
 
   /**
    * @brief Assembles the nonlinear system for nodal loading.
    *
    * @param load Load vector specified at the mesh nodes
    */
-  void assemble_system(std::vector<std::array<real_t, 3>> load);
+  void assemble_system(std::vector<std::array<real_t, 3>> load,
+                       real_t                              bending_scale = 1.0);
 
   /**
    * @brief Apply boundary conditions to the residual and jacobian
@@ -529,6 +518,9 @@ protected:
                                std::vector<std::array<real_t, 3>> load,
                                real_t beta,
                                real_t gamma);
+  void add_midpoint_bending_terms();
+  void add_averaged_uniform_load(std::array<real_t, 3>& load) const;
+  void add_averaged_nodal_load(std::vector<std::array<real_t, 3>>& load) const;
 
   /**
    * @brief Adds the Newmark inertial residual and tangent contributions.

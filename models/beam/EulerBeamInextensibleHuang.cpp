@@ -447,7 +447,7 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
         tau_star.row(last).dot(tau_star.row(last - 1)) / (ds * ds);
     }
     A(last, last) = -tau_star.row(last).squaredNorm() / (ds * ds);
-    b(last) = corr(last) - velsq(last) -
+    b(last) = corr(last) - velsq(last) +
               tau_star.row(last).dot(Fb_star.row(last).transpose()) / ds +
               tau_star.row(last).dot(body_force.transpose()) / ds;
   }

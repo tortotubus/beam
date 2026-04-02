@@ -1,16 +1,49 @@
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
-#include <elff/models/beam/EulerBeamDynamicInextensibleADDM.hpp>
-#include <elff/models/beam/EulerBeamStaticInextensibleADDM.hpp>
+#include <elff/models/beam/EulerBeamInextensibleADDM.hpp>
 #include <elff/models/beam/EulerBeamInextensibleMoM.hpp>
 #include <gtest/gtest.h>
 #include <string>
+
+#include "EulerBeamStaticInextensibleReferences.hpp"
 
 namespace ELFF {
 
 using namespace IO::CXX;
 using namespace Models;
 
-TEST(EulerBeamDynamicInextensibleADDMTest, Glowinski)
+TEST(EulerBeamInextensibleADDMTest, BisshoppAndDrucker)
+{
+  real_t length = 1., EI = 1., area = 1., r_pentalty = 1e2;
+  size_t nodes = 40;
+  (void)area;
+
+  real_t tip_force_y = -1;
+  double comparison_tol = 5e-7;
+
+  EulerBeam::EulerBeamBCs boundary_conditions = {
+    .end = { EulerBeam::left, EulerBeam::right },
+    .type = { EulerBeam::clamped_bc, EulerBeam::point_force_bc },
+    .vals = { { .position = { 0, 0, 0 }, .slope = { 1, 0, 0 } },
+              { .force = { 0, tip_force_y, 0 } } }
+  };
+
+  EulerBeamInextensibleADDM beam(
+    length, EI, nodes, boundary_conditions, r_pentalty);
+  beam.solve();
+  beam.get_mesh().plot_gnuplot("Bisshopp and Drucker ADDM");
+
+  EulerBeamMesh& mesh = beam.get_mesh();
+  auto centerline = mesh.get_centerline();
+  std::array<real_t, 3> tip = centerline[nodes - 1];
+
+  BisshoppAndDrucker1945Result res =
+    BisshoppAndDrucker1945(length, EI, -tip_force_y);
+
+  EXPECT_NEAR(std::abs(length - tip[0]), res.A, comparison_tol);
+  EXPECT_NEAR(std::abs(tip[1]), res.delta, comparison_tol);
+}
+
+TEST(EulerBeamInextensibleADDMTest, Glowinski)
 {
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
   real_t length = 32.6, EI = 700., mu = 7.67, r_penalty = 1e5;
@@ -40,7 +73,6 @@ TEST(EulerBeamDynamicInextensibleADDMTest, Glowinski)
               } }
   };
 
-
   EulerBeamInextensibleMoM static_beam(
     length, EI, nodes, boundary_conditions, 1e8);
   static_beam.apply_initial_condition();
@@ -50,30 +82,29 @@ TEST(EulerBeamDynamicInextensibleADDMTest, Glowinski)
 
   boundary_conditions.type[1] = EulerBeam::free_bc;
 
-  EulerBeamDynamicInextensibleADDM dynamic_beam(
+  EulerBeamInextensibleADDM beam(
     length, EI, mu, nodes, boundary_conditions, r_penalty);
-
-  dynamic_beam.apply_initial_condition(static_beam.get_mesh());
+  beam.apply_initial_condition(static_beam.get_mesh());
 
   ELFF_LOG("Dynamic Solve:");
   for (size_t ti = 0; ti < Nt; ti++) {
     std::string filename = "glowinski_addm.vtkhdf";
 
     if (ti == 0) {
-      vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();
+      vtkPolyData pd = beam.get_mesh().to_vtk_polydata();
       vtkHDFPolyData hdf_pd(filename, pd);
       hdf_pd.write_new_transient(true, ti * dt);
     } else {
-      vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();
+      vtkPolyData pd = beam.get_mesh().to_vtk_polydata();
       vtkHDFPolyData hdf_pd(filename, pd);
       hdf_pd.append_transient(ti * dt);
     }
 
-    dynamic_beam.solve(dt, load);
+    beam.solve(dt, load);
   }
-};
+}
 
-TEST(EulerBeamDynamicInextensibleADDMTest, Huang)
+TEST(EulerBeamInextensibleADDMTest, Huang)
 {
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
 
@@ -129,26 +160,25 @@ TEST(EulerBeamDynamicInextensibleADDMTest, Huang)
 
   std::array<real_t, 3> load = { 10, 0, 0 };
 
-  EulerBeamDynamicInextensibleADDM dynamic_beam(
+  EulerBeamInextensibleADDM beam(
     length, EI, mu, nodes, boundary_conditions, r_penalty);
-
-  dynamic_beam.apply_initial_condition(ic_mesh);
+  beam.apply_initial_condition(ic_mesh);
 
   for (size_t ti = 0; ti < Nt; ti++) {
     std::string filename = "huang_addm.vtkhdf";
 
     if (ti == 0) {
-      vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();
+      vtkPolyData pd = beam.get_mesh().to_vtk_polydata();
       vtkHDFPolyData hdf_pd(filename, pd);
       hdf_pd.write_new_transient(true, ti * dt);
     } else {
-      vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();
+      vtkPolyData pd = beam.get_mesh().to_vtk_polydata();
       vtkHDFPolyData hdf_pd(filename, pd);
       hdf_pd.append_transient(ti * dt);
     }
 
-    dynamic_beam.solve(dt, load);
+    beam.solve(dt, load);
   }
-};
+}
 
 } // namespace ELFF

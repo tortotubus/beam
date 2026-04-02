@@ -37,11 +37,19 @@ EulerBeamInextensibleMoM::EulerBeamInextensibleMoM(
   , residual(VectorXd::Zero(ndof))
   , lambda(VectorXd::Zero(ndof_l))
   , jacobian(SparseMatrix<real_t>(ndof, ndof))
+  , mass(SparseMatrix<real_t>(ndof, ndof))
+  , bending_matrix(SparseMatrix<real_t>(ndof, ndof))
   , u(VectorXd::Zero(ndof))
   , u_prev(VectorXd::Zero(ndof))
   , v_prev(VectorXd::Zero(ndof))
   , a_prev(VectorXd::Zero(ndof))
+  , load_prev({ 0.0, 0.0, 0.0 })
+  , nodal_load_prev(nodes, { 0.0, 0.0, 0.0 })
+  , have_prev_uniform_load(false)
+  , have_prev_nodal_load(false)
 {
+  assemble_mass_matrix();
+  assemble_bending_matrix();
   apply_initial_condition(mesh);
 }
 
@@ -67,21 +75,29 @@ EulerBeamInextensibleMoM::EulerBeamInextensibleMoM(
   , offset_l(ndof_x + ndof_y + ndof_z)
   , ndof(ndof_x + ndof_y + ndof_z)
   , r_penalty(r_penalty)
-  , max_iter_inner(1)
+  , max_iter_inner(2)
   , min_iter_inner(1)
-  , max_iter_outer(20)
+  , max_iter_outer(1000)
   , min_iter_outer(1)
-  , tol_linear(5e-5)
-  , tol_primal(5e-5)
-  , tol_constraint(1e0)
+  , tol_linear(5e-12)
+  , tol_primal(1e-5)
+  , tol_constraint(100)
   , residual(VectorXd::Zero(ndof))
   , lambda(VectorXd::Zero(ndof_l))
   , jacobian(SparseMatrix<real_t>(ndof, ndof))
+  , mass(SparseMatrix<real_t>(ndof, ndof))
+  , bending_matrix(SparseMatrix<real_t>(ndof, ndof))
   , u(VectorXd::Zero(ndof))
   , u_prev(VectorXd::Zero(ndof))
   , v_prev(VectorXd::Zero(ndof))
   , a_prev(VectorXd::Zero(ndof))
+  , load_prev({ 0.0, 0.0, 0.0 })
+  , nodal_load_prev(nodes, { 0.0, 0.0, 0.0 })
+  , have_prev_uniform_load(false)
+  , have_prev_nodal_load(false)
 {
+  assemble_mass_matrix();
+  assemble_bending_matrix();
   apply_initial_condition(mesh);
 }
 
@@ -258,6 +274,8 @@ EulerBeamInextensibleMoM::apply_initial_condition(
 
   u_prev = u;
   a_prev.setZero();
+  have_prev_uniform_load = false;
+  have_prev_nodal_load = false;
   update_mesh();
 }
 
@@ -276,6 +294,8 @@ EulerBeamInextensibleMoM::apply_initial_condition()
   u_prev = u;
   v_prev.setZero();
   a_prev.setZero();
+  have_prev_uniform_load = false;
+  have_prev_nodal_load = false;
   update_mesh();
 }
 
@@ -322,6 +342,69 @@ std::array<real_t, 2>
 EulerBeamInextensibleMoM::get_element_lambda(size_t e) const
 {
   return { lambda(e), lambda(e + 1) };
+}
+
+void
+EulerBeamInextensibleMoM::assemble_mass_matrix()
+{
+  std::vector<Triplet<real_t>> triplets;
+  triplets.reserve(3 * nodes);
+
+  for (size_t n = 0; n < nodes; ++n) {
+    const real_t w = (n == 0 || n == nodes - 1) ? 0.5 * ds : ds;
+    const real_t entry = mu * w;
+
+    triplets.emplace_back(offset_x + 2 * n + 0, offset_x + 2 * n + 0, entry);
+    triplets.emplace_back(offset_y + 2 * n + 0, offset_y + 2 * n + 0, entry);
+    triplets.emplace_back(offset_z + 2 * n + 0, offset_z + 2 * n + 0, entry);
+  }
+
+  mass.resize(ndof, ndof);
+  mass.setFromTriplets(triplets.begin(), triplets.end());
+  mass.makeCompressed();
+}
+
+void
+EulerBeamInextensibleMoM::assemble_bending_matrix()
+{
+  std::vector<Triplet<real_t>> triplets;
+  triplets.reserve(elements * 3 * 16);
+
+  const real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+  const real_t w_q[] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+
+  for (size_t e = 0; e < elements; ++e) {
+    const auto idx = get_element_dof_indices(e);
+    Matrix<real_t, 4, 4> K_local = Matrix<real_t, 4, 4>::Zero();
+
+    for (size_t qi = 0; qi < 3; ++qi) {
+      const auto ddH =
+        ELFF::FEM::CubicHermite<real_t>::second_derivs(xi_q[qi], ds);
+
+      for (size_t a = 0; a < 4; ++a) {
+        for (size_t b = 0; b < 4; ++b) {
+          K_local(a, b) += EI * ddH[a] * ddH[b] * w_q[qi] * ds;
+        }
+      }
+    }
+
+    for (size_t a = 0; a < 4; ++a) {
+      for (size_t b = 0; b < 4; ++b) {
+        const real_t value = K_local(a, b);
+        if (value == 0.0) {
+          continue;
+        }
+
+        triplets.emplace_back(idx[a], idx[b], value);
+        triplets.emplace_back(idx[4 + a], idx[4 + b], value);
+        triplets.emplace_back(idx[8 + a], idx[8 + b], value);
+      }
+    }
+  }
+
+  bending_matrix.resize(ndof, ndof);
+  bending_matrix.setFromTriplets(triplets.begin(), triplets.end());
+  bending_matrix.makeCompressed();
 }
 
 real_t
@@ -403,45 +486,61 @@ EulerBeamInextensibleMoM::update_lambda(real_t omega)
     lambda_rhs.cwiseQuotient(lambda_mass_lumped);
 
   lambda += omega * r_penalty * delta_lambda;
-  // lambda = omega * r_penalty * delta_lambda;
+  // lambda  += omega * delta_lambda;
   apply_lambda_boundary_conditions();
   return delta_lambda.norm();
 }
 
 real_t
-EulerBeamInextensibleMoM::update_lambda_dynamic(real_t omega)
+EulerBeamInextensibleMoM::update_lambda_newmark(real_t dt, real_t omega)
 {
+
+  return update_lambda();
+
+  ELFF_ASSERT(dt > 0.0, "Time step must be positive.\n");
+
   static constexpr std::array<real_t, 3> xi_q = { 0.1127016654,
                                                   0.5,
                                                   0.8872983346 };
   static constexpr std::array<real_t, 3> w_q = { 0.2777777778,
                                                  0.4444444444,
                                                  0.2777777778 };
-  Matrix<real_t, Dynamic, 1> lambda_n =
-    Matrix<real_t, Dynamic, 1>::Zero(ndof_l);
+
+  VectorXd lambda_rhs = VectorXd::Zero(ndof_l);
+  VectorXd lambda_mass_lumped = VectorXd::Zero(ndof_l);
+  VectorXd schur_rhs_correction = VectorXd::Zero(ndof_l);
+  VectorXd schur_diag = VectorXd::Zero(ndof_l);
+  const VectorXd primal_diag =
+    jacobian.diagonal().cwiseAbs().cwiseMax(real_t(1e-12));
 
   for (size_t e = 0; e < elements; ++e) {
-    const size_t elem_nodes[] = { e, e + 1 };
-    const size_t idx_x[] = { offset_x + 2 * elem_nodes[0],
-                             offset_x + 2 * elem_nodes[0] + 1,
-                             offset_x + 2 * elem_nodes[1],
-                             offset_x + 2 * elem_nodes[1] + 1 };
-    const size_t idx_y[] = { offset_y + 2 * elem_nodes[0],
-                             offset_y + 2 * elem_nodes[0] + 1,
-                             offset_y + 2 * elem_nodes[1],
-                             offset_y + 2 * elem_nodes[1] + 1 };
-    const size_t idx_z[] = { offset_z + 2 * elem_nodes[0],
-                             offset_z + 2 * elem_nodes[0] + 1,
-                             offset_z + 2 * elem_nodes[1],
-                             offset_z + 2 * elem_nodes[1] + 1 };
-    const size_t idx_l[] = { elem_nodes[0], elem_nodes[1] };
+    const std::vector<size_t> elem_nodes = { e, e + 1 };
+    const std::vector<size_t> idx_x = { offset_x + 2 * elem_nodes[0],
+                                        offset_x + 2 * elem_nodes[0] + 1,
+                                        offset_x + 2 * elem_nodes[1],
+                                        offset_x + 2 * elem_nodes[1] + 1 };
+    const std::vector<size_t> idx_y = { offset_y + 2 * elem_nodes[0],
+                                        offset_y + 2 * elem_nodes[0] + 1,
+                                        offset_y + 2 * elem_nodes[1],
+                                        offset_y + 2 * elem_nodes[1] + 1 };
+    const std::vector<size_t> idx_z = { offset_z + 2 * elem_nodes[0],
+                                        offset_z + 2 * elem_nodes[0] + 1,
+                                        offset_z + 2 * elem_nodes[1],
+                                        offset_z + 2 * elem_nodes[1] + 1 };
+    const std::vector<size_t> idx_l = { elem_nodes[0], elem_nodes[1] };
 
-    const real_t ux[] = { u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]] };
-    const real_t uy[] = { u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]] };
-    const real_t uz[] = { u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]] };
-    const real_t ul[] = { lambda[idx_l[0]], lambda[idx_l[1]] };
+    const std::array<real_t, 4> ux = {
+      u[idx_x[0]], u[idx_x[1]], u[idx_x[2]], u[idx_x[3]]
+    };
+    const std::array<real_t, 4> uy = {
+      u[idx_y[0]], u[idx_y[1]], u[idx_y[2]], u[idx_y[3]]
+    };
+    const std::array<real_t, 4> uz = {
+      u[idx_z[0]], u[idx_z[1]], u[idx_z[2]], u[idx_z[3]]
+    };
 
-    real_t R_loc_l[2] = { 0., 0. };
+    std::array<real_t, 2> R_loc_l = { 0.0, 0.0 };
+    std::array<real_t, 2> M_loc_lumped = { 0.0, 0.0 };
 
     for (size_t qi = 0; qi < 3; ++qi) {
       const real_t xi = xi_q[qi];
@@ -460,38 +559,65 @@ EulerBeamInextensibleMoM::update_lambda_dynamic(real_t omega)
         zp += dH[i] * uz[i];
       }
 
-      real_t l = 0.0;
-      for (size_t i = 0; i < 2; ++i) {
-        l += M[i] * ul[i];
-      }
-      (void)l;
-
       const real_t S = xp * xp + yp * yp + zp * zp - 1.0;
 
       for (size_t a = 0; a < 2; ++a) {
-        R_loc_l[a] += S * M[a] * w * ds;
+        const real_t weight = M[a] * w * ds;
+        R_loc_l[a] += S * weight;
+        M_loc_lumped[a] += weight;
+
+        for (size_t i = 0; i < 4; ++i) {
+          const real_t gx = 2.0 * xp * dH[i] * weight;
+          const real_t gy = 2.0 * yp * dH[i] * weight;
+          const real_t gz = 2.0 * zp * dH[i] * weight;
+
+          schur_rhs_correction(idx_l[a]) +=
+            gx * residual(idx_x[i]) / primal_diag(idx_x[i]);
+          schur_rhs_correction(idx_l[a]) +=
+            gy * residual(idx_y[i]) / primal_diag(idx_y[i]);
+          schur_rhs_correction(idx_l[a]) +=
+            gz * residual(idx_z[i]) / primal_diag(idx_z[i]);
+
+          schur_diag(idx_l[a]) += gx * gx / primal_diag(idx_x[i]);
+          schur_diag(idx_l[a]) += gy * gy / primal_diag(idx_y[i]);
+          schur_diag(idx_l[a]) += gz * gz / primal_diag(idx_z[i]);
+        }
       }
     }
 
     for (size_t i = 0; i < 2; ++i) {
-      lambda_n[idx_l[i]] += R_loc_l[i];
+      lambda_rhs[idx_l[i]] += R_loc_l[i];
+      lambda_mass_lumped[idx_l[i]] += M_loc_lumped[i];
     }
   }
 
-  lambda = (1.0 - omega) * lambda + omega * lambda_n;
-  return lambda_n.norm();
+  const real_t dual_shift = dt;
+  const VectorXd delta_lambda =
+    (lambda_rhs - schur_rhs_correction)
+      .cwiseQuotient(
+        (schur_diag.array() + lambda_mass_lumped.array() + dual_shift)
+          .matrix());
+
+  lambda += omega * r_penalty * delta_lambda;
+  apply_lambda_boundary_conditions();
+  return delta_lambda.norm();
 }
 
 void
 EulerBeamInextensibleMoM::solve_newmark(real_t dt,
-                                              std::array<real_t, 3> load,
-                                              real_t beta,
-                                              real_t gamma)
+                                        std::array<real_t, 3> load,
+                                        real_t                beta,
+                                        real_t                gamma)
 {
-  ConjugateGradient<SparseMatrix<real_t>, Lower | Upper> solver;
+  SparseLU<SparseMatrix<real_t>, COLAMDOrdering<int>> solver;
 
   if (time_iter == 0) {
     initialize_acceleration(load);
+  }
+  const std::array<real_t, 3> load_current = load;
+  if (!have_prev_uniform_load) {
+    load_prev = load;
+    have_prev_uniform_load = true;
   }
 
   u_prev = u;
@@ -500,37 +626,39 @@ EulerBeamInextensibleMoM::solve_newmark(real_t dt,
 
   real_t dlambda_norm = 0.0, constr_norm = 0.0, res_norm = 0.0;
   size_t iter_outer = 0, iter_inner = 0;
-
+ 
   for (iter_outer = 0; iter_outer < max_iter_outer; ++iter_outer) {
     for (iter_inner = 0; iter_inner < max_iter_inner; ++iter_inner) {
       assemble_system_newmark(dt, load, beta, gamma);
       apply_boundary_conditions();
 
       res_norm = residual.norm();
+      if (iter_inner + 1 >= min_iter_inner && res_norm < tol_primal) {
+        break;
+      }
 
-      solver.setTolerance(tol_linear);
       solver.compute(jacobian);
 
       if (solver.info() != Success) {
         ELFF_ABORT("EulerBeamInextensibleMoM::solve_newmark(): "
-                   "Preconditioner failed.\n");
+                   "SparseLU factorization failed.\n");
       }
 
       const VectorXd delta_u = solver.solve(-residual);
 
       if (solver.info() != Success) {
         ELFF_ABORT("EulerBeamInextensibleMoM::solve_newmark(): "
-                   "linear solve failed.\n");
+                   "SparseLU solve failed.\n");
       }
       u += delta_u;
-
-      ELFF_LOG(time_iter << "\t" << iter_outer << "\t" << iter_inner << "\t"
-                         << res_norm << "\t" << dlambda_norm << "\t"
-                         << constr_norm);
     }
 
-    dlambda_norm = update_lambda_dynamic();
+    dlambda_norm = update_lambda_newmark(dt);
     constr_norm = compute_inextensibility_error_l2();
+
+    ELFF_LOG(time_iter << "\t" << iter_outer << "\t" << iter_inner << "\t"
+                       << res_norm << "\t" << dlambda_norm << "\t"
+                       << constr_norm);
 
     if (iter_outer >= min_iter_outer - 1 && iter_inner >= min_iter_inner - 1) {
       if (res_norm < tol_primal && constr_norm < tol_constraint) {
@@ -550,6 +678,8 @@ EulerBeamInextensibleMoM::solve_newmark(real_t dt,
   update_newmark_state_from_displacement(dt, beta, gamma, v_old, a_old);
   apply_dynamic_state_boundary_conditions();
   u_prev = u;
+  load_prev = load_current;
+  have_prev_uniform_load = true;
   update_mesh();
   ++time_iter;
   t += dt;
@@ -565,56 +695,74 @@ EulerBeamInextensibleMoM::solve_newmark(
   ELFF_ASSERT(load.size() == nodes,
               "Size of load vector must equal number of nodes.");
 
-  ConjugateGradient<SparseMatrix<real_t>, Lower | Upper> solver;
+  SparseLU<SparseMatrix<real_t>, COLAMDOrdering<int>> solver;
 
   if (time_iter == 0) {
     initialize_acceleration(load);
+  }
+  const std::vector<std::array<real_t, 3>> load_current = load;
+  if (!have_prev_nodal_load) {
+    nodal_load_prev = load;
+    have_prev_nodal_load = true;
   }
 
   u_prev = u;
   const VectorXd v_old = v_prev;
   const VectorXd a_old = a_prev;
 
-  real_t dlambda_norm = 0.0;
+  real_t dlambda_norm = 0.0, constr_norm = 0.0, res_norm = 0.0;
+  size_t iter_outer = 0, iter_inner = 0;
 
-  for (size_t iter_outer = 0; iter_outer < max_iter_outer; ++iter_outer) {
-    assemble_system_newmark(dt, load, beta, gamma);
-    apply_boundary_conditions();
+  for (iter_outer = 0; iter_outer < max_iter_outer; ++iter_outer) {
+    for (iter_inner = 0; iter_inner < max_iter_inner; ++iter_inner) {
+      assemble_system_newmark(dt, load, beta, gamma);
+      apply_boundary_conditions();
 
-    const real_t res_norm = residual.norm();
+      res_norm = residual.norm();
+      if (iter_inner + 1 >= min_iter_inner && res_norm < tol_primal) {
+        break;
+      }
+      solver.compute(jacobian);
 
-    if (res_norm < tol_primal) {
-      break;
+      if (solver.info() != Success) {
+        ELFF_ABORT("EulerBeamInextensibleMoM::solve_newmark(): "
+                   "SparseLU factorization failed.\n");
+      }
+
+      const VectorXd delta_u = solver.solve(-residual);
+
+      if (solver.info() != Success) {
+        ELFF_ABORT("EulerBeamInextensibleMoM::solve_newmark(): "
+                   "SparseLU solve failed.\n");
+      }
+
+      u += delta_u;
     }
+
+    dlambda_norm = update_lambda_newmark(dt);
+    constr_norm = compute_inextensibility_error_l2();
+
+    ELFF_LOG(time_iter << "\t" << iter_outer << "\t" << iter_inner << "\t"
+                       << res_norm << "\t" << dlambda_norm << "\t"
+                       << constr_norm);
+
+    if (iter_outer >= min_iter_outer - 1 && iter_inner >= min_iter_inner - 1) {
+      if (res_norm < tol_primal && constr_norm < tol_constraint) {
+        break;
+      }
+    }
+
     if (iter_outer == max_iter_outer - 1) {
       ELFF_ABORT("EulerBeamInextensibleMoM::solve_newmark() did not "
                  "converge.\n");
     }
-
-    solver.setTolerance(tol_linear);
-    solver.compute(jacobian);
-
-    if (solver.info() != Success) {
-      ELFF_ABORT("EulerBeamInextensibleMoM::solve_newmark(): "
-                 "Preconditioner failed.\n");
-    }
-
-    const VectorXd delta_u = solver.solve(-residual);
-
-    if (solver.info() != Success) {
-      ELFF_ABORT("EulerBeamInextensibleMoM::solve_newmark(): "
-                 "linear solve failed.\n");
-    }
-
-    u += delta_u;
-    dlambda_norm = update_lambda_dynamic();
   }
-
-  static_cast<void>(dlambda_norm);
 
   update_newmark_state_from_displacement(dt, beta, gamma, v_old, a_old);
   apply_dynamic_state_boundary_conditions();
   u_prev = u;
+  nodal_load_prev = load_current;
+  have_prev_nodal_load = true;
   update_mesh();
   ++time_iter;
   t += dt;
@@ -794,7 +942,8 @@ EulerBeamInextensibleMoM::update_mesh()
 
 void
 EulerBeamInextensibleMoM::assemble_system(
-  std::array<real_t, 3> load)
+  std::array<real_t, 3> load,
+  real_t                bending_scale)
 {
   using ADDeriv = Matrix<real_t, 12, 1>;
   using AD = AutoDiffScalar<ADDeriv>;
@@ -818,7 +967,7 @@ EulerBeamInextensibleMoM::assemble_system(
     }
 
     const ADVec R_loc_ad =
-      assemble_element_residual_template<AD>(u_ad, lambda_elem, load);
+      assemble_element_residual_template<AD>(u_ad, lambda_elem, load, bending_scale);
 
     for (int a = 0; a < 12; ++a) {
       residual(idx[a]) += R_loc_ad(a).value();
@@ -840,7 +989,8 @@ EulerBeamInextensibleMoM::assemble_system(
 
 void
 EulerBeamInextensibleMoM::assemble_system(
-  std::vector<std::array<real_t, 3>> load)
+  std::vector<std::array<real_t, 3>> load,
+  real_t                              bending_scale)
 {
   using ADDeriv = Matrix<real_t, 12, 1>;
   using AD = AutoDiffScalar<ADDeriv>;
@@ -865,8 +1015,8 @@ EulerBeamInextensibleMoM::assemble_system(
       u_ad(a) = AD(u_elem(a), seed);
     }
 
-    const ADVec R_loc_ad =
-      assemble_element_residual_template<AD>(u_ad, lambda_elem, load_elem);
+    const ADVec R_loc_ad = assemble_element_residual_template<AD>(
+      u_ad, lambda_elem, load_elem, bending_scale);
 
     for (int a = 0; a < 12; ++a) {
       residual(idx[a]) += R_loc_ad(a).value();
@@ -1005,8 +1155,9 @@ EulerBeamInextensibleMoM::assemble_system_newmark(
   real_t gamma)
 {
   static_cast<void>(gamma);
-
-  assemble_system(load);
+  add_averaged_uniform_load(load);
+  assemble_system(load, 0.0);
+  add_midpoint_bending_terms();
   add_newmark_inertial_terms(dt, beta);
 }
 
@@ -1018,9 +1169,50 @@ EulerBeamInextensibleMoM::assemble_system_newmark(
   real_t gamma)
 {
   static_cast<void>(gamma);
-
-  assemble_system(load);
+  add_averaged_nodal_load(load);
+  assemble_system(load, 0.0);
+  add_midpoint_bending_terms();
   add_newmark_inertial_terms(dt, beta);
+}
+
+void
+EulerBeamInextensibleMoM::add_midpoint_bending_terms()
+{
+  residual.noalias() += 0.5 * (bending_matrix * u);
+  residual.noalias() += 0.5 * (bending_matrix * u_prev);
+  jacobian += 0.5 * bending_matrix;
+  jacobian.makeCompressed();
+}
+
+void
+EulerBeamInextensibleMoM::add_averaged_uniform_load(
+  std::array<real_t, 3>& load) const
+{
+  if (!have_prev_uniform_load) {
+    return;
+  }
+
+  for (size_t i = 0; i < 3; ++i) {
+    load[i] = 0.5 * (load_prev[i] + load[i]);
+  }
+}
+
+void
+EulerBeamInextensibleMoM::add_averaged_nodal_load(
+  std::vector<std::array<real_t, 3>>& load) const
+{
+  if (!have_prev_nodal_load) {
+    return;
+  }
+
+  ELFF_ASSERT(load.size() == nodal_load_prev.size(),
+              "Stored nodal load history must match node count.");
+
+  for (size_t i = 0; i < load.size(); ++i) {
+    for (size_t d = 0; d < 3; ++d) {
+      load[i][d] = 0.5 * (nodal_load_prev[i][d] + load[i][d]);
+    }
+  }
 }
 
 void

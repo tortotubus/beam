@@ -20,7 +20,21 @@ EulerBeamDynamicInextensibleIndex1::EulerBeamDynamicInextensibleIndex1(
   real_t                  mu,
   size_t                  n_nodes,
   EulerBeam::EulerBeamBCs bcs)
-  : EulerBeamInextensibleMoM(length, EI, mu, n_nodes, bcs, 0.0)
+  : EulerBeam(length, EI, mu, n_nodes, bcs)
+  , elements(n_nodes - 1)
+  , nodes(n_nodes)
+  , ds(mesh.get_ds())
+  , ndof_x(2 * n_nodes)
+  , ndof_y(2 * n_nodes)
+  , ndof_z(2 * n_nodes)
+  , ndof_l(n_nodes)
+  , offset_x(0)
+  , offset_y(ndof_x)
+  , offset_z(ndof_x + ndof_y)
+  , offset_l(ndof_x + ndof_y + ndof_z)
+  , ndof(ndof_x + ndof_y + ndof_z)
+  , u(VectorXd::Zero(ndof))
+  , lambda(VectorXd::Zero(ndof_l))
   , u_prev(VectorXd::Zero(ndof))
   , v_prev(VectorXd::Zero(ndof))
   , a_prev(VectorXd::Zero(ndof))
@@ -30,11 +44,8 @@ EulerBeamDynamicInextensibleIndex1::EulerBeamDynamicInextensibleIndex1(
   , tol_position_drift(1e-8)
   , tol_velocity_drift(1e-8)
   , max_projection_iter(20)
-  , time_iter(0)
-  , t(0.0)
 {
-  // Parent constructor already called apply_initial_condition(mesh)
-  // so u is initialised. Copy it here as the t=0 state.
+  apply_initial_condition(mesh);
   assemble_elastic_stiffness();
   u_prev = u;
 }
@@ -42,33 +53,58 @@ EulerBeamDynamicInextensibleIndex1::EulerBeamDynamicInextensibleIndex1(
 // -----------------------------------------------------------------------
 // Initial conditions
 // -----------------------------------------------------------------------
+void EulerBeamDynamicInextensibleIndex1::solve()
+{
+  ELFF_ABORT("EulerBeamDynamicInextensibleIndex1 does not implement a static solve.\n");
+}
+
+void EulerBeamDynamicInextensibleIndex1::solve(std::array<real_t, 3> load)
+{
+  static_cast<void>(load);
+  ELFF_ABORT("EulerBeamDynamicInextensibleIndex1 does not implement a static solve.\n");
+}
+
+void EulerBeamDynamicInextensibleIndex1::solve(
+  std::vector<std::array<real_t, 3>> load)
+{
+  static_cast<void>(load);
+  ELFF_ABORT("EulerBeamDynamicInextensibleIndex1 does not implement a static solve.\n");
+}
+
 void EulerBeamDynamicInextensibleIndex1::apply_initial_condition()
 {
-  EulerBeamInextensibleMoM::apply_initial_condition();
-  u_prev = u;
-  v_prev.setZero();
-  a_prev.setZero();
-  time_iter = 0;
-  t         = 0.0;
+  apply_initial_condition(mesh);
 }
 
 void EulerBeamDynamicInextensibleIndex1::apply_initial_condition(
   EulerBeamMesh& bmesh)
 {
-  EulerBeamInextensibleMoM::apply_initial_condition(bmesh);
-  u_prev = u;
-  v_prev.setZero();
-  a_prev.setZero();
+  ELFF_ASSERT(nodes == bmesh.get_nodes(),
+              "Provided mesh must have same node count as the previous mesh.\n");
 
-  // Seed velocity DOFs from mesh if velocities are available
-  const auto& vel = bmesh.get_centerline_velocity();
-  for (size_t i = 0; i < nodes; ++i) {
-    v_prev(offset_x + 2 * i) = vel[i][0];
-    v_prev(offset_y + 2 * i) = vel[i][1];
-    v_prev(offset_z + 2 * i) = vel[i][2];
+  const auto centerline = bmesh.get_centerline();
+  const auto slopes = bmesh.get_slope();
+  const auto velocity = bmesh.get_centerline_velocity();
+
+  for (size_t ni = 0; ni < nodes; ++ni) {
+    u(offset_x + 2 * ni + 0) = centerline[ni][0];
+    u(offset_x + 2 * ni + 1) = slopes[ni][0];
+    u(offset_y + 2 * ni + 0) = centerline[ni][1];
+    u(offset_y + 2 * ni + 1) = slopes[ni][1];
+    u(offset_z + 2 * ni + 0) = centerline[ni][2];
+    u(offset_z + 2 * ni + 1) = slopes[ni][2];
+
+    v_prev(offset_x + 2 * ni) = velocity[ni][0];
+    v_prev(offset_y + 2 * ni) = velocity[ni][1];
+    v_prev(offset_z + 2 * ni) = velocity[ni][2];
   }
+
+  lambda.setZero();
+  u_prev = u;
+  a_prev.setZero();
   time_iter = 0;
-  t         = 0.0;
+  t = 0.0;
+  update_mesh();
 }
 
 // -----------------------------------------------------------------------
@@ -746,10 +782,16 @@ void EulerBeamDynamicInextensibleIndex1::project_velocity_onto_constraint(
 // -----------------------------------------------------------------------
 void EulerBeamDynamicInextensibleIndex1::update_mesh()
 {
-  EulerBeamInextensibleMoM::update_mesh();
-
+  std::vector<std::array<real_t, 3>>& centerline = mesh.get_centerline();
+  std::vector<std::array<real_t, 3>>& slope = mesh.get_slope();
   std::vector<std::array<real_t, 3>>& vel = mesh.get_centerline_velocity();
   for (size_t i = 0; i < nodes; ++i) {
+    centerline[i][0] = u(offset_x + 2 * i);
+    centerline[i][1] = u(offset_y + 2 * i);
+    centerline[i][2] = u(offset_z + 2 * i);
+    slope[i][0] = u(offset_x + 2 * i + 1);
+    slope[i][1] = u(offset_y + 2 * i + 1);
+    slope[i][2] = u(offset_z + 2 * i + 1);
     vel[i][0] = v_prev(offset_x + 2 * i);
     vel[i][1] = v_prev(offset_y + 2 * i);
     vel[i][2] = v_prev(offset_z + 2 * i);

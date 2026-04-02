@@ -20,6 +20,10 @@ if(ELFF_BUILD_THIRD_PARTY_GTEST)
         COMMAND elff_benchmark_tests --gtest_filter=EulerBeamDynamicInextensibleGGLTest.*
     )
     add_test(
+        NAME EulerBeamInextensibleGGL2Test
+        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamInextensibleGGL2Test.*
+    )
+    add_test(
         NAME EulerBeamHuangTest
         COMMAND elff_benchmark_tests --gtest_filter=EulerBeamHuangTest.*
     )
