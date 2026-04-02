@@ -10,3 +10,9 @@
 [submodule "third_party/gtest/gtest_submodule"]
 	path = third_party/gtest/gtest_submodule
 	url = https://github.com/google/googletest.git
+[submodule "build/release/tests/third_party/amrex/amrex_submodule"]
+	path = build/release/tests/third_party/amrex/amrex_submodule
+	url = https://github.com/AMReX-Codes/amrex.git
+[submodule "build/release/tests/third_party/amrex-hydro/amrex-hydro_submodule"]
+	path = build/release/tests/third_party/amrex-hydro/amrex-hydro_submodule
+	url = https://github.com/AMReX-Codes/AMReX-Hydro.git
