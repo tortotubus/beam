@@ -13,23 +13,32 @@ constexpr std::array<real_t, 3> w_q  = { 0.2777777778,
                                          0.4444444444,
                                          0.2777777778 };
 
-template<typename Scalar>
-real_t scalar_value(const Scalar& x)
+struct GGLLinearizedElementData
 {
-  return x;
-}
+  Matrix<real_t, 16, 1> residual;
+  Matrix<real_t, 12, 1> velocity_residual;
+  Matrix<real_t, 12, 12> displacement_jacobian;
+  Matrix<real_t, 12, 12> velocity_displacement_jacobian;
+  Matrix<real_t, 2, 12> lambda_displacement_jacobian;
+  Matrix<real_t, 2, 12> mu_displacement_jacobian;
+  Matrix<real_t, 2, 12> mu_velocity_jacobian;
 
-template<typename DerType>
-real_t scalar_value(const AutoDiffScalar<DerType>& x)
-{
-  return x.value();
-}
+  void reset(const Matrix<real_t, 12, 12>& local_bending_jacobian)
+  {
+    residual.setZero();
+    velocity_residual.setZero();
+    displacement_jacobian = local_bending_jacobian;
+    velocity_displacement_jacobian.setZero();
+    lambda_displacement_jacobian.setZero();
+    mu_displacement_jacobian.setZero();
+    mu_velocity_jacobian.setZero();
+  }
+};
 
-template<typename Scalar>
-void assemble_ggl_element_data(
+void assemble_ggl_element_linearized_data(
   real_t                                      EI,
   real_t                                      ds,
-  const Matrix<Scalar, 12, 1>&                u_elem,
+  const Matrix<real_t, 12, 1>&                u_elem,
   const std::array<real_t, 2>&                lambda_elem,
   const std::array<real_t, 2>&                mu_elem,
   const std::array<real_t, 4>&                vx_elem,
@@ -40,25 +49,20 @@ void assemble_ggl_element_data(
   const std::array<std::array<real_t, 4>, 3>& quad_dH,
   const std::array<std::array<real_t, 4>, 3>& quad_ddH,
   const std::array<std::array<real_t, 2>, 3>& quad_M,
-  Matrix<Scalar, 16, 1>&                      R,
-  Matrix<Scalar, 12, 1>&                      Rv_mu,
-  Matrix<real_t, 2, 12>&                      C_loc)
+  const Matrix<real_t, 12, 12>&               local_bending_jacobian,
+  GGLLinearizedElementData&                    data)
 {
-  // Fused element kernel: evaluate the nonlinear residual pieces and the
-  // velocity-constraint coupling in a single quadrature sweep.
-  R.setZero();
-  Rv_mu.setZero();
-  C_loc.setZero();
+  data.reset(local_bending_jacobian);
 
   for (size_t qi = 0; qi < xi_q.size(); ++qi) {
-    const real_t w  = w_q[qi];
+    const real_t wds = w_q[qi] * ds;
     const auto& H   = quad_H[qi];
     const auto& dH  = quad_dH[qi];
     const auto& ddH = quad_ddH[qi];
     const auto& M   = quad_M[qi];
 
-    Scalar xp = 0, yp = 0, zp = 0;
-    Scalar xpp = 0, ypp = 0, zpp = 0;
+    real_t xp = 0.0, yp = 0.0, zp = 0.0;
+    real_t xpp = 0.0, ypp = 0.0, zpp = 0.0;
     for (size_t i = 0; i < 4; ++i) {
       xp  += dH[i]  * u_elem(i);
       yp  += dH[i]  * u_elem(i + 4);
@@ -75,43 +79,57 @@ void assemble_ggl_element_data(
       vzp += dH[i] * vz_elem[i];
     }
 
-    const Scalar lambda_q = M[0] * lambda_elem[0] + M[1] * lambda_elem[1];
+    const real_t lambda_q = M[0] * lambda_elem[0] + M[1] * lambda_elem[1];
     const real_t mu_q     = M[0] * mu_elem[0]     + M[1] * mu_elem[1];
     const real_t fx       = M[0] * load_elem[0][0] + M[1] * load_elem[1][0];
     const real_t fy       = M[0] * load_elem[0][1] + M[1] * load_elem[1][1];
     const real_t fz       = M[0] * load_elem[0][2] + M[1] * load_elem[1][2];
 
-    for (size_t a = 0; a < 4; ++a) {
-      R(a)     += EI * xpp * ddH[a] * w * ds;
-      R(a + 4) += EI * ypp * ddH[a] * w * ds;
-      R(a + 8) += EI * zpp * ddH[a] * w * ds;
+    const std::array<real_t, 3> slope = { xp, yp, zp };
+    const std::array<real_t, 3> curvature = { xpp, ypp, zpp };
+    const std::array<real_t, 3> velocity_slope = { vxp, vyp, vzp };
+    const std::array<real_t, 3> load_q = { fx, fy, fz };
 
-      const Scalar lambda_coeff = 2.0 * lambda_q * dH[a] * w * ds;
-      R(a)     -= lambda_coeff * xp;
-      R(a + 4) -= lambda_coeff * yp;
-      R(a + 8) -= lambda_coeff * zp;
+    for (size_t axis = 0; axis < 3; ++axis) {
+      const size_t row_offset = 4 * axis;
+      for (size_t a = 0; a < 4; ++a) {
+        const real_t weighted_dH = dH[a] * wds;
+        data.residual(row_offset + a) += EI * curvature[axis] * ddH[a] * wds;
+        data.residual(row_offset + a) -=
+          2.0 * lambda_q * slope[axis] * weighted_dH;
+        data.residual(row_offset + a) -= load_q[axis] * H[a] * wds;
 
-      R(a)     -= fx * H[a] * w * ds;
-      R(a + 4) -= fy * H[a] * w * ds;
-      R(a + 8) -= fz * H[a] * w * ds;
+        data.velocity_residual(row_offset + a) -=
+          mu_q * slope[axis] * weighted_dH;
 
-      const Scalar mu_coeff = mu_q * dH[a] * w * ds;
-      Rv_mu(a)     -= mu_coeff * xp;
-      Rv_mu(a + 4) -= mu_coeff * yp;
-      Rv_mu(a + 8) -= mu_coeff * zp;
+        for (size_t b = 0; b < 4; ++b) {
+          const real_t dHdH = dH[a] * dH[b] * wds;
+          data.displacement_jacobian(row_offset + a, row_offset + b) -=
+            2.0 * lambda_q * dHdH;
+          data.velocity_displacement_jacobian(row_offset + a,
+                                              row_offset + b) -= mu_q * dHdH;
+        }
+      }
     }
 
-    const Scalar g  = xp * xp + yp * yp + zp * zp - Scalar(1.0);
-    const Scalar Gv = xp * vxp + yp * vyp + zp * vzp;
+    const real_t g  = xp * xp + yp * yp + zp * zp - 1.0;
+    const real_t Gv = xp * vxp + yp * vyp + zp * vzp;
     for (size_t a = 0; a < 2; ++a) {
-      R(12 + a) += g * M[a] * w * ds;
-      R(14 + a) += Gv * M[a] * w * ds;
+      const real_t weighted_M = M[a] * wds;
+      data.residual(12 + a) += g * weighted_M;
+      data.residual(14 + a) += Gv * weighted_M;
 
-      for (size_t i = 0; i < 4; ++i) {
-        const real_t coeff = M[a] * dH[i] * w * ds;
-        C_loc(a, i)     += scalar_value(xp) * coeff;
-        C_loc(a, i + 4) += scalar_value(yp) * coeff;
-        C_loc(a, i + 8) += scalar_value(zp) * coeff;
+      for (size_t axis = 0; axis < 3; ++axis) {
+        const size_t row_offset = 4 * axis;
+        for (size_t i = 0; i < 4; ++i) {
+          const real_t coeff = weighted_M * dH[i];
+          data.lambda_displacement_jacobian(a, row_offset + i) +=
+            2.0 * slope[axis] * coeff;
+          data.mu_displacement_jacobian(a, row_offset + i) +=
+            velocity_slope[axis] * coeff;
+          data.mu_velocity_jacobian(a, row_offset + i) +=
+            slope[axis] * coeff;
+        }
       }
     }
   }
@@ -164,6 +182,8 @@ EulerBeamInextensibleGGL::EulerBeamInextensibleGGL(
   , quad_dH()
   , quad_ddH()
   , quad_M()
+  , element_disp_dof_indices_cache(elements)
+  , local_bending_jacobian(Matrix<real_t, 12, 12>::Zero())
   , max_newton(25)
   , tol_newton(5e-5)
 {
@@ -171,6 +191,8 @@ EulerBeamInextensibleGGL::EulerBeamInextensibleGGL(
   apply_initial_condition(mesh);
   u_prev = u;
   initialize_quadrature_cache();
+  initialize_element_dof_cache();
+  initialize_constant_element_matrices();
   assemble_mass_matrix();
 }
 
@@ -264,9 +286,7 @@ EulerBeamInextensibleGGL::solve(real_t dt, std::array<real_t, 3> load)
 
   // Start Newton from the previous converged state.
   for (size_t iter = 0; iter < max_newton; ++iter) {
-    // Assemble and constrain the full [u, v, lambda, mu] system.
     assemble_ggl_system(u_cur, v_cur, lambda_cur, mu_cur, load);
-    apply_ggl_boundary_conditions(u_cur, v_cur);
 
     const real_t res_norm = ggl_residual.norm();
     final_iter = iter;
@@ -356,9 +376,7 @@ EulerBeamInextensibleGGL::solve(
   bool pattern_analyzed = false;
 
   for (size_t iter = 0; iter < max_newton; ++iter) {
-    // This path shares the same Newton solve; only load interpolation differs.
     assemble_ggl_system(u_cur, v_cur, lambda_cur, mu_cur, load);
-    apply_ggl_boundary_conditions(u_cur, v_cur);
 
     const real_t res_norm = ggl_residual.norm();
     final_iter = iter;
@@ -455,7 +473,7 @@ EulerBeamInextensibleGGL::compute_inextensibility_error(
   size_t sample_count = 0;
 
   for (size_t e = 0; e < elements; ++e) {
-    const auto idx = get_element_disp_dof_indices(e);
+    const auto& idx = get_element_disp_dof_indices(e);
 
     Matrix<real_t, 12, 1> u_elem;
     for (int i = 0; i < 12; ++i) {
@@ -505,6 +523,43 @@ EulerBeamInextensibleGGL::initialize_quadrature_cache()
     quad_ddH[qi] =
       ELFF::FEM::CubicHermite<real_t>::second_derivs(xi_q[qi], ds);
     quad_M[qi] = ELFF::FEM::LinearShape<real_t>::values(xi_q[qi]);
+  }
+}
+
+void
+EulerBeamInextensibleGGL::initialize_element_dof_cache()
+{
+  for (size_t e = 0; e < elements; ++e) {
+    const size_t n0 = e;
+    const size_t n1 = e + 1;
+    element_disp_dof_indices_cache[e] = {
+      offset_x + 2 * n0,     offset_x + 2 * n0 + 1,
+      offset_x + 2 * n1,     offset_x + 2 * n1 + 1,
+      offset_y + 2 * n0,     offset_y + 2 * n0 + 1,
+      offset_y + 2 * n1,     offset_y + 2 * n1 + 1,
+      offset_z + 2 * n0,     offset_z + 2 * n0 + 1,
+      offset_z + 2 * n1,     offset_z + 2 * n1 + 1
+    };
+  }
+}
+
+void
+EulerBeamInextensibleGGL::initialize_constant_element_matrices()
+{
+  local_bending_jacobian.setZero();
+
+  for (size_t qi = 0; qi < xi_q.size(); ++qi) {
+    const auto& ddH = quad_ddH[qi];
+    const real_t wds = w_q[qi] * ds;
+
+    for (size_t a = 0; a < 4; ++a) {
+      for (size_t b = 0; b < 4; ++b) {
+        const real_t value = EI * ddH[a] * ddH[b] * wds;
+        local_bending_jacobian(a, b) += value;
+        local_bending_jacobian(a + 4, b + 4) += value;
+        local_bending_jacobian(a + 8, b + 8) += value;
+      }
+    }
   }
 }
 
@@ -739,19 +794,10 @@ EulerBeamInextensibleGGL::assemble_velocity_multiplier_residual(
   return Rv;
 }
 
-std::array<size_t, 12>
+const std::array<size_t, 12>&
 EulerBeamInextensibleGGL::get_element_disp_dof_indices(size_t e) const
 {
-  const size_t n0 = e;
-  const size_t n1 = e + 1;
-  return {
-    offset_x + 2 * n0,     offset_x + 2 * n0 + 1,
-    offset_x + 2 * n1,     offset_x + 2 * n1 + 1,
-    offset_y + 2 * n0,     offset_y + 2 * n0 + 1,
-    offset_y + 2 * n1,     offset_y + 2 * n1 + 1,
-    offset_z + 2 * n0,     offset_z + 2 * n0 + 1,
-    offset_z + 2 * n1,     offset_z + 2 * n1 + 1
-  };
+  return element_disp_dof_indices_cache[e];
 }
 
 // -----------------------------------------------------------------------
@@ -798,78 +844,84 @@ EulerBeamInextensibleGGL::assemble_ggl_system(
   const VectorXd&       mu_cur,
   std::array<real_t, 3> load)
 {
-  using ADDeriv = Matrix<real_t, 12, 1>;
-  using AD      = AutoDiffScalar<ADDeriv>;
-  using ADVec   = Matrix<AD, 12, 1>;
   using Tpl     = Triplet<real_t>;
 
   const VectorXd a_cur = compute_acceleration(u_cur);
   const VectorXd v_newmark = compute_velocity(u_cur);
 
-  // The first two residual blocks contain the mass/Newmark contributions.
   ggl_residual.setZero();
   ggl_residual.head(ndof) += mass * a_cur;
   ggl_residual.segment(offset_v, ndof) += mass * (v_cur - v_newmark);
 
-  std::vector<Tpl> triplets;
-  triplets.reserve(elements * 240);
+  std::vector<char> constrained(ggl_dof, 0);
+  VectorXd          constrained_value = VectorXd::Zero(ggl_dof);
+  collect_ggl_constraints(constrained, constrained_value);
 
-  // Insert the constant-in-geometry Jacobian terms coming from the mass matrix.
+  std::vector<Tpl> triplets;
+  triplets.reserve(3 * mass.nonZeros() + elements * 192 + ggl_dof / 8);
+
+  auto add_jacobian_entry = [&](size_t row, size_t col, real_t value) {
+    if (value == 0.0) {
+      return;
+    }
+    if (constrained[row]) {
+      return;
+    }
+    if (constrained[col]) {
+      ggl_residual(row) -= value * constrained_value(col);
+      return;
+    }
+
+    triplets.emplace_back(static_cast<int>(row),
+                          static_cast<int>(col),
+                          value);
+  };
+
   for (int col = 0; col < mass.outerSize(); ++col) {
     for (SparseMatrix<real_t>::InnerIterator it(mass, col); it; ++it) {
-      triplets.emplace_back(it.row(), it.col(), newmark_coeff_a * it.value());
-      triplets.emplace_back(offset_v + it.row(), it.col(),
-                            -newmark_coeff_v * it.value());
-      triplets.emplace_back(offset_v + it.row(), offset_v + it.col(),
-                            it.value());
+      add_jacobian_entry(it.row(), it.col(), newmark_coeff_a * it.value());
+      add_jacobian_entry(offset_v + it.row(),
+                         it.col(),
+                         -newmark_coeff_v * it.value());
+      add_jacobian_entry(offset_v + it.row(),
+                         offset_v + it.col(),
+                         it.value());
     }
   }
 
   for (size_t e = 0; e < elements; ++e) {
-    const auto idx = get_element_disp_dof_indices(e);
+    const auto& idx = get_element_disp_dof_indices(e);
     const std::array<real_t, 2> lambda_elem = { lambda_cur(e),
                                                 lambda_cur(e + 1) };
     const std::array<real_t, 2> mu_elem = { mu_cur(e), mu_cur(e + 1) };
     const auto vx_elem = get_element_velocity_x(e, v_cur);
     const auto vy_elem = get_element_velocity_y(e, v_cur);
     const auto vz_elem = get_element_velocity_z(e, v_cur);
-
-    ADVec u_ad;
+    Matrix<real_t, 12, 1> u_elem;
     for (int a = 0; a < 12; ++a) {
-      ADDeriv seed = ADDeriv::Zero();
-      seed(a) = 1.0;
-      u_ad(a) = AD(u_cur(idx[a]), seed);
+      u_elem(a) = u_cur(idx[a]);
     }
 
     const std::array<std::array<real_t, 3>, 2> load_elem = { load, load };
-    Matrix<AD, 16, 1>   R_ad;
-    Matrix<AD, 12, 1>   Rv_mu_ad;
-    Matrix<real_t, 2, 12> C_loc;
+    GGLLinearizedElementData elem_data;
 
-    // Gather all geometry-dependent element contributions in one cached pass.
-    assemble_ggl_element_data(
-      EI, ds, u_ad, lambda_elem, mu_elem,
+    assemble_ggl_element_linearized_data(
+      EI, ds, u_elem, lambda_elem, mu_elem,
       vx_elem, vy_elem, vz_elem, load_elem,
       quad_H, quad_dH, quad_ddH, quad_M,
-      R_ad, Rv_mu_ad, C_loc);
+      local_bending_jacobian, elem_data);
 
     for (int a = 0; a < 12; ++a) {
-      // Dynamic equilibrium block and its u-tangent.
-      ggl_residual(idx[a]) += R_ad(a).value();
-      const ADDeriv& dRa = R_ad(a).derivatives();
-      for (int b = 0; b < 12; ++b) {
-        if (dRa(b) != 0.0) {
-          triplets.emplace_back(idx[a], idx[b], dRa(b));
-        }
-      }
+      ggl_residual(idx[a]) += elem_data.residual(a);
+      ggl_residual(offset_v + idx[a]) += elem_data.velocity_residual(a);
 
-      // Velocity-row contribution from -C(u)^T mu and its u-derivative.
-      ggl_residual(offset_v + idx[a]) += Rv_mu_ad(a).value();
-      const ADDeriv& dRv = Rv_mu_ad(a).derivatives();
       for (int b = 0; b < 12; ++b) {
-        if (dRv(b) != 0.0) {
-          triplets.emplace_back(offset_v + idx[a], idx[b], dRv(b));
-        }
+        add_jacobian_entry(idx[a],
+                           idx[b],
+                           elem_data.displacement_jacobian(a, b));
+        add_jacobian_entry(offset_v + idx[a],
+                           idx[b],
+                           elem_data.velocity_displacement_jacobian(a, b));
       }
     }
 
@@ -877,35 +929,21 @@ EulerBeamInextensibleGGL::assemble_ggl_system(
       const size_t global_l = offset_lambda + e + a;
       const size_t global_mu = offset_mu + e + a;
 
-      ggl_residual(global_l) += R_ad(12 + a).value();
-      ggl_residual(global_mu) += R_ad(14 + a).value();
+      ggl_residual(global_l) += elem_data.residual(12 + a);
+      ggl_residual(global_mu) += elem_data.residual(14 + a);
 
-      const ADDeriv& dRla = R_ad(12 + a).derivatives();
-      const ADDeriv& dRma = R_ad(14 + a).derivatives();
       for (int b = 0; b < 12; ++b) {
-        if (dRla(b) != 0.0) {
-          // Position constraint row and transpose coupling to lambda.
-          triplets.emplace_back(global_l, idx[b], dRla(b));
-          triplets.emplace_back(idx[b], global_l, -dRla(b));
-        }
-        if (dRma(b) != 0.0) {
-          // Velocity constraint differentiated with respect to displacement.
-          triplets.emplace_back(global_mu, idx[b], dRma(b));
-        }
-      }
-    }
+        const real_t dRlambda =
+          elem_data.lambda_displacement_jacobian(a, b);
+        add_jacobian_entry(global_l, idx[b], dRlambda);
+        add_jacobian_entry(idx[b], global_l, -dRlambda);
+        add_jacobian_entry(global_mu,
+                           idx[b],
+                           elem_data.mu_displacement_jacobian(a, b));
 
-    // C_loc stores dR_mu / dv and, by transpose, the mu-coupling in R_v.
-    for (int a = 0; a < 2; ++a) {
-      const size_t global_mu = offset_mu + e + a;
-      for (int b = 0; b < 12; ++b) {
-        const real_t value = C_loc(a, b);
-        if (value == 0.0) {
-          continue;
-        }
-
-        triplets.emplace_back(global_mu, offset_v + idx[b], value);
-        triplets.emplace_back(offset_v + idx[b], global_mu, -value);
+        const real_t dRmu_dv = elem_data.mu_velocity_jacobian(a, b);
+        add_jacobian_entry(global_mu, offset_v + idx[b], dRmu_dv);
+        add_jacobian_entry(offset_v + idx[b], global_mu, -dRmu_dv);
       }
     }
   }
@@ -924,6 +962,23 @@ EulerBeamInextensibleGGL::assemble_ggl_system(
       ggl_residual(offset_x + 2 * ni + 1) -= bcvals.torque[0];
       ggl_residual(offset_y + 2 * ni + 1) -= bcvals.torque[1];
       ggl_residual(offset_z + 2 * ni + 1) -= bcvals.torque[2];
+    }
+  }
+
+  for (size_t dof = 0; dof < ggl_dof; ++dof) {
+    if (!constrained[dof]) {
+      continue;
+    }
+
+    triplets.emplace_back(static_cast<int>(dof),
+                          static_cast<int>(dof),
+                          1.0);
+    if (dof < offset_v) {
+      ggl_residual(dof) = u_cur(dof) - constrained_value(dof);
+    } else if (dof < offset_lambda) {
+      ggl_residual(dof) = v_cur(dof - offset_v) - constrained_value(dof);
+    } else {
+      ggl_residual(dof) = -constrained_value(dof);
     }
   }
 
@@ -940,9 +995,6 @@ EulerBeamInextensibleGGL::assemble_ggl_system(
   const VectorXd&                            mu_cur,
   const std::vector<std::array<real_t, 3>>& load)
 {
-  using ADDeriv = Matrix<real_t, 12, 1>;
-  using AD      = AutoDiffScalar<ADDeriv>;
-  using ADVec   = Matrix<AD, 12, 1>;
   using Tpl     = Triplet<real_t>;
 
   const VectorXd a_cur = compute_acceleration(u_cur);
@@ -952,21 +1004,44 @@ EulerBeamInextensibleGGL::assemble_ggl_system(
   ggl_residual.head(ndof) += mass * a_cur;
   ggl_residual.segment(offset_v, ndof) += mass * (v_cur - v_newmark);
 
+  std::vector<char> constrained(ggl_dof, 0);
+  VectorXd          constrained_value = VectorXd::Zero(ggl_dof);
+  collect_ggl_constraints(constrained, constrained_value);
+
   std::vector<Tpl> triplets;
-  triplets.reserve(elements * 240);
+  triplets.reserve(3 * mass.nonZeros() + elements * 192 + ggl_dof / 8);
+
+  auto add_jacobian_entry = [&](size_t row, size_t col, real_t value) {
+    if (value == 0.0) {
+      return;
+    }
+    if (constrained[row]) {
+      return;
+    }
+    if (constrained[col]) {
+      ggl_residual(row) -= value * constrained_value(col);
+      return;
+    }
+
+    triplets.emplace_back(static_cast<int>(row),
+                          static_cast<int>(col),
+                          value);
+  };
 
   for (int col = 0; col < mass.outerSize(); ++col) {
     for (SparseMatrix<real_t>::InnerIterator it(mass, col); it; ++it) {
-      triplets.emplace_back(it.row(), it.col(), newmark_coeff_a * it.value());
-      triplets.emplace_back(offset_v + it.row(), it.col(),
-                            -newmark_coeff_v * it.value());
-      triplets.emplace_back(offset_v + it.row(), offset_v + it.col(),
-                            it.value());
+      add_jacobian_entry(it.row(), it.col(), newmark_coeff_a * it.value());
+      add_jacobian_entry(offset_v + it.row(),
+                         it.col(),
+                         -newmark_coeff_v * it.value());
+      add_jacobian_entry(offset_v + it.row(),
+                         offset_v + it.col(),
+                         it.value());
     }
   }
 
   for (size_t e = 0; e < elements; ++e) {
-    const auto idx = get_element_disp_dof_indices(e);
+    const auto& idx = get_element_disp_dof_indices(e);
     const std::array<real_t, 2> lambda_elem = { lambda_cur(e),
                                                 lambda_cur(e + 1) };
     const std::array<real_t, 2> mu_elem = { mu_cur(e), mu_cur(e + 1) };
@@ -975,41 +1050,30 @@ EulerBeamInextensibleGGL::assemble_ggl_system(
     const auto vz_elem = get_element_velocity_z(e, v_cur);
     const std::array<std::array<real_t, 3>, 2> load_elem = { load[e],
                                                              load[e + 1] };
-
-    ADVec u_ad;
+    Matrix<real_t, 12, 1> u_elem;
     for (int a = 0; a < 12; ++a) {
-      ADDeriv seed = ADDeriv::Zero();
-      seed(a) = 1.0;
-      u_ad(a) = AD(u_cur(idx[a]), seed);
+      u_elem(a) = u_cur(idx[a]);
     }
 
-    Matrix<AD, 16, 1> R_ad;
-    Matrix<AD, 12, 1> Rv_mu_ad;
-    Matrix<real_t, 2, 12> C_loc;
+    GGLLinearizedElementData elem_data;
 
-    // Same fused element kernel as the uniform-load path, but with nodal-load
-    // interpolation local to the current element.
-    assemble_ggl_element_data(
-      EI, ds, u_ad, lambda_elem, mu_elem,
+    assemble_ggl_element_linearized_data(
+      EI, ds, u_elem, lambda_elem, mu_elem,
       vx_elem, vy_elem, vz_elem, load_elem,
       quad_H, quad_dH, quad_ddH, quad_M,
-      R_ad, Rv_mu_ad, C_loc);
+      local_bending_jacobian, elem_data);
 
     for (int a = 0; a < 12; ++a) {
-      ggl_residual(idx[a]) += R_ad(a).value();
-      const ADDeriv& dRa = R_ad(a).derivatives();
-      for (int b = 0; b < 12; ++b) {
-        if (dRa(b) != 0.0) {
-          triplets.emplace_back(idx[a], idx[b], dRa(b));
-        }
-      }
+      ggl_residual(idx[a]) += elem_data.residual(a);
+      ggl_residual(offset_v + idx[a]) += elem_data.velocity_residual(a);
 
-      ggl_residual(offset_v + idx[a]) += Rv_mu_ad(a).value();
-      const ADDeriv& dRv = Rv_mu_ad(a).derivatives();
       for (int b = 0; b < 12; ++b) {
-        if (dRv(b) != 0.0) {
-          triplets.emplace_back(offset_v + idx[a], idx[b], dRv(b));
-        }
+        add_jacobian_entry(idx[a],
+                           idx[b],
+                           elem_data.displacement_jacobian(a, b));
+        add_jacobian_entry(offset_v + idx[a],
+                           idx[b],
+                           elem_data.velocity_displacement_jacobian(a, b));
       }
     }
 
@@ -1017,32 +1081,21 @@ EulerBeamInextensibleGGL::assemble_ggl_system(
       const size_t global_l = offset_lambda + e + a;
       const size_t global_mu = offset_mu + e + a;
 
-      ggl_residual(global_l) += R_ad(12 + a).value();
-      ggl_residual(global_mu) += R_ad(14 + a).value();
+      ggl_residual(global_l) += elem_data.residual(12 + a);
+      ggl_residual(global_mu) += elem_data.residual(14 + a);
 
-      const ADDeriv& dRla = R_ad(12 + a).derivatives();
-      const ADDeriv& dRma = R_ad(14 + a).derivatives();
       for (int b = 0; b < 12; ++b) {
-        if (dRla(b) != 0.0) {
-          triplets.emplace_back(global_l, idx[b], dRla(b));
-          triplets.emplace_back(idx[b], global_l, -dRla(b));
-        }
-        if (dRma(b) != 0.0) {
-          triplets.emplace_back(global_mu, idx[b], dRma(b));
-        }
-      }
-    }
+        const real_t dRlambda =
+          elem_data.lambda_displacement_jacobian(a, b);
+        add_jacobian_entry(global_l, idx[b], dRlambda);
+        add_jacobian_entry(idx[b], global_l, -dRlambda);
+        add_jacobian_entry(global_mu,
+                           idx[b],
+                           elem_data.mu_displacement_jacobian(a, b));
 
-    for (int a = 0; a < 2; ++a) {
-      const size_t global_mu = offset_mu + e + a;
-      for (int b = 0; b < 12; ++b) {
-        const real_t value = C_loc(a, b);
-        if (value == 0.0) {
-          continue;
-        }
-
-        triplets.emplace_back(global_mu, offset_v + idx[b], value);
-        triplets.emplace_back(offset_v + idx[b], global_mu, -value);
+        const real_t dRmu_dv = elem_data.mu_velocity_jacobian(a, b);
+        add_jacobian_entry(global_mu, offset_v + idx[b], dRmu_dv);
+        add_jacobian_entry(offset_v + idx[b], global_mu, -dRmu_dv);
       }
     }
   }
@@ -1064,20 +1117,35 @@ EulerBeamInextensibleGGL::assemble_ggl_system(
     }
   }
 
+  for (size_t dof = 0; dof < ggl_dof; ++dof) {
+    if (!constrained[dof]) {
+      continue;
+    }
+
+    triplets.emplace_back(static_cast<int>(dof),
+                          static_cast<int>(dof),
+                          1.0);
+    if (dof < offset_v) {
+      ggl_residual(dof) = u_cur(dof) - constrained_value(dof);
+    } else if (dof < offset_lambda) {
+      ggl_residual(dof) = v_cur(dof - offset_v) - constrained_value(dof);
+    } else {
+      ggl_residual(dof) = -constrained_value(dof);
+    }
+  }
+
   ggl_jacobian.resize(ggl_dof, ggl_dof);
   ggl_jacobian.setFromTriplets(triplets.begin(), triplets.end());
   ggl_jacobian.makeCompressed();
 }
 
 void
-EulerBeamInextensibleGGL::apply_ggl_boundary_conditions(
-  const VectorXd& u_cur,
-  const VectorXd& v_cur)
+EulerBeamInextensibleGGL::collect_ggl_constraints(
+  std::vector<char>& constrained,
+  VectorXd&          constrained_value) const
 {
-  // Gather constrained rows first so the sparse matrix only needs one
-  // elimination sweep.
-  std::vector<char> constrained(ggl_dof, 0);
-  VectorXd          constrained_value = VectorXd::Zero(ggl_dof);
+  constrained.assign(ggl_dof, 0);
+  constrained_value.setZero(ggl_dof);
 
   auto add_constraint = [&](size_t dof, real_t value) {
     constrained[dof] = 1;
@@ -1120,41 +1188,6 @@ EulerBeamInextensibleGGL::apply_ggl_boundary_conditions(
       add_constraint(offset_mu + ni, 0.0);
     }
   }
-
-  for (int col = 0; col < ggl_jacobian.outerSize(); ++col) {
-    for (SparseMatrix<real_t>::InnerIterator it(ggl_jacobian, col); it; ++it) {
-      const size_t row = static_cast<size_t>(it.row());
-      const size_t dof_col = static_cast<size_t>(it.col());
-
-      if (constrained[dof_col] && row != dof_col) {
-        ggl_residual(row) -= it.value() * constrained_value(dof_col);
-        it.valueRef() = 0.0;
-        continue;
-      }
-
-      if (constrained[row] && row != dof_col) {
-        it.valueRef() = 0.0;
-      }
-    }
-  }
-
-  // Restore diagonal identity rows and residual values for constrained DOFs.
-  for (size_t dof = 0; dof < ggl_dof; ++dof) {
-    if (!constrained[dof]) {
-      continue;
-    }
-
-    ggl_jacobian.coeffRef(dof, dof) = 1.0;
-    if (dof < offset_v) {
-      ggl_residual(dof) = u_cur(dof) - constrained_value(dof);
-    } else if (dof < offset_lambda) {
-      ggl_residual(dof) = v_cur(dof - offset_v) - constrained_value(dof);
-    } else {
-      ggl_residual(dof) = -constrained_value(dof);
-    }
-  }
-
-  ggl_jacobian.makeCompressed();
 }
 
 // -----------------------------------------------------------------------

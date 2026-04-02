@@ -157,12 +157,20 @@ protected:
   std::array<std::array<real_t, 4>, 3> quad_dH;  ///< Cached Hermite first derivatives.
   std::array<std::array<real_t, 4>, 3> quad_ddH; ///< Cached Hermite second derivatives.
   std::array<std::array<real_t, 2>, 3> quad_M;   ///< Cached linear multiplier shape values.
+  std::vector<std::array<size_t, 12>>
+    element_disp_dof_indices_cache; ///< Cached displacement dof maps per element.
+  Matrix<real_t, 12, 12>
+    local_bending_jacobian; ///< Constant local bending tangent reused during assembly.
 
   size_t max_newton; ///< Maximum Newton iterations per time step.
   real_t tol_newton; ///< Newton stopping tolerance on the full residual norm.
 
   /** @brief Precompute all shape-function data used at the fixed quadrature rule. */
   void initialize_quadrature_cache();
+  /** @brief Cache the global displacement dof indices for each element. */
+  void initialize_element_dof_cache();
+  /** @brief Build constant element matrices used by every Newton iteration. */
+  void initialize_constant_element_matrices();
   /** @brief Assemble the consistent translational-and-slope mass matrix. */
   void assemble_mass_matrix();
 
@@ -236,9 +244,9 @@ protected:
     const Matrix<Scalar, 12, 1>& u_elem,
     const std::array<real_t, 2>& mu_elem) const;
 
-  /** @brief Enforce essential and free-end multiplier conditions on the full system. */
-  void apply_ggl_boundary_conditions(const VectorXd& u_cur,
-                                     const VectorXd& v_cur);
+  /** @brief Collect constrained dofs and their prescribed values. */
+  void collect_ggl_constraints(std::vector<char>& constrained,
+                               VectorXd&          constrained_value) const;
 
   /** @brief Update Newmark predictor states and coefficients for the next solve. */
   void update_newmark_predictors(real_t dt, real_t beta, real_t gamma);
@@ -262,7 +270,7 @@ protected:
   void update_mesh();
 
   /** @brief Return the 12 local displacement DOF indices for one element. */
-  std::array<size_t, 12> get_element_disp_dof_indices(size_t e) const;
+  const std::array<size_t, 12>& get_element_disp_dof_indices(size_t e) const;
 
   /** @brief Extract the element x-velocity DOFs from a global vector. */
   std::array<real_t, 4> get_element_velocity_x(size_t e,
