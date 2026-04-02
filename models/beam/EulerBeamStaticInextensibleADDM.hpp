@@ -69,6 +69,8 @@ protected:
 
   MatrixXd A;
   MatrixXd A_unconstrained;
+  MatrixXd K_bending;
+  MatrixXd K_constraint;
   VectorXd x, y, z;
   VectorXd f_x, f_y, f_z;
   LLT<MatrixXd> llt;
@@ -101,6 +103,11 @@ protected:
   void apply_boundary_condition_A();
   void assemble_A();
   void decompose_A();
+  void clear_rhs();
+  void assemble_constraint_rhs();
+  void add_uniform_load_rhs(std::array<real_t, 3> load);
+  void add_nodal_load_rhs(const std::vector<std::array<real_t, 3>>& load);
+  void add_point_boundary_loads();
   void assemble_f(std::array<real_t, 3> load);
   void apply_boundary_condition_f();
   virtual void update_xy(std::array<real_t, 3> load);

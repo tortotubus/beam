@@ -65,7 +65,7 @@ init(i = 0)
 {
   int m_id = ibmeshmanager_add_mesh();
   IBMeshModel beam_model =
-    elff_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta);
+    elff_euler_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta);
   ibmeshmanager_set_model(m_id, beam_model);
 
   foreach_ibnode_per_ibmesh()

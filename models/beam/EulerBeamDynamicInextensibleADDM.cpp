@@ -23,11 +23,13 @@ EulerBeamDynamicInextensibleADDM::EulerBeamDynamicInextensibleADDM(
   , ay_prev(VectorXd::Zero(dof))
   , az_prev(VectorXd::Zero(dof))
   , mass(MatrixXd::Zero(dof, dof))
-  , A_static_unconstrained(A_unconstrained)
   , load_prev({ 0., 0., 0. })
+  , nodal_load_prev()
+  , have_prev_uniform_load(false)
+  , have_prev_nodal_load(false)
 {
-  max_outer = 1000;
-  tol_outer = 1e-5;
+  max_outer = 2000;
+  tol_outer = 1e-7;
   x_prev = x;
   y_prev = y;
   z_prev = z;
@@ -71,38 +73,43 @@ EulerBeamDynamicInextensibleADDM::solve_newmark(real_t dt,
   if (!(gamma > 0.0)) {
     throw std::runtime_error("Newmark: gamma must be > 0");
   }
+  ELFF_ASSERT(std::abs(beta - 0.25) < 1e-12 && std::abs(gamma - 0.5) < 1e-12,
+              "EulerBeamDynamicInextensibleADDM implements the average-"
+              "acceleration Newmark variant used in the paper.\n");
+
+  if (!have_prev_uniform_load) {
+    load_prev = load;
+    have_prev_uniform_load = true;
+  }
+  have_prev_nodal_load = false;
 
   x = x_prev;
   y = y_prev;
   z = z_prev;
-  lambda_x.setZero();
-  lambda_y.setZero();
-  lambda_z.setZero();
-  apply_initial_condition_pq();
-  apply_boundary_condition_lambda();
 
   const VectorXd x_old = x_prev;
   const VectorXd y_old = y_prev;
   const VectorXd z_old = z_prev;
   real_t final_rel_update = 0.0;
   real_t final_max_pq_error = 0.0;
-  real_t final_max_xy_error = 0.0;
+  real_t final_max_state_error = 0.0;
   bool converged = false;
   size_t iter;
   for (iter = 0; iter < max_outer; ++iter) {
     const VectorXd x_iter_prev = x;
     const VectorXd y_iter_prev = y;
+    const VectorXd z_iter_prev = z;
     update_pq();
-    assemble_system_newmark(load, dt, beta, gamma);
+    assemble_system_newmark(load, dt);
     x = llt.solve(f_x);
     y = llt.solve(f_y);
     z = llt.solve(f_z);
     update_multipliers();
-    final_rel_update =
-      compute_relative_xy_update(x_iter_prev, x, y_iter_prev, y);
+    final_rel_update = compute_relative_state_update(
+      x_iter_prev, x, y_iter_prev, y, z_iter_prev, z);
     final_max_pq_error = compute_max_pq_error();
-    final_max_xy_error =
-      compute_max_xy_update(x_iter_prev, x, y_iter_prev, y);
+    final_max_state_error = compute_max_state_update(
+      x_iter_prev, x, y_iter_prev, y, z_iter_prev, z);
 
     if (final_rel_update < tol_outer) {
       converged = true;
@@ -112,25 +119,25 @@ EulerBeamDynamicInextensibleADDM::solve_newmark(real_t dt,
 
   if (!converged) {
     ELFF_WARNING("EulerBeamDynamicInextensibleADDM::solve_newmark() final "
-                 "relative xy update = "
+                 "relative state update = "
                  << final_rel_update << " at step " << time_iter << " after "
                  << iter << " iterations");
     // ELFF_ABORT("EulerBeamDynamicInextensibleADDM::solve_newmark() did not "
     //            "converge.\n");
   }
 
-  ELFF_LOG(time_iter << "\t" << final_max_pq_error << "\t"
-                     << final_max_xy_error << "\t" << iter);
+  ELFF_LOG(time_iter << "\t" << final_rel_update << "\t" << iter);
 
-  update_newmark_state_component(x_old, x, vx_prev, ax_prev, dt, beta, gamma);
-  update_newmark_state_component(y_old, y, vy_prev, ay_prev, dt, beta, gamma);
-  update_newmark_state_component(z_old, z, vz_prev, az_prev, dt, beta, gamma);
+  update_average_acceleration_state_component(x_old, x, vx_prev, ax_prev, dt);
+  update_average_acceleration_state_component(y_old, y, vy_prev, ay_prev, dt);
+  update_average_acceleration_state_component(z_old, z, vz_prev, az_prev, dt);
   apply_dynamic_state_boundary_conditions();
 
   x_prev = x;
   y_prev = y;
   z_prev = z;
   load_prev = load;
+  have_prev_uniform_load = true;
 
   update_mesh();
 
@@ -157,39 +164,44 @@ EulerBeamDynamicInextensibleADDM::solve_newmark(
   if (!(gamma > 0.0)) {
     throw std::runtime_error("Newmark: gamma must be > 0");
   }
+  ELFF_ASSERT(std::abs(beta - 0.25) < 1e-12 && std::abs(gamma - 0.5) < 1e-12,
+              "EulerBeamDynamicInextensibleADDM implements the average-"
+              "acceleration Newmark variant used in the paper.\n");
+
+  if (!have_prev_nodal_load) {
+    nodal_load_prev = load;
+    have_prev_nodal_load = true;
+  }
+  have_prev_uniform_load = false;
 
   x = x_prev;
   y = y_prev;
   z = z_prev;
-  lambda_x.setZero();
-  lambda_y.setZero();
-  lambda_z.setZero();
-  apply_initial_condition_pq();
-  apply_boundary_condition_lambda();
 
   const VectorXd x_old = x_prev;
   const VectorXd y_old = y_prev;
   const VectorXd z_old = z_prev;
   real_t final_rel_update = 0.0;
   real_t final_max_pq_error = 0.0;
-  real_t final_max_xy_error = 0.0;
+  real_t final_max_state_error = 0.0;
   bool converged = false;
   size_t iter;
 
   for (iter = 0; iter < max_outer; ++iter) {
     const VectorXd x_iter_prev = x;
     const VectorXd y_iter_prev = y;
+    const VectorXd z_iter_prev = z;
     update_pq();
-    assemble_system_newmark(load, dt, beta, gamma);
+    assemble_system_newmark(load, dt);
     x = llt.solve(f_x);
     y = llt.solve(f_y);
     z = llt.solve(f_z);
     update_multipliers();
-    final_rel_update =
-      compute_relative_xy_update(x_iter_prev, x, y_iter_prev, y);
+    final_rel_update = compute_relative_state_update(
+      x_iter_prev, x, y_iter_prev, y, z_iter_prev, z);
     final_max_pq_error = compute_max_pq_error();
-    final_max_xy_error =
-      compute_max_xy_update(x_iter_prev, x, y_iter_prev, y);
+    final_max_state_error = compute_max_state_update(
+      x_iter_prev, x, y_iter_prev, y, z_iter_prev, z);
 
     if (final_rel_update < tol_outer) {
       converged = true;
@@ -199,7 +211,7 @@ EulerBeamDynamicInextensibleADDM::solve_newmark(
 
   if (!converged) {
     ELFF_WARNING("EulerBeamDynamicInextensibleADDM::solve_newmark() final "
-                 "relative xy update = "
+                 "relative state update = "
                  << final_rel_update << " at step " << time_iter << " after "
                  << iter << " iterations");
     ELFF_ABORT("EulerBeamDynamicInextensibleADDM::solve_newmark() did not "
@@ -207,17 +219,18 @@ EulerBeamDynamicInextensibleADDM::solve_newmark(
   }
 
   ELFF_LOG(time_iter << "\t" << final_max_pq_error << "\t"
-                     << final_max_xy_error << "\t" << iter);
+                     << final_max_state_error << "\t" << iter);
 
-  update_newmark_state_component(x_old, x, vx_prev, ax_prev, dt, beta, gamma);
-  update_newmark_state_component(y_old, y, vy_prev, ay_prev, dt, beta, gamma);
-  update_newmark_state_component(z_old, z, vz_prev, az_prev, dt, beta, gamma);
+  update_average_acceleration_state_component(x_old, x, vx_prev, ax_prev, dt);
+  update_average_acceleration_state_component(y_old, y, vy_prev, ay_prev, dt);
+  update_average_acceleration_state_component(z_old, z, vz_prev, az_prev, dt);
   apply_dynamic_state_boundary_conditions();
 
   x_prev = x;
   y_prev = y;
   z_prev = z;
-  load_prev = { 0., 0., 0. };
+  nodal_load_prev = load;
+  have_prev_nodal_load = true;
 
   update_mesh();
 
@@ -239,6 +252,9 @@ EulerBeamDynamicInextensibleADDM::apply_initial_condition()
   ay_prev.setZero();
   az_prev.setZero();
   load_prev = { 0., 0., 0. };
+  nodal_load_prev.clear();
+  have_prev_uniform_load = false;
+  have_prev_nodal_load = false;
   update_mesh();
 }
 
@@ -262,6 +278,9 @@ EulerBeamDynamicInextensibleADDM::apply_initial_condition(EulerBeamMesh& bmesh)
   ay_prev.setZero();
   az_prev.setZero();
   load_prev = { 0., 0., 0. };
+  nodal_load_prev.clear();
+  have_prev_uniform_load = false;
+  have_prev_nodal_load = false;
   update_mesh();
 }
 
@@ -281,31 +300,24 @@ EulerBeamDynamicInextensibleADDM::assemble_mass_matrix()
 
 void
 EulerBeamDynamicInextensibleADDM::assemble_system_newmark(
-  std::array<real_t, 3> load,
-  real_t dt,
-  real_t beta,
-  real_t gamma)
+  std::array<real_t, 3> load, real_t dt)
 {
-  static_cast<void>(gamma);
+  clear_rhs();
+  assemble_constraint_rhs();
+  add_averaged_uniform_load_rhs(load);
+  apply_midpoint_bending_rhs();
 
-  EulerBeamStaticInextensibleADDM::assemble_f(load);
+  const real_t coeff = 2.0 / (dt * dt);
+  const VectorXd x_inertia = coeff * x_prev + (2.0 / dt) * vx_prev;
+  const VectorXd y_inertia = coeff * y_prev + (2.0 / dt) * vy_prev;
+  const VectorXd z_inertia = coeff * z_prev + (2.0 / dt) * vz_prev;
 
-  const real_t coeff = 1.0 / (beta * dt * dt);
-  const real_t inv_bt = 1.0 / (beta * dt);
-  const real_t kappa = (1.0 - 2.0 * beta) / (2.0 * beta);
+  f_x.noalias() += mass * x_inertia;
+  f_y.noalias() += mass * y_inertia;
+  f_z.noalias() += mass * z_inertia;
 
-  const VectorXd x_predict =
-    coeff * x_prev + inv_bt * vx_prev + kappa * ax_prev;
-  const VectorXd y_predict =
-    coeff * y_prev + inv_bt * vy_prev + kappa * ay_prev;
-  const VectorXd z_predict =
-    coeff * z_prev + inv_bt * vz_prev + kappa * az_prev;
-
-  f_x.noalias() += mass * x_predict;
-  f_y.noalias() += mass * y_predict;
-  f_z.noalias() += mass * z_predict;
-
-  A_unconstrained = A_static_unconstrained + coeff * mass;
+  A_unconstrained =
+    coeff * mass + 0.5 * EI * K_bending + r_penalty * K_constraint;
   A = A_unconstrained;
 
   apply_boundary_condition_A();
@@ -315,31 +327,24 @@ EulerBeamDynamicInextensibleADDM::assemble_system_newmark(
 
 void
 EulerBeamDynamicInextensibleADDM::assemble_system_newmark(
-  const std::vector<std::array<real_t, 3>>& load,
-  real_t dt,
-  real_t beta,
-  real_t gamma)
+  const std::vector<std::array<real_t, 3>>& load, real_t dt)
 {
-  static_cast<void>(gamma);
+  clear_rhs();
+  assemble_constraint_rhs();
+  add_averaged_nodal_load_rhs(load);
+  apply_midpoint_bending_rhs();
 
-  assemble_f_nodal(load);
+  const real_t coeff = 2.0 / (dt * dt);
+  const VectorXd x_inertia = coeff * x_prev + (2.0 / dt) * vx_prev;
+  const VectorXd y_inertia = coeff * y_prev + (2.0 / dt) * vy_prev;
+  const VectorXd z_inertia = coeff * z_prev + (2.0 / dt) * vz_prev;
 
-  const real_t coeff = 1.0 / (beta * dt * dt);
-  const real_t inv_bt = 1.0 / (beta * dt);
-  const real_t kappa = (1.0 - 2.0 * beta) / (2.0 * beta);
+  f_x.noalias() += mass * x_inertia;
+  f_y.noalias() += mass * y_inertia;
+  f_z.noalias() += mass * z_inertia;
 
-  const VectorXd x_predict =
-    coeff * x_prev + inv_bt * vx_prev + kappa * ax_prev;
-  const VectorXd y_predict =
-    coeff * y_prev + inv_bt * vy_prev + kappa * ay_prev;
-  const VectorXd z_predict =
-    coeff * z_prev + inv_bt * vz_prev + kappa * az_prev;
-
-  f_x.noalias() += mass * x_predict;
-  f_y.noalias() += mass * y_predict;
-  f_z.noalias() += mass * z_predict;
-
-  A_unconstrained = A_static_unconstrained + coeff * mass;
+  A_unconstrained =
+    coeff * mass + 0.5 * EI * K_bending + r_penalty * K_constraint;
   A = A_unconstrained;
 
   apply_boundary_condition_A();
@@ -348,175 +353,43 @@ EulerBeamDynamicInextensibleADDM::assemble_system_newmark(
 }
 
 void
-EulerBeamDynamicInextensibleADDM::assemble_f_nodal(
+EulerBeamDynamicInextensibleADDM::add_averaged_uniform_load_rhs(
+  std::array<real_t, 3> load)
+{
+  std::array<real_t, 3> averaged = {
+    0.5 * (load_prev[0] + load[0]),
+    0.5 * (load_prev[1] + load[1]),
+    0.5 * (load_prev[2] + load[2]),
+  };
+  add_uniform_load_rhs(averaged);
+  add_point_boundary_loads();
+}
+
+void
+EulerBeamDynamicInextensibleADDM::add_averaged_nodal_load_rhs(
   const std::vector<std::array<real_t, 3>>& load)
 {
   ELFF_ASSERT(load.size() == mesh.get_nodes(),
               "Size of load vector must equal number of nodes.");
+  ELFF_ASSERT(nodal_load_prev.size() == load.size(),
+              "Stored nodal load history must match node count.");
 
-  f_x.setZero();
-  f_y.setZero();
-  f_z.setZero();
-
-  const real_t h = mesh.get_ds();
-  const size_t nodes = mesh.get_nodes();
-
-  const real_t xi_q[3] = { 0.1127016654, 0.5, 0.8872983346 };
-  const real_t w_q[3] = { 0.2777777778, 0.4444444444, 0.2777777778 };
-
-  for (size_t e = 0; e < elements; ++e) {
-    const size_t edofs[4] = {
-      2 * (e + 0) + 0, 2 * (e + 0) + 1, 2 * (e + 1) + 0, 2 * (e + 1) + 1
-    };
-    real_t fxe[4] = { 0, 0, 0, 0 };
-    real_t fye[4] = { 0, 0, 0, 0 };
-    real_t fze[4] = { 0, 0, 0, 0 };
-
-    for (size_t qi = 0; qi < 3; ++qi) {
-      const real_t xi = xi_q[qi];
-      const real_t w = w_q[qi];
-
-      const auto L = ELFF::FEM::QuadraticLagrange<real_t>::values(xi);
-      const auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
-      const auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, h);
-      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, h);
-
-      const size_t li = e;
-      const size_t mi = nodes + e;
-      const size_t ri = e + 1;
-
-      const real_t p_val = L[0] * p[li] + L[1] * p[mi] + L[2] * p[ri];
-      const real_t lambda_x_val =
-        L[0] * lambda_x[li] + L[1] * lambda_x[mi] + L[2] * lambda_x[ri];
-      const real_t q_val = L[0] * q[li] + L[1] * q[mi] + L[2] * q[ri];
-      const real_t lambda_y_val =
-        L[0] * lambda_y[li] + L[1] * lambda_y[mi] + L[2] * lambda_y[ri];
-      const real_t r_val = L[0] * r[li] + L[1] * r[mi] + L[2] * r[ri];
-      const real_t lambda_z_val =
-        L[0] * lambda_z[li] + L[1] * lambda_z[mi] + L[2] * lambda_z[ri];
-
-      const real_t fx_q = M[0] * load[e][0] + M[1] * load[e + 1][0];
-      const real_t fy_q = M[0] * load[e][1] + M[1] * load[e + 1][1];
-      const real_t fz_q = M[0] * load[e][2] + M[1] * load[e + 1][2];
-
-      for (size_t a = 0; a < 4; ++a) {
-        fxe[a] += (lambda_x_val + r_penalty * p_val) * dH[a] * w * h;
-        fye[a] += (lambda_y_val + r_penalty * q_val) * dH[a] * w * h;
-        fze[a] += (lambda_z_val + r_penalty * r_val) * dH[a] * w * h;
-        fxe[a] += fx_q * H[a] * w * h;
-        fye[a] += fy_q * H[a] * w * h;
-        fze[a] += fz_q * H[a] * w * h;
-      }
-    }
-
-    for (size_t a = 0; a < 4; ++a) {
-      f_x(edofs[a]) += fxe[a];
-      f_y(edofs[a]) += fye[a];
-      f_z(edofs[a]) += fze[a];
-    }
+  std::vector<std::array<real_t, 3>> averaged(load.size());
+  for (size_t i = 0; i < load.size(); ++i) {
+    averaged[i][0] = 0.5 * (nodal_load_prev[i][0] + load[i][0]);
+    averaged[i][1] = 0.5 * (nodal_load_prev[i][1] + load[i][1]);
+    averaged[i][2] = 0.5 * (nodal_load_prev[i][2] + load[i][2]);
   }
-
-  for (size_t bi = 0; bi < 2; ++bi) {
-    const EulerBeamBCEnd bcend = boundary_conditions.end[bi];
-    const EulerBeamBCType bctype = boundary_conditions.type[bi];
-    const EulerBeamBCVals bcvals = boundary_conditions.vals[bi];
-
-    size_t ni = 0;
-    switch (bcend) {
-      case left:
-        ni = 0;
-        break;
-      case right:
-        ni = nodes - 1;
-        break;
-    }
-
-    if (bctype == point_force_bc) {
-      f_x(2 * ni + 0) += bcvals.force[0];
-      f_y(2 * ni + 0) += bcvals.force[1];
-      f_z(2 * ni + 0) += bcvals.force[2];
-    } else if (bctype == point_torque_bc) {
-      f_x(2 * ni + 1) += bcvals.torque[0];
-      f_y(2 * ni + 1) += bcvals.torque[1];
-      f_z(2 * ni + 1) += bcvals.torque[2];
-    }
-  }
+  add_nodal_load_rhs(averaged);
+  add_point_boundary_loads();
 }
 
 void
-EulerBeamDynamicInextensibleADDM::initialize_newmark_acceleration(
-  std::array<real_t, 3> load)
+EulerBeamDynamicInextensibleADDM::apply_midpoint_bending_rhs()
 {
-  update_pq();
-  EulerBeamStaticInextensibleADDM::assemble_f(load);
-
-  VectorXd rhs_x = f_x - A_static_unconstrained * x;
-  VectorXd rhs_y = f_y - A_static_unconstrained * y;
-  VectorXd rhs_z = f_z - A_static_unconstrained * z;
-
-  std::vector<size_t> idx;
-  std::vector<real_t> xvals, yvals, zvals;
-  collect_boundary_dofs(idx, xvals, yvals, zvals);
-
-  MatrixXd mass_bc = mass;
-  for (const size_t d : idx) {
-    mass_bc.row(d).setZero();
-    mass_bc.col(d).setZero();
-    mass_bc(d, d) = 1.0;
-    rhs_x(d) = 0.0;
-    rhs_y(d) = 0.0;
-    rhs_z(d) = 0.0;
-  }
-
-  LLT<MatrixXd> mass_solver;
-  mass_solver.compute(mass_bc);
-  if (mass_solver.info() != Success) {
-    ELFF_ABORT("EulerBeamDynamicInextensibleADDM::initialize_newmark_"
-               "acceleration(): mass factorization failed.\n");
-  }
-
-  ax_prev = mass_solver.solve(rhs_x);
-  ay_prev = mass_solver.solve(rhs_y);
-  az_prev = mass_solver.solve(rhs_z);
-  apply_dynamic_state_boundary_conditions();
-}
-
-void
-EulerBeamDynamicInextensibleADDM::initialize_newmark_acceleration(
-  const std::vector<std::array<real_t, 3>>& load)
-{
-  update_pq();
-  assemble_f_nodal(load);
-
-  VectorXd rhs_x = f_x - A_static_unconstrained * x;
-  VectorXd rhs_y = f_y - A_static_unconstrained * y;
-  VectorXd rhs_z = f_z - A_static_unconstrained * z;
-
-  std::vector<size_t> idx;
-  std::vector<real_t> xvals, yvals, zvals;
-  collect_boundary_dofs(idx, xvals, yvals, zvals);
-
-  MatrixXd mass_bc = mass;
-  for (const size_t d : idx) {
-    mass_bc.row(d).setZero();
-    mass_bc.col(d).setZero();
-    mass_bc(d, d) = 1.0;
-    rhs_x(d) = 0.0;
-    rhs_y(d) = 0.0;
-    rhs_z(d) = 0.0;
-  }
-
-  LLT<MatrixXd> mass_solver;
-  mass_solver.compute(mass_bc);
-  if (mass_solver.info() != Success) {
-    ELFF_ABORT("EulerBeamDynamicInextensibleADDM::initialize_newmark_"
-               "acceleration(): mass factorization failed.\n");
-  }
-
-  ax_prev = mass_solver.solve(rhs_x);
-  ay_prev = mass_solver.solve(rhs_y);
-  az_prev = mass_solver.solve(rhs_z);
-  apply_dynamic_state_boundary_conditions();
+  f_x.noalias() -= 0.5 * EI * K_bending * x_prev;
+  f_y.noalias() -= 0.5 * EI * K_bending * y_prev;
+  f_z.noalias() -= 0.5 * EI * K_bending * z_prev;
 }
 
 void
@@ -560,18 +433,24 @@ EulerBeamDynamicInextensibleADDM::apply_dynamic_state_boundary_conditions()
 }
 
 real_t
-EulerBeamDynamicInextensibleADDM::compute_relative_xy_update(
+EulerBeamDynamicInextensibleADDM::compute_relative_state_update(
   const VectorXd& x_old_iter,
   const VectorXd& x_new_iter,
   const VectorXd& y_old_iter,
-  const VectorXd& y_new_iter) const
+  const VectorXd& y_new_iter,
+  const VectorXd& z_old_iter,
+  const VectorXd& z_new_iter) const
 {
   const VectorXd dx = x_new_iter - x_old_iter;
   const VectorXd dy = y_new_iter - y_old_iter;
+  const VectorXd dz = z_new_iter - z_old_iter;
 
-  const real_t numerator = std::sqrt(dx.squaredNorm() + dy.squaredNorm());
+  const real_t numerator =
+    std::sqrt(dx.squaredNorm() + dy.squaredNorm() + dz.squaredNorm());
   const real_t denominator = std::max<real_t>(
-    1e-14, std::sqrt(x_new_iter.squaredNorm() + y_new_iter.squaredNorm()));
+    1e-14,
+    std::sqrt(x_old_iter.squaredNorm() + y_old_iter.squaredNorm() +
+              z_old_iter.squaredNorm()));
 
   return numerator / denominator;
 }
@@ -586,34 +465,31 @@ EulerBeamDynamicInextensibleADDM::compute_max_pq_error() const
 }
 
 real_t
-EulerBeamDynamicInextensibleADDM::compute_max_xy_update(
+EulerBeamDynamicInextensibleADDM::compute_max_state_update(
   const VectorXd& x_old_iter,
   const VectorXd& x_new_iter,
   const VectorXd& y_old_iter,
-  const VectorXd& y_new_iter) const
+  const VectorXd& y_new_iter,
+  const VectorXd& z_old_iter,
+  const VectorXd& z_new_iter) const
 {
   const real_t max_dx = (x_new_iter - x_old_iter).cwiseAbs().maxCoeff();
   const real_t max_dy = (y_new_iter - y_old_iter).cwiseAbs().maxCoeff();
-  return std::max(max_dx, max_dy);
+  const real_t max_dz = (z_new_iter - z_old_iter).cwiseAbs().maxCoeff();
+  return std::max({ max_dx, max_dy, max_dz });
 }
 
 void
-EulerBeamDynamicInextensibleADDM::update_newmark_state_component(
+EulerBeamDynamicInextensibleADDM::update_average_acceleration_state_component(
   const VectorXd& u_old,
   const VectorXd& u_new,
   VectorXd& v_hist,
   VectorXd& a_hist,
-  real_t dt,
-  real_t beta,
-  real_t gamma)
+  real_t dt)
 {
   const VectorXd v_old = v_hist;
-  const VectorXd a_old = a_hist;
-  const real_t inv = 1.0 / (beta * dt * dt);
-  const real_t kappa = (1.0 - 2.0 * beta) / (2.0 * beta);
-
-  a_hist = inv * (u_new - u_old - dt * v_old) - kappa * a_old;
-  v_hist = v_old + dt * ((1.0 - gamma) * a_old + gamma * a_hist);
+  v_hist = (2.0 / dt) * (u_new - u_old) - v_old;
+  a_hist = (v_hist - v_old) / dt;
 }
 
 void

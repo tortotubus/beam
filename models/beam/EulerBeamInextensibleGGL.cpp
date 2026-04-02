@@ -117,22 +117,6 @@ void assemble_ggl_element_data(
   }
 }
 
-std::array<real_t, 5>
-get_ggl_block_norms(const VectorXd& residual,
-                    size_t          ndof,
-                    size_t          offset_v,
-                    size_t          offset_lambda,
-                    size_t          offset_mu,
-                    size_t          ndof_l)
-{
-  return {
-    residual.norm(),
-    residual.head(ndof).norm(),
-    residual.segment(offset_v, ndof).norm(),
-    residual.segment(offset_lambda, ndof_l).norm(),
-    residual.segment(offset_mu, ndof_l).norm()
-  };
-}
 } // namespace
 
 // -----------------------------------------------------------------------
@@ -272,6 +256,8 @@ EulerBeamInextensibleGGL::solve(real_t dt, std::array<real_t, 3> load)
   VectorXd v_cur = v_prev;
   VectorXd lambda_cur = lambda_prev;
   VectorXd mu_cur = mu_prev;
+  size_t final_iter = 0;
+  real_t final_res_norm = 0.0;
 
   SparseLU<SparseMatrix<real_t>, COLAMDOrdering<int>> solver;
   bool pattern_analyzed = false;
@@ -282,15 +268,9 @@ EulerBeamInextensibleGGL::solve(real_t dt, std::array<real_t, 3> load)
     assemble_ggl_system(u_cur, v_cur, lambda_cur, mu_cur, load);
     apply_ggl_boundary_conditions(u_cur, v_cur);
 
-    const auto norms = get_ggl_block_norms(
-      ggl_residual, ndof, offset_v, offset_lambda, offset_mu, ndof_l);
-    const real_t res_norm = norms[0];
-    ELFF_LOG(time_iter << "\t" << iter
-                       << "\t|R|=" << norms[0]
-                       << "\t|Ru|=" << norms[1]
-                       << "\t|Rv|=" << norms[2]
-                       << "\t|Rl|=" << norms[3]
-                       << "\t|Rmu|=" << norms[4]);
+    const real_t res_norm = ggl_residual.norm();
+    final_iter = iter;
+    final_res_norm = res_norm;
 
     if (res_norm < tol_newton) {
       break;
@@ -328,6 +308,12 @@ EulerBeamInextensibleGGL::solve(real_t dt, std::array<real_t, 3> load)
   tension = lambda_cur;
   lambda = lambda_cur;
 
+  const auto [inext_l2, inext_lmax] = compute_inextensibility_error(u_cur);
+  ELFF_LOG(time_iter << "\t" << final_iter
+                     << "\t" << final_res_norm
+                     << "\t|g|_l2=" << inext_l2
+                     << "\t|g|_max=" << inext_lmax);
+
   // Commit the converged state and refresh mesh-level output fields.
   update_newmark_state(u_cur, v_cur);
   apply_dynamic_state_boundary_conditions();
@@ -363,6 +349,8 @@ EulerBeamInextensibleGGL::solve(
   VectorXd v_cur = v_prev;
   VectorXd lambda_cur = lambda_prev;
   VectorXd mu_cur = mu_prev;
+  size_t final_iter = 0;
+  real_t final_res_norm = 0.0;
 
   SparseLU<SparseMatrix<real_t>, COLAMDOrdering<int>> solver;
   bool pattern_analyzed = false;
@@ -372,15 +360,9 @@ EulerBeamInextensibleGGL::solve(
     assemble_ggl_system(u_cur, v_cur, lambda_cur, mu_cur, load);
     apply_ggl_boundary_conditions(u_cur, v_cur);
 
-    const auto norms = get_ggl_block_norms(
-      ggl_residual, ndof, offset_v, offset_lambda, offset_mu, ndof_l);
-    const real_t res_norm = norms[0];
-    ELFF_LOG(time_iter << "\t" << iter
-                       << "\t|R|=" << norms[0]
-                       << "\t|Ru|=" << norms[1]
-                       << "\t|Rv|=" << norms[2]
-                       << "\t|Rl|=" << norms[3]
-                       << "\t|Rmu|=" << norms[4]);
+    const real_t res_norm = ggl_residual.norm();
+    final_iter = iter;
+    final_res_norm = res_norm;
 
     if (res_norm < tol_newton) {
       break;
@@ -415,6 +397,12 @@ EulerBeamInextensibleGGL::solve(
 
   tension = lambda_cur;
   lambda = lambda_cur;
+
+  const auto [inext_l2, inext_lmax] = compute_inextensibility_error(u_cur);
+  ELFF_LOG(time_iter << "\t" << final_iter
+                     << "\t" << final_res_norm
+                     << "\t|g|_l2=" << inext_l2
+                     << "\t|g|_max=" << inext_lmax);
 
   update_newmark_state(u_cur, v_cur);
   apply_dynamic_state_boundary_conditions();
@@ -456,6 +444,53 @@ EulerBeamInextensibleGGL::compute_acceleration(
   const VectorXd& u_cur) const
 {
   return newmark_coeff_a * (u_cur - u_tilde);
+}
+
+std::pair<real_t, real_t>
+EulerBeamInextensibleGGL::compute_inextensibility_error(
+  const VectorXd& u_cur) const
+{
+  real_t max_abs = 0.0;
+  real_t sum_sq = 0.0;
+  size_t sample_count = 0;
+
+  for (size_t e = 0; e < elements; ++e) {
+    const auto idx = get_element_disp_dof_indices(e);
+
+    Matrix<real_t, 12, 1> u_elem;
+    for (int i = 0; i < 12; ++i) {
+      u_elem(i) = u_cur(idx[i]);
+    }
+
+    const Matrix<real_t, 4, 1> ux = u_elem.segment<4>(0);
+    const Matrix<real_t, 4, 1> uy = u_elem.segment<4>(4);
+    const Matrix<real_t, 4, 1> uz = u_elem.segment<4>(8);
+
+    for (real_t xi : xi_q) {
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+
+      real_t xp = 0.0;
+      real_t yp = 0.0;
+      real_t zp = 0.0;
+      for (size_t i = 0; i < 4; ++i) {
+        xp += dH[i] * ux(i);
+        yp += dH[i] * uy(i);
+        zp += dH[i] * uz(i);
+      }
+
+      const real_t g = xp * xp + yp * yp + zp * zp - 1.0;
+      const real_t abs_g = std::abs(g);
+      max_abs = std::max(max_abs, abs_g);
+      sum_sq += g * g;
+      ++sample_count;
+    }
+  }
+
+  if (sample_count == 0) {
+    return { 0.0, 0.0 };
+  }
+
+  return { std::sqrt(sum_sq / static_cast<real_t>(sample_count)), max_abs };
 }
 
 // -----------------------------------------------------------------------

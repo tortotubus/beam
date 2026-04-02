@@ -8,14 +8,14 @@ extern "C"
 #endif
 
   /**
-   * @name ib_beam_t
+   * @name ib_euler_beam_t
    * @brief C handle and related functions for immersed-boundary beam models.
    * @{
    */
   /**
    * @brief Opaque handle to a beam model exposed through the C API.
    */
-  typedef void* ib_beam_t;
+  typedef void* ib_euler_beam_t;
 
   /**
    * @brief Creates a new beam model with the given initial slope.
@@ -30,7 +30,7 @@ extern "C"
    * @param r_penalty Penalty parameter used in the inextensibility constraint
    * @return Opaque beam handle
    */
-  ib_beam_t ib_beam_new(vertex_t s0,
+  ib_euler_beam_t ib_euler_beam_new(vertex_t s0,
                         int bc_type_1,
                         int bc_type_2,
                         double length,
@@ -53,7 +53,7 @@ extern "C"
    * @param theta Initial angle parameter
    * @return Opaque beam handle
    */
-  ib_beam_t ib_beam_new_theta(vertex_t s0,
+  ib_euler_beam_t ib_euler_beam_new_theta(vertex_t s0,
                               int bc_type_1,
                               int bc_type_2,
                               double length,
@@ -68,7 +68,7 @@ extern "C"
    *
    * @param handle Opaque beam handle
    */
-  void ib_beam_destroy(ib_beam_t handle);
+  void ib_euler_beam_destroy(ib_euler_beam_t handle);
   /** @} */
 
 #ifdef __cplusplus

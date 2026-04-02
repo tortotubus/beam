@@ -248,6 +248,10 @@ protected:
   /** @brief Recover the Newmark-consistent acceleration for a displacement iterate. */
   VectorXd compute_acceleration(const VectorXd& u_cur) const;
 
+  /** @brief Compute quadrature-based inextensibility errors for a state vector. */
+  std::pair<real_t, real_t> compute_inextensibility_error(
+    const VectorXd& u_cur) const;
+
   /** @brief Commit the converged displacement and velocity state. */
   void update_newmark_state(const VectorXd& u_new, const VectorXd& v_new);
 

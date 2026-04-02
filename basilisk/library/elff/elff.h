@@ -1,5 +1,8 @@
 
 #include "elff/c/models/beam/IBEulerBeam.h"
+#include "elff/c/models/beam/IBEulerBeamGGL.h"
+#include "elff/c/models/beam/IBEulerBeamHuang.h"
+#include "elff/c/models/beam/IBEulerBeamPenalty.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
 
 #include "library/ibm/IBMeshModel.h"
@@ -84,70 +87,103 @@ trace void elff_fc_advance (void* ctx, void* mesh, double dt) {
 // ELFF EulerBernoulli Beam
 // ============================================================================
 
-IBMeshModel elff_beam_new (double length,
-                           double EI,
-                           double mu,
-                           int nodes,
-                           double r_penalty,
-                           coord s0,
-                           int bc_type_1,
-                           int bc_type_2,
-                           int pid);
-
-IBMeshModel elff_beam_new_theta (double length,
+IBMeshModel elff_euler_beam_new (double length,
                                  double EI,
                                  double mu,
                                  int nodes,
                                  double r_penalty,
-                                 double theta,
                                  coord s0,
                                  int bc_type_1,
                                  int bc_type_2,
                                  int pid);
-void elff_beam_destroy (void* ctx);
+
+IBMeshModel elff_euler_beam_new_theta (double length,
+                                       double EI,
+                                       double mu,
+                                       int nodes,
+                                       double r_penalty,
+                                       double theta,
+                                       coord s0,
+                                       int bc_type_1,
+                                       int bc_type_2,
+                                       int pid);
+
+void elff_euler_beam_destroy (void* ctx);
+
+IBMeshModel elff_euler_beam_penalty_new (double length,
+                                         double EI,
+                                         double mu,
+                                         int nodes,
+                                         double r_penalty,
+                                         coord s0,
+                                         int bc_type_1,
+                                         int bc_type_2,
+                                         int pid);
+IBMeshModel elff_euler_beam_penalty_new_theta (double length,
+                                               double EI,
+                                               double mu,
+                                               int nodes,
+                                               double r_penalty,
+                                               double theta,
+                                               coord s0,
+                                               int bc_type_1,
+                                               int bc_type_2,
+                                               int pid);
+void elff_euler_beam_penalty_destroy (void* ctx);
+IBMeshModel elff_euler_beam_ggl_new (double length,
+                                     double EI,
+                                     double mu,
+                                     int nodes,
+                                     double r_penalty,
+                                     coord s0,
+                                     int bc_type_1,
+                                     int bc_type_2,
+                                     int pid);
+IBMeshModel elff_euler_beam_ggl_new_theta (double length,
+                                           double EI,
+                                           double mu,
+                                           int nodes,
+                                           double r_penalty,
+                                           double theta,
+                                           coord s0,
+                                           int bc_type_1,
+                                           int bc_type_2,
+                                           int pid);
+void elff_euler_beam_ggl_destroy (void* ctx);
+IBMeshModel elff_euler_beam_huang_new (double length,
+                                       double EI,
+                                       double mu,
+                                       int nodes,
+                                       coord s0,
+                                       int bc_type_1,
+                                       int bc_type_2,
+                                       int pid);
+IBMeshModel elff_euler_beam_huang_new_theta (double length,
+                                             double EI,
+                                             double mu,
+                                             int nodes,
+                                             double theta,
+                                             coord s0,
+                                             int bc_type_1,
+                                             int bc_type_2,
+                                             int pid);
+void elff_euler_beam_huang_destroy (void* ctx);
 
 /**
  * @brief
  */
-IBMeshModel elff_beam_new (double length,
-                           double EI,
-                           double mu,
-                           int nodes,
-                           double r_penalty,
-                           coord s0 = {0},
-                           int bc_type_1 = 0,
-                           int bc_type_2 = 0,
-                           int pid = 0) {
-  vertex_t v0 = {s0.x, s0.y, s0.z};
-  ib_beam_t beam_ptr =
-    ib_beam_new (v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
-
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_beam_destroy;
-
-  return ib_model;
-}
-
-IBMeshModel elff_beam_new_theta (double length,
+IBMeshModel elff_euler_beam_new (double length,
                                  double EI,
                                  double mu,
                                  int nodes,
                                  double r_penalty,
-                                 double theta,
                                  coord s0 = {0},
                                  int bc_type_1 = 0,
                                  int bc_type_2 = 0,
                                  int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
-  ib_beam_t beam_ptr =
-    ib_beam_new_theta (v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty, theta);
+  ib_euler_beam_t beam_ptr =
+    ib_euler_beam_new (v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -157,7 +193,7 @@ IBMeshModel elff_beam_new_theta (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_beam_destroy;
+  ib_model.force_ops->destroy = elff_euler_beam_destroy;
 
   return ib_model;
 }
@@ -165,7 +201,233 @@ IBMeshModel elff_beam_new_theta (double length,
 /**
  * @brief
  */
-void elff_beam_destroy (void* ctx) {
-  ib_beam_t handle = (ib_beam_t) ctx;
-  ib_beam_destroy (handle);
+IBMeshModel elff_euler_beam_new_theta (double length,
+                                       double EI,
+                                       double mu,
+                                       int nodes,
+                                       double r_penalty,
+                                       double theta,
+                                       coord s0 = {0},
+                                       int bc_type_1 = 0,
+                                       int bc_type_2 = 0,
+                                       int pid = 0) {
+  vertex_t v0 = {s0.x, s0.y, s0.z};
+  ib_euler_beam_t beam_ptr = ib_euler_beam_new_theta (
+    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty, theta);
+
+  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = beam_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_euler_beam_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+void elff_euler_beam_destroy (void* ctx) {
+  ib_euler_beam_t handle = (ib_euler_beam_t) ctx;
+  ib_euler_beam_destroy (handle);
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_euler_beam_penalty_new (double length,
+                                         double EI,
+                                         double mu,
+                                         int nodes,
+                                         double r_penalty,
+                                         coord s0 = {0},
+                                         int bc_type_1 = 0,
+                                         int bc_type_2 = 0,
+                                         int pid = 0) {
+  vertex_t v0 = {s0.x, s0.y, s0.z};
+  ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new (
+    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty);
+
+  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = beam_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_euler_beam_penalty_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_euler_beam_penalty_new_theta (double length,
+                                               double EI,
+                                               double mu,
+                                               int nodes,
+                                               double r_penalty,
+                                               double theta,
+                                               coord s0 = {0},
+                                               int bc_type_1 = 0,
+                                               int bc_type_2 = 0,
+                                               int pid = 0) {
+  vertex_t v0 = {s0.x, s0.y, s0.z};
+  ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new_theta (
+    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty, theta);
+
+  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = beam_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_euler_beam_penalty_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+void elff_euler_beam_penalty_destroy (void* ctx) {
+  ib_euler_beam_penalty_t handle = (ib_euler_beam_penalty_t) ctx;
+  ib_euler_beam_penalty_destroy (handle);
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_euler_beam_ggl_new (double length,
+                                     double EI,
+                                     double mu,
+                                     int nodes,
+                                     double r_penalty,
+                                     coord s0 = {0},
+                                     int bc_type_1 = 0,
+                                     int bc_type_2 = 0,
+                                     int pid = 0) {
+  vertex_t v0 = {s0.x, s0.y, s0.z};
+  ib_euler_beam_ggl_t beam_ptr =
+    ib_euler_beam_ggl_new (v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty);
+
+  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = beam_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_euler_beam_ggl_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_euler_beam_ggl_new_theta (double length,
+                                           double EI,
+                                           double mu,
+                                           int nodes,
+                                           double r_penalty,
+                                           double theta,
+                                           coord s0 = {0},
+                                           int bc_type_1 = 0,
+                                           int bc_type_2 = 0,
+                                           int pid = 0) {
+  vertex_t v0 = {s0.x, s0.y, s0.z};
+  ib_euler_beam_ggl_t beam_ptr = ib_euler_beam_ggl_new_theta (
+    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty, theta);
+
+  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = beam_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_euler_beam_ggl_destroy;
+
+  return ib_model;
+}
+
+void elff_euler_beam_ggl_destroy (void* ctx) {
+  ib_euler_beam_ggl_t handle = (ib_euler_beam_ggl_t) ctx;
+  ib_euler_beam_ggl_destroy (handle);
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_euler_beam_huang_new (double length,
+                                       double EI,
+                                       double mu,
+                                       int nodes,
+                                       coord s0 = {0},
+                                       int bc_type_1 = 0,
+                                       int bc_type_2 = 0,
+                                       int pid = 0) {
+  vertex_t v0 = {s0.x, s0.y, s0.z};
+  ib_euler_beam_huang_t beam_ptr =
+    ib_euler_beam_huang_new (v0, bc_type_1, bc_type_2, length, EI, mu, nodes);
+
+  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = beam_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_euler_beam_huang_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_euler_beam_huang_new_theta (double length,
+                                             double EI,
+                                             double mu,
+                                             int nodes,
+                                             double theta,
+                                             coord s0 = {0},
+                                             int bc_type_1 = 0,
+                                             int bc_type_2 = 0,
+                                             int pid = 0) {
+  vertex_t v0 = {s0.x, s0.y, s0.z};
+  ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_theta (
+    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, theta);
+
+  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = beam_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_euler_beam_huang_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+void elff_euler_beam_huang_destroy (void* ctx) {
+  ib_euler_beam_huang_t handle = (ib_euler_beam_huang_t) ctx;
+  ib_euler_beam_huang_destroy (handle);
 }

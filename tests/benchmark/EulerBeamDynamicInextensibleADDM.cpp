@@ -1,6 +1,7 @@
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
 #include <elff/models/beam/EulerBeamDynamicInextensibleADDM.hpp>
 #include <elff/models/beam/EulerBeamStaticInextensibleADDM.hpp>
+#include <elff/models/beam/EulerBeamInextensibleMoM.hpp>
 #include <gtest/gtest.h>
 #include <string>
 
@@ -12,7 +13,7 @@ using namespace Models;
 TEST(EulerBeamDynamicInextensibleADDMTest, Glowinski)
 {
   GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
-  real_t length = 32.6, EI = 700., mu = 7.67, r_penalty = 1e4;
+  real_t length = 32.6, EI = 700., mu = 7.67, r_penalty = 1e5;
   std::array<real_t, 3> load = { 0, -9.81 * mu, 0 };
 
   real_t dt = 1e-2;
@@ -39,8 +40,9 @@ TEST(EulerBeamDynamicInextensibleADDMTest, Glowinski)
               } }
   };
 
-  EulerBeamStaticInextensibleADDM static_beam(
-    length, EI, nodes, boundary_conditions, r_penalty);
+
+  EulerBeamInextensibleMoM static_beam(
+    length, EI, nodes, boundary_conditions, 1e8);
   static_beam.apply_initial_condition();
 
   ELFF_LOG("Static Solve:");

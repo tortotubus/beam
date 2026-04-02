@@ -63,6 +63,8 @@ void
 EulerBeamInextensibleHuang::solve(real_t dt, std::array<real_t, 3> load)
 {
   ELFF_ASSERT(dt > 0.0, "Time step must be positive.");
+  ELFF_ASSERT(mu > 0.0,
+              "EulerBeamInextensibleHuang requires mu > 0 for the dynamic solve.");
 
   if (mesh.get_nodes() < 3) {
     ELFF_ABORT("EulerBeamInextensibleHuang requires at least 3 nodes for the BC1 "
@@ -80,16 +82,21 @@ EulerBeamInextensibleHuang::solve(real_t dt, std::array<real_t, 3> load)
   body_force(0) = load[0];
   body_force(1) = load[1];
   body_force(2) = load[2];
-
-  if (mu > 0.0) {
-    body_force /= mu;
-  }
+  const Vec3 body_accel = body_force / mu;
 
   const MatX3 X_star = 2.0 * X_n - X_nm1;
   const MatX3 Fb_star = bending_force(X_star);
 
-  last_T = solve_tension(dt, body_force);
+  // The Huang tension solve is formulated in specific-tension units
+  // consistent with acceleration-form forcing. Convert back to a physical
+  // tension so the position equation matches the force-balance form used by
+  // the other beam solvers.
+  last_T = mu * solve_tension(dt, body_accel);
   MatX3 X_np1 = solve_position(last_T, dt, body_force, Fb_star);
+
+  const auto [inext_linf, inext_l2] = compute_inextensibility_error(X_np1);
+  ELFF_LOG(time_iter << "\t" << (t + dt) << "\t|g|_inf=" << inext_linf
+                     << "\t|g|_l2=" << inext_l2);
 
   X_nm1 = X_n;
   X_n = X_np1;
@@ -274,6 +281,29 @@ EulerBeamInextensibleHuang::tau_half(const MatX3& X) const
   return tau;
 }
 
+std::pair<real_t, real_t>
+EulerBeamInextensibleHuang::compute_inextensibility_error(const MatX3& X) const
+{
+  const MatX3 tau = tau_half(X);
+  const Index segments = tau.rows();
+
+  if (segments == 0) {
+    return { 0.0, 0.0 };
+  }
+
+  real_t max_abs = 0.0;
+  real_t sum_sq = 0.0;
+
+  for (Index i = 0; i < segments; ++i) {
+    const real_t gi = tau.row(i).squaredNorm() - 1.0;
+    const real_t abs_gi = std::abs(gi);
+    max_abs = std::max(max_abs, abs_gi);
+    sum_sq += gi * gi;
+  }
+
+  return { max_abs, std::sqrt(sum_sq / static_cast<real_t>(segments)) };
+}
+
 EulerBeamInextensibleHuang::MatX3
 EulerBeamInextensibleHuang::dss_nodes(const MatX3& X) const
 {
@@ -345,6 +375,8 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
 {
   const Index segments = static_cast<Index>(mesh.get_nodes() - 1);
   const Index last = segments - 1;
+  ELFF_ASSERT(mu > 0.0,
+              "EulerBeamInextensibleHuang requires mu > 0 for the tension solve.");
 
   MatX3 X_star = 2.0 * X_n - X_nm1;
   MatX3 U_n = (X_n - X_nm1) / dt;
@@ -352,7 +384,7 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
   MatX3 tau_star = tau_half(X_star);
   MatX3 tau_n = tau_half(X_n);
   MatX3 tau_nm1 = tau_half(X_nm1);
-  MatX3 Fb_star = bending_force(X_star);
+  MatX3 Fb_star = bending_force(X_star) / mu;
 
   VectorXd corr = VectorXd::Zero(segments);
   VectorXd velsq = VectorXd::Zero(segments);
@@ -430,8 +462,10 @@ EulerBeamInextensibleHuang::solve_position(const VectorXd& T_half,
                                const MatX3& Fb_star) const
 {
   const Index n = static_cast<Index>(mesh.get_nodes());
+  ELFF_ASSERT(mu > 0.0,
+              "EulerBeamInextensibleHuang requires mu > 0 for the position solve.");
 
-  MatX3 rhs = (2.0 * X_n - X_nm1) / (dt * dt);
+  MatX3 rhs = mu * (2.0 * X_n - X_nm1) / (dt * dt);
   for (Index i = 0; i < n; ++i) {
     rhs.row(i) += body_force.transpose();
     if (!implicit_bending) {
@@ -449,20 +483,20 @@ EulerBeamInextensibleHuang::solve_position(const VectorXd& T_half,
     VectorXd b = rhs.col(comp);
 
     if (is_free(EulerBeam::left)) {
-      A(0, 0) = 1.0 / (dt * dt) + 2.0 * T_half(0) / (ds * ds);
+      A(0, 0) = mu / (dt * dt) + 2.0 * T_half(0) / (ds * ds);
       A(0, 1) = -2.0 * T_half(0) / (ds * ds);
     }
 
     for (Index i = 1; i < n - 1; ++i) {
       A(i, i - 1) = -T_half(i - 1) / (ds * ds);
-      A(i, i) = 1.0 / (dt * dt) + (T_half(i - 1) + T_half(i)) / (ds * ds);
+      A(i, i) = mu / (dt * dt) + (T_half(i - 1) + T_half(i)) / (ds * ds);
       A(i, i + 1) = -T_half(i) / (ds * ds);
     }
 
     if (is_free(EulerBeam::right)) {
       A(n - 1, n - 2) = -2.0 * T_half(last_segment) / (ds * ds);
       A(n - 1, n - 1) =
-        1.0 / (dt * dt) + 2.0 * T_half(last_segment) / (ds * ds);
+        mu / (dt * dt) + 2.0 * T_half(last_segment) / (ds * ds);
     }
 
     if (implicit_bending) {

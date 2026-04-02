@@ -3,13 +3,15 @@
 #include "elff/config/config.hpp"
 #include "elff/models/beam/IBEulerBeam.hpp"
 
+#include <cmath>
+
 using namespace ELFF::Models;
 using namespace ELFF;
 
 extern "C"
 {
 
-  ib_beam_t ib_beam_new(vertex_t s0,
+  ib_euler_beam_t ib_euler_beam_new(vertex_t s0,
                         int bc_type_1,
                         int bc_type_2,
                         double length,
@@ -52,7 +54,7 @@ extern "C"
     return beam;
   }
 
-  ib_beam_t ib_beam_new_theta(vertex_t s0,
+  ib_euler_beam_t ib_euler_beam_new_theta(vertex_t s0,
                               int bc_type_1,
                               int bc_type_2,
                               double length,
@@ -108,7 +110,7 @@ extern "C"
     return beam;
   }
 
-  void ib_beam_destroy(ib_beam_t handle)
+  void ib_euler_beam_destroy(ib_euler_beam_t handle)
   {
     delete reinterpret_cast<IBEulerBeam*>(handle);
   }

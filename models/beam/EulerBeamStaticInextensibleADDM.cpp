@@ -18,6 +18,8 @@ EulerBeamStaticInextensibleADDM::EulerBeamStaticInextensibleADDM(
   , alpha()
   , A(MatrixXd::Zero(dof, dof))
   , A_unconstrained(MatrixXd::Zero(dof, dof))
+  , K_bending(MatrixXd::Zero(dof, dof))
+  , K_constraint(MatrixXd::Zero(dof, dof))
   , x(VectorXd::Zero(dof))
   , y(VectorXd::Zero(dof))
   , z(VectorXd::Zero(dof))
@@ -35,7 +37,7 @@ EulerBeamStaticInextensibleADDM::EulerBeamStaticInextensibleADDM(
   , yp(VectorXd::Zero(nodes + elements))
   , zp(VectorXd::Zero(nodes + elements))
   , max_outer(100000)
-  , tol_outer(1e-10)
+  , tol_outer(1e-13)
 {
   apply_initial_condition();
   assemble_A();
@@ -58,6 +60,8 @@ EulerBeamStaticInextensibleADDM::EulerBeamStaticInextensibleADDM(
   , alpha()
   , A(MatrixXd::Zero(dof, dof))
   , A_unconstrained(MatrixXd::Zero(dof, dof))
+  , K_bending(MatrixXd::Zero(dof, dof))
+  , K_constraint(MatrixXd::Zero(dof, dof))
   , x(VectorXd::Zero(dof))
   , y(VectorXd::Zero(dof))
   , z(VectorXd::Zero(dof))
@@ -430,7 +434,9 @@ EulerBeamStaticInextensibleADDM::assemble_A()
     }
   }
 
-  this->A_unconstrained = this->EI * K4 + this->r_penalty * K2;
+  K_bending = K4;
+  K_constraint = K2;
+  this->A_unconstrained = this->EI * K_bending + this->r_penalty * K_constraint;
   this->A = this->A_unconstrained;
 }
 
@@ -441,12 +447,16 @@ EulerBeamStaticInextensibleADDM::decompose_A()
 }
 
 void
-EulerBeamStaticInextensibleADDM::assemble_f(std::array<real_t, 3> load)
+EulerBeamStaticInextensibleADDM::clear_rhs()
 {
   f_x.setZero();
   f_y.setZero();
   f_z.setZero();
+}
 
+void
+EulerBeamStaticInextensibleADDM::assemble_constraint_rhs()
+{
   const real_t h = this->mesh.get_ds();
   const size_t nodes = this->mesh.get_nodes();
 
@@ -466,7 +476,6 @@ EulerBeamStaticInextensibleADDM::assemble_f(std::array<real_t, 3> load)
       const real_t w = w_q[qi];
 
       const auto L = ELFF::FEM::QuadraticLagrange<real_t>::values(xi);
-      const auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, h);
       const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, h);
 
       const size_t li = e;
@@ -487,6 +496,40 @@ EulerBeamStaticInextensibleADDM::assemble_f(std::array<real_t, 3> load)
         fxe[a] += (lambda_x_val + r_penalty * p_val) * dH[a] * w * h;
         fye[a] += (lambda_y_val + r_penalty * q_val) * dH[a] * w * h;
         fze[a] += (lambda_z_val + r_penalty * r_val) * dH[a] * w * h;
+      }
+    }
+
+    for (size_t a = 0; a < 4; ++a) {
+      f_x(edofs[a]) += fxe[a];
+      f_y(edofs[a]) += fye[a];
+      f_z(edofs[a]) += fze[a];
+    }
+  }
+}
+
+void
+EulerBeamStaticInextensibleADDM::add_uniform_load_rhs(std::array<real_t, 3> load)
+{
+  const real_t h = this->mesh.get_ds();
+
+  const real_t xi_q[3] = { 0.1127016654, 0.5, 0.8872983346 };
+  const real_t w_q[3] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+
+  for (size_t e = 0; e < elements; ++e) {
+    const size_t edofs[4] = {
+      2 * (e + 0) + 0, 2 * (e + 0) + 1, 2 * (e + 1) + 0, 2 * (e + 1) + 1
+    };
+    real_t fxe[4] = { 0, 0, 0, 0 };
+    real_t fye[4] = { 0, 0, 0, 0 };
+    real_t fze[4] = { 0, 0, 0, 0 };
+
+    for (size_t qi = 0; qi < 3; ++qi) {
+      const real_t xi = xi_q[qi];
+      const real_t w = w_q[qi];
+
+      const auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, h);
+
+      for (size_t a = 0; a < 4; ++a) {
         fxe[a] += load[0] * H[a] * w * h;
         fye[a] += load[1] * H[a] * w * h;
         fze[a] += load[2] * H[a] * w * h;
@@ -499,9 +542,59 @@ EulerBeamStaticInextensibleADDM::assemble_f(std::array<real_t, 3> load)
       f_z(edofs[a]) += fze[a];
     }
   }
+}
 
-  // Point force and torque BCs add directly to f
+void
+EulerBeamStaticInextensibleADDM::add_nodal_load_rhs(
+  const std::vector<std::array<real_t, 3>>& load)
+{
+  ELFF_ASSERT(load.size() == mesh.get_nodes(),
+              "Size of load vector must equal number of nodes.");
+
+  const real_t h = this->mesh.get_ds();
+
+  const real_t xi_q[3] = { 0.1127016654, 0.5, 0.8872983346 };
+  const real_t w_q[3] = { 0.2777777778, 0.4444444444, 0.2777777778 };
+
+  for (size_t e = 0; e < elements; ++e) {
+    const size_t edofs[4] = {
+      2 * (e + 0) + 0, 2 * (e + 0) + 1, 2 * (e + 1) + 0, 2 * (e + 1) + 1
+    };
+    real_t fxe[4] = { 0, 0, 0, 0 };
+    real_t fye[4] = { 0, 0, 0, 0 };
+    real_t fze[4] = { 0, 0, 0, 0 };
+
+    for (size_t qi = 0; qi < 3; ++qi) {
+      const real_t xi = xi_q[qi];
+      const real_t w = w_q[qi];
+
+      const auto M = ELFF::FEM::LinearShape<real_t>::values(xi);
+      const auto H = ELFF::FEM::CubicHermite<real_t>::values(xi, h);
+
+      const real_t fx_q = M[0] * load[e][0] + M[1] * load[e + 1][0];
+      const real_t fy_q = M[0] * load[e][1] + M[1] * load[e + 1][1];
+      const real_t fz_q = M[0] * load[e][2] + M[1] * load[e + 1][2];
+
+      for (size_t a = 0; a < 4; ++a) {
+        fxe[a] += fx_q * H[a] * w * h;
+        fye[a] += fy_q * H[a] * w * h;
+        fze[a] += fz_q * H[a] * w * h;
+      }
+    }
+
+    for (size_t a = 0; a < 4; ++a) {
+      f_x(edofs[a]) += fxe[a];
+      f_y(edofs[a]) += fye[a];
+      f_z(edofs[a]) += fze[a];
+    }
+  }
+}
+
+void
+EulerBeamStaticInextensibleADDM::add_point_boundary_loads()
+{
   const size_t nodes_count = mesh.get_nodes();
+
   for (size_t bi = 0; bi < 2; ++bi) {
     const EulerBeamBCEnd bcend = boundary_conditions.end[bi];
     const EulerBeamBCType bctype = boundary_conditions.type[bi];
@@ -523,6 +616,15 @@ EulerBeamStaticInextensibleADDM::assemble_f(std::array<real_t, 3> load)
       f_z(2 * ni + 1) += bcvals.torque[2];
     }
   }
+}
+
+void
+EulerBeamStaticInextensibleADDM::assemble_f(std::array<real_t, 3> load)
+{
+  clear_rhs();
+  assemble_constraint_rhs();
+  add_uniform_load_rhs(load);
+  add_point_boundary_loads();
 }
 
 void

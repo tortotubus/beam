@@ -52,7 +52,7 @@ TEST(EulerBeamInextensiblePenaltyTest, Glowinski)
   const real_t length = 32.6;
   const real_t EI = 700.0;
   const real_t mu = 7.67;
-  const real_t r_penalty = 1e5;
+  const real_t r_penalty = 1e6;
   const std::array<real_t, 3> load = { 0.0, -9.81 * mu, 0.0 };
 
   const real_t dt = 1e-2;
@@ -143,7 +143,7 @@ TEST(EulerBeamInextensiblePenaltyTest, Huang)
 
   const real_t EI = 0.01;
   const real_t mu = 1.0;
-  const real_t r_penalty = 1e4;
+  const real_t r_penalty = 1e5;
   const real_t dt = 0.02;
   const real_t tf = 0.8;
   const size_t Nt = static_cast<size_t>(std::ceil(tf / dt));

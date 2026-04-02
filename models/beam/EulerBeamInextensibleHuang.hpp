@@ -84,6 +84,8 @@ protected:
   Vec3 endpoint_tangent(EulerBeam::EulerBeamBCEnd end) const;
 
   MatX3 tau_half(const MatX3& X) const;
+  std::pair<real_t, real_t> compute_inextensibility_error(
+    const MatX3& X) const;
   MatX3 dss_nodes(const MatX3& X) const;
   MatX3 bending_force(const MatX3& X) const;
   MatrixXd build_bending_matrix() const;

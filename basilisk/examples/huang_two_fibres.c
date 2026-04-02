@@ -67,11 +67,11 @@ event
 init(i = 0)
 {
   int m_id1 = ibmeshmanager_add_mesh();
-  IBMeshModel beam_model1 = elff_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta, {0.,b_d,0.});
+  IBMeshModel beam_model1 = elff_euler_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta, {0.,b_d,0.});
   ibmeshmanager_set_model(m_id1, beam_model1);
 
   int m_id2 = ibmeshmanager_add_mesh();
-  IBMeshModel beam_model2 = elff_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta, {0.,-b_d,0.});
+  IBMeshModel beam_model2 = elff_euler_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta, {0.,-b_d,0.});
   ibmeshmanager_set_model(m_id2, beam_model2);
 
   foreach_ibnode_per_ibmesh()

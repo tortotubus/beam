@@ -330,6 +330,55 @@ EulerBeamInextensiblePenalty::assemble_system(
   jacobian.makeCompressed();
 }
 
+std::pair<real_t, real_t>
+EulerBeamInextensiblePenalty::compute_inextensibility_error(
+  const VectorXd& state) const
+{
+  const real_t xi_q[] = { 0.1127016654, 0.5, 0.8872983346 };
+
+  real_t max_abs = 0.0;
+  real_t sum_sq = 0.0;
+  size_t sample_count = 0;
+
+  for (size_t e = 0; e < elements; ++e) {
+    const auto idx = get_element_dof_indices(e);
+
+    Matrix<real_t, 12, 1> u_elem;
+    for (int i = 0; i < 12; ++i) {
+      u_elem(i) = state(idx[i]);
+    }
+
+    const Matrix<real_t, 4, 1> ux = u_elem.segment<4>(0);
+    const Matrix<real_t, 4, 1> uy = u_elem.segment<4>(4);
+    const Matrix<real_t, 4, 1> uz = u_elem.segment<4>(8);
+
+    for (real_t xi : xi_q) {
+      const auto dH = ELFF::FEM::CubicHermite<real_t>::derivs(xi, ds);
+
+      real_t xp = 0.0;
+      real_t yp = 0.0;
+      real_t zp = 0.0;
+      for (size_t i = 0; i < 4; ++i) {
+        xp += dH[i] * ux(i);
+        yp += dH[i] * uy(i);
+        zp += dH[i] * uz(i);
+      }
+
+      const real_t g = xp * xp + yp * yp + zp * zp - 1.0;
+      const real_t abs_g = std::abs(g);
+      max_abs = std::max(max_abs, abs_g);
+      sum_sq += g * g;
+      ++sample_count;
+    }
+  }
+
+  if (sample_count == 0) {
+    return { 0.0, 0.0 };
+  }
+
+  return { std::sqrt(sum_sq / static_cast<real_t>(sample_count)), max_abs };
+}
+
 void
 EulerBeamInextensiblePenalty::apply_boundary_conditions()
 {
@@ -453,6 +502,8 @@ EulerBeamInextensiblePenalty::solve_newmark(real_t dt,
   u_prev = u;
   const VectorXd v_old = v_prev;
   const VectorXd a_old = a_prev;
+  size_t final_iter = 0;
+  real_t final_res_norm = 0.0;
 
   for (size_t iter = 0; iter < max_iter_nonlinear; ++iter) {
     assemble_system(load);
@@ -460,8 +511,9 @@ EulerBeamInextensiblePenalty::solve_newmark(real_t dt,
     apply_boundary_conditions();
 
     const real_t res_norm = residual.norm();
+    final_iter = iter;
+    final_res_norm = res_norm;
     if (res_norm < tol_primal) {
-      ELFF_LOG(time_iter << "\t" << iter << "\t" << res_norm);
       break;
     }
 
@@ -484,6 +536,11 @@ EulerBeamInextensiblePenalty::solve_newmark(real_t dt,
 
     u += delta_u;
   }
+
+  const auto [inext_l2, inext_lmax] = compute_inextensibility_error(u);
+  ELFF_LOG(time_iter << "\t" << final_iter << "\t" << final_res_norm
+                     << "\t|g|_l2=" << inext_l2
+                     << "\t|g|_max=" << inext_lmax);
 
   update_newmark_state_from_displacement(dt, beta, gamma, v_old, a_old);
   apply_dynamic_state_boundary_conditions();
@@ -512,6 +569,8 @@ EulerBeamInextensiblePenalty::solve_newmark(
   u_prev = u;
   const VectorXd v_old = v_prev;
   const VectorXd a_old = a_prev;
+  size_t final_iter = 0;
+  real_t final_res_norm = 0.0;
 
   for (size_t iter = 0; iter < max_iter_nonlinear; ++iter) {
     assemble_system(load);
@@ -519,8 +578,9 @@ EulerBeamInextensiblePenalty::solve_newmark(
     apply_boundary_conditions();
 
     const real_t res_norm = residual.norm();
+    final_iter = iter;
+    final_res_norm = res_norm;
     if (res_norm < tol_primal) {
-      ELFF_LOG(time_iter << "\t" << iter << "\t" << res_norm);
       break;
     }
 
@@ -543,6 +603,11 @@ EulerBeamInextensiblePenalty::solve_newmark(
 
     u += delta_u;
   }
+
+  const auto [inext_l2, inext_lmax] = compute_inextensibility_error(u);
+  ELFF_LOG(time_iter << "\t" << final_iter << "\t" << final_res_norm
+                     << "\t|g|_l2=" << inext_l2
+                     << "\t|g|_max=" << inext_lmax);
 
   update_newmark_state_from_displacement(dt, beta, gamma, v_old, a_old);
   apply_dynamic_state_boundary_conditions();
