@@ -1,0 +1,92 @@
+AMREX_NO_PROBINIT=TRUE
+BL_NO_FORT = TRUE
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.defs
+
+#These are the directories in IAMR
+
+Bdirs += Source
+Bdirs += Source/prob
+Bdirs += Source/Utilities
+
+Bpack	+= $(foreach dir, $(Bdirs), $(TOP)/$(dir)/Make.package)
+Blocs	+= $(foreach dir, $(Bdirs), $(TOP)/$(dir))
+
+Hdirs += $(AMREX_HYDRO_HOME)/Utils
+Hdirs += $(AMREX_HYDRO_HOME)/MOL
+Hdirs += $(AMREX_HYDRO_HOME)/Godunov
+Hdirs += $(AMREX_HYDRO_HOME)/BDS
+Hdirs += $(AMREX_HYDRO_HOME)/Projections
+
+ifeq ($(USE_EB), TRUE)
+Hdirs += $(AMREX_HYDRO_HOME)/EBMOL
+Hdirs += $(AMREX_HYDRO_HOME)/EBGodunov
+endif
+
+Bpack	+= $(foreach dir, $(Hdirs), $(dir)/Make.package)
+Blocs	+= $(foreach dir, $(Hdirs), $(dir))
+
+include $(Bpack)
+
+VPATH_LOCATIONS   += $(Blocs)
+INCLUDE_LOCATIONS += $(Blocs)
+
+#These are the directories in AMReX
+
+Pdirs   := Base AmrCore Amr Boundary
+Pdirs   += LinearSolvers/MLMG
+
+
+ifeq ($(USE_PARTICLES),TRUE)
+  Pdirs += Particle
+endif
+
+ifeq ($(USE_EB),TRUE)
+  Pdirs += EB
+endif
+
+ifeq ($(USE_HYPRE),TRUE)
+  Pdirs += Extern/HYPRE
+endif
+
+ifeq ($(USE_SENSEI_INSITU),TRUE)
+    Pdirs += Extern/SENSEI
+endif
+
+Ppack   += $(foreach dir, $(Pdirs), $(AMREX_HOME)/Src/$(dir)/Make.package)
+include $(Ppack)
+
+ifeq ($(USE_VELOCITY), TRUE)
+  DEFINES += -DBL_NOLINEVALUES -DBL_USE_VELOCITY -DBL_PARALLEL_IO
+  include $(AMREX_HOME)/Src/Extern/amrdata/Make.package
+endif
+
+ifeq ($(USE_TURBULENT_FORCING), TRUE)
+  DEFINES += -DAMREX_USE_TURBULENT_FORCING
+  ifeq ($(USE_FAST_FORCE), TRUE)
+    DEFINES += -DAMREX_USE_FAST_FORCE
+  endif
+endif
+
+# job_info support
+CEXE_sources += AMReX_buildInfo.cpp
+CEXE_headers += $(AMREX_HOME)/Tools/C_scripts/AMReX_buildInfo.H
+INCLUDE_LOCATIONS +=  $(AMREX_HOME)/Tools/C_scripts
+
+all: $(executable)
+ifneq ($(KEEP_BUILDINFO_CPP),TRUE)
+	$(SILENT) $(RM) AMReX_buildInfo.cpp
+endif
+	@echo SUCCESS
+
+AMReX_buildInfo.cpp:
+	$(AMREX_HOME)/Tools/C_scripts/makebuildinfo_C.py \
+          --amrex_home "$(AMREX_HOME)" \
+          --COMP "$(COMP)" --COMP_VERSION "$(COMP_VERSION)" \
+          --FCOMP "$(FCOMP)" --FCOMP_VERSION "$(FCOMP_VERSION)" \
+          --GIT "$(TOP) $(AMREX_HOME)"
+
+include $(AMREX_HOME)/Tools/GNUMake/Make.rules
+
+clean::
+	$(SILENT) $(RM) AMReX_buildInfo.cpp

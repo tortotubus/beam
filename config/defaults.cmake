@@ -26,3 +26,12 @@ option(ELFF_BUILD_THIRD_PARTY_EIGEN3 "Build Eigen" OFF)
 
 option(ELFF_USE_BASILISK "Enable the basilisk subproject" ON)
 option(ELFF_BUILD_THIRD_PARTY_BASILISK "Build Basilisk" ON)
+
+option(ELFF_USE_AMREX "Enable AMReX" ON)
+option(ELFF_BUILD_THIRD_PARTY_AMREX "Build Basilisk" ON)
+option(ELFF_USE_EB "Enable Embedded Boundary (EB) in AMReX/Hydro/IAMR" OFF)
+
+option(ELFF_USE_AMREX_HYDRO "Enable AMReX-Hydro" ON)
+option(ELFF_BUILD_THIRD_PARTY_AMREX_HYDRO "Build AMReX-Hydro" ON)
+
+option(ELFF_BUILD_FLUID "Build the IAMR-style fluid executable" ON)

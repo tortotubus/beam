@@ -226,6 +226,10 @@ if (ELFF_USE_BASILISK)
   add_subdirectory(basilisk)
 endif()
 
+if (ELFF_BUILD_FLUID)
+  add_subdirectory(fluid)
+endif()
+
 #
 # Tests
 #

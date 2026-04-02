@@ -1,0 +1,38 @@
+
+CEXE_sources += main.cpp SyncRegister.cpp  NS_init_eb2.cpp
+
+ifneq ($(SKIP_NS_SPECIFIC_CODE), TRUE)
+  #
+  # These files contain routines that may be overridden by code that
+  # inherits from NavierStokes.  They should only be included if they
+  # aren't implemented by inherited code.  In particular, LMC has its own
+  # implementation of these routines.
+  #
+  CEXE_sources += NS_error.cpp NS_setup.cpp NSBld.cpp NavierStokes.cpp
+  CEXE_headers += NavierStokes.H NS_bcfill.H
+
+endif
+
+CEXE_sources += NS_getForce.cpp
+
+CEXE_sources += OutFlowBC.cpp
+
+CEXE_sources += FluxBoxes.cpp
+
+CEXE_headers += OutFlowBC.H
+
+CEXE_headers += SyncRegister.H RegType.H
+
+CEXE_headers += iamr_constants.H
+
+CEXE_sources += NavierStokesBase.cpp Projection.cpp MacProj.cpp Diffusion.cpp
+
+CEXE_sources += NS_LES.cpp
+
+CEXE_sources += NS_derive.cpp NS_average.cpp
+CEXE_headers += NS_derive.H
+
+CEXE_headers += Projection.H MacProj.H Diffusion.H NavierStokesBase.H FluxBoxes.H EBUserDefined.H
+
+CEXE_sources += NS_util.cpp
+CEXE_headers += NS_util.H

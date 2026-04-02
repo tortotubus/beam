@@ -1,0 +1,82 @@
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#            SIMULATION STOP            #
+#.......................................#
+max_step                =  10           # Max number of time steps
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#           SOLVER SETTINGS             #
+#.......................................#
+ns.init_shrink     = 1.0
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#         TIME STEP COMPUTATION         #
+#.......................................#
+ns.cfl               = 0.3
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#         Algorithm options             #
+#.......................................#
+ns.do_mom_diff=1
+ns.do_cons_trac=1
+ns.do_trac2 = 1
+ns.do_cons_trac2=1
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#            INPUT AND OUTPUT           #
+#.......................................#
+amr.plot_int            =   20          # Steps between plot files
+amr.check_int           =   1000        # Steps between checkpoint files
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#               PHYSICS                 #
+#.......................................#
+ns.gravity          =   0.
+ns.vel_visc_coef         = 0.1
+ns.scal_diff_coefs       = 0.1 0.005
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#        ADAPTIVE MESH REFINEMENT       #
+#.......................................#
+amr.n_cell              =   32 8 96     # Grid cells at coarsest AMRlevel
+amr.max_level           =   0           # Max AMR level in hierarchy
+amr.n_error_buf         =   8
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#              GEOMETRY                 #
+#.......................................#
+geometry.prob_lo        =  -0.2 -0.05 -0.6  # Lo corner coordinates
+geometry.prob_hi        =   0.2  0.05  0.6  # Hi corner coordinates
+geometry.is_periodic    =   0   1   0   # Periodicity x y z (0/1)
+
+# 0 = Interior/Periodic  3 = Symmetry
+# 1 = Inflow             4 = SlipWall
+# 2 = Outflow            5 = NoSlipWal
+# Boundary conditions on the low end of the domain.
+ns.lo_bc 	     	= 4 0 1
+# Boundary conditions on the high end of the domain.
+ns.hi_bc   	      	= 5 0 2
+
+zlo.velocity = 0. 0. 10.
+zlo.density  = 1.
+zlo.tracer   = 0.
+zlo.tracer2  = 1.
+
+# Add cylinder
+eb2.geom_type                 = cylinder
+eb2.cylinder_has_fluid_inside = 0
+eb2.cylinder_radius           = 0.05001
+eb2.cylinder_direction        = 1
+eb2.cylinder_center           = 0.0 0.0 -0.45
+
+# Reditribution method for small cells
+ns.redistribution_type = StateRedist
+
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#          PROBLEM PARAMETERS           #
+#.......................................#
+
+prob.probtype = 4
+prob.blob_center =  0.05 0.0 -0.55
+prob.blob_radius =  0.04
+# Constant density initial condition
+prob.density_ic = 1.0
+# Set up a flow, defaults to zero
+prob.velocity_ic = 0. 0. 10.
+
+#¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨¨#
+#              VERBOSITY                #
+#.......................................#
+ns.v              = 1 # NS solver
