@@ -6,6 +6,14 @@
 namespace ELFF {
 namespace Models {
 
+/**
+ * @brief Immersed-boundary wrapper for the full GGL inextensible Euler beam
+ * solver.
+ *
+ * This class couples @ref EulerBeamInextensibleGGL to the immersed-boundary
+ * force interface by translating between IB mesh data and the underlying beam
+ * state while preserving restart support through @ref IBModel.
+ */
 class IBEulerBeamGGL
   : public IBForceCoupled
   , public EulerBeamInextensibleGGL
