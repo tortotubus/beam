@@ -90,7 +90,7 @@ protected:
   /**
    * @brief Return a C vtkPolyData struct with heap arrays belonging to it
    */
-  C::vtkPolyData to_c_struct();
+  C::vtkPolyData to_c_struct() const;
 
   friend class vtkHDFPolyData;
 
@@ -180,6 +180,11 @@ public:
   std::vector<double>& get_pointdata(int64_t field);
 
   /**
+   * @brief Get read-only storage for a point-data field
+   */
+  const std::vector<double>& get_pointdata(int64_t field) const;
+
+  /**
    * @brief Set one tuple of a 3-component vector point-data field
    */
   void set_pointdata_vector3(int64_t field,
@@ -230,6 +235,18 @@ public:
    * @param polygon_points
    */
   int64_t add_polygon(std::vector<int64_t> polygon_points);
+
+  /**
+   * @brief Append another vtkPolyData into this object
+   *
+   * This method delegates the merge semantics to @ref C::vtk_polydata_append.
+   */
+  void append(const vtkPolyData& other);
+
+  /**
+   * @brief Return a new vtkPolyData containing all datasets appended in order
+   */
+  static vtkPolyData append_many(const std::vector<vtkPolyData>& datasets);
 };
 
 }

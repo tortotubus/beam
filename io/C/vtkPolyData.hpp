@@ -261,6 +261,17 @@ vtk_polydata_add_line(vtkPolyData* pd,
 
 /**
  * @memberof vtkPolyData
+ *
+ * @brief Append source polydata into destination polydata
+ *
+ * Point-data schema must match exactly (same number of fields, same names,
+ * same component counts).
+ */
+void
+vtk_polydata_append(vtkPolyData* dst, const vtkPolyData* src);
+
+/**
+ * @memberof vtkPolyData
  */
 int64_t
 vtk_polydata_add_pointdata_scalar(vtkPolyData* pd, const char* name);

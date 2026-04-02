@@ -8,7 +8,7 @@ namespace IO {
 namespace CXX {
 
 C::vtkPolyData
-vtkPolyData::to_c_struct()
+vtkPolyData::to_c_struct() const
 {
   // Points:
   const size_t points_size = this->points.size();
@@ -392,6 +392,18 @@ vtkPolyData::get_pointdata(int64_t field)
   return pointdata_data[id];
 }
 
+const std::vector<double>&
+vtkPolyData::get_pointdata(int64_t field) const
+{
+  const size_t id = static_cast<size_t>(field);
+
+  if (id >= pointdata_data.size()) {
+    ELFF_ABORT("Point-data field does not exist.\n");
+  }
+
+  return pointdata_data[id];
+}
+
 void
 vtkPolyData::set_pointdata_vector3(int64_t field,
                                    size_t point_id,
@@ -525,6 +537,79 @@ vtkPolyData::add_polygon(std::vector<int64_t> polygon_points)
   polygons_offsets.push_back(polygons_connectivity.size());
 
   return number_of_polygons() - 1;
+}
+
+void
+vtkPolyData::append(const vtkPolyData& other)
+{
+  if (this == &other) {
+    vtkPolyData copy = other;
+    append(copy);
+    return;
+  }
+
+  C::vtkPolyData c_dst = this->to_c_struct();
+  C::vtkPolyData c_src = other.to_c_struct();
+
+  C::vtk_polydata_append(&c_dst, &c_src);
+
+  points_state = (c_dst.points_state == C::SEALED) ? State::SEALED : State::BUILDING;
+  points.assign(c_dst.points, c_dst.points + (c_dst.n_points * 3));
+
+  connectivity_state =
+    (c_dst.connectivity_state == C::SEALED) ? State::SEALED : State::BUILDING;
+
+  vertices_connectivity.assign(c_dst.vertices_connectivity,
+                               c_dst.vertices_connectivity + c_dst.n_vertices_connectivity);
+  vertices_offsets.assign(
+    c_dst.vertices_offsets, c_dst.vertices_offsets + c_dst.n_vertices_offsets);
+
+  lines_connectivity.assign(
+    c_dst.lines_connectivity, c_dst.lines_connectivity + c_dst.n_lines_connectivity);
+  lines_offsets.assign(c_dst.lines_offsets, c_dst.lines_offsets + c_dst.n_lines_offsets);
+
+  strips_connectivity.assign(
+    c_dst.strips_connectivity, c_dst.strips_connectivity + c_dst.n_strips_connectivity);
+  strips_offsets.assign(c_dst.strips_offsets, c_dst.strips_offsets + c_dst.n_strips_offsets);
+
+  polygons_connectivity.assign(c_dst.polygons_connectivity,
+                               c_dst.polygons_connectivity + c_dst.n_polygons_connectivity);
+  polygons_offsets.assign(
+    c_dst.polygons_offsets, c_dst.polygons_offsets + c_dst.n_polygons_offsets);
+
+  fields_state = (c_dst.fields_state == C::SEALED) ? State::SEALED : State::BUILDING;
+
+  pointdata_names.resize(c_dst.n_pointdata);
+  pointdata_ncomp.resize(c_dst.n_pointdata);
+  pointdata_data.resize(c_dst.n_pointdata);
+
+  for (size_t i = 0; i < c_dst.n_pointdata; ++i) {
+    pointdata_names[i] = c_dst.pointdata_names[i];
+    pointdata_ncomp[i] = c_dst.pointdata_ncomp[i];
+    pointdata_data[i].assign(c_dst.pointdata_data[i],
+                             c_dst.pointdata_data[i] +
+                               (c_dst.n_points * c_dst.pointdata_ncomp[i]));
+  }
+
+  C::vtk_polydata_free(&c_dst);
+  C::vtk_polydata_free(&c_src);
+}
+
+vtkPolyData
+vtkPolyData::append_many(const std::vector<vtkPolyData>& datasets)
+{
+  vtkPolyData out;
+
+  if (datasets.empty()) {
+    return out;
+  }
+
+  out = datasets.front();
+  for (size_t i = 1; i < datasets.size(); ++i) {
+    out.append(datasets[i]);
+  }
+
+  return out;
 }
 
 }

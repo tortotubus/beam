@@ -8,6 +8,41 @@ namespace ELFF {
 namespace IO {
 namespace C {
 
+static void
+vtk_polydata_require_point_capacity(vtkPolyData* pd, size_t required_points)
+{
+  if (required_points <= pd->m_points) {
+    return;
+  }
+
+  pd->points = static_cast<float*>(realloc(pd->points, sizeof(float) * required_points * 3));
+  assert(pd->points != nullptr);
+  pd->m_points = required_points;
+}
+
+static void
+vtk_polydata_require_connectivity_capacity(int64_t** connectivity,
+                                           size_t* m_connectivity,
+                                           size_t required_connectivity,
+                                           int64_t** offsets,
+                                           size_t* m_offsets,
+                                           size_t required_offsets)
+{
+  if (required_connectivity > *m_connectivity) {
+    *connectivity = static_cast<int64_t*>(
+      realloc(*connectivity, sizeof(int64_t) * required_connectivity));
+    assert(*connectivity != nullptr);
+    *m_connectivity = required_connectivity;
+  }
+
+  if (required_offsets > *m_offsets) {
+    *offsets =
+      static_cast<int64_t*>(realloc(*offsets, sizeof(int64_t) * required_offsets));
+    assert(*offsets != nullptr);
+    *m_offsets = required_offsets;
+  }
+}
+
 bool
 vtk_polydata_points_is_sealed(vtkPolyData* pd)
 {
@@ -306,6 +341,170 @@ vtk_polydata_add_line(vtkPolyData* pd,
   pd->n_lines_offsets++;
 
   return vtk_polydata_number_of_lines(pd) - 1;
+}
+
+void
+vtk_polydata_append(vtkPolyData* dst, const vtkPolyData* src)
+{
+  assert(dst != nullptr);
+  assert(src != nullptr);
+  assert(dst != src);
+
+  assert(dst->n_pointdata == src->n_pointdata);
+  for (size_t i = 0; i < dst->n_pointdata; ++i) {
+    assert(dst->pointdata_ncomp[i] == src->pointdata_ncomp[i]);
+    assert(strcmp(dst->pointdata_names[i], src->pointdata_names[i]) == 0);
+  }
+  assert(dst->n_celldata == src->n_celldata);
+  for (size_t i = 0; i < dst->n_celldata; ++i) {
+    assert(dst->celldata_ncomp[i] == src->celldata_ncomp[i]);
+    assert(strcmp(dst->celldata_names[i], src->celldata_names[i]) == 0);
+  }
+
+  const size_t old_n_points = dst->n_points;
+  const size_t src_n_points = src->n_points;
+  const size_t old_n_cells = (dst->n_vertices_offsets - 1) + (dst->n_lines_offsets - 1) +
+                             (dst->n_polygons_offsets - 1) + (dst->n_strips_offsets - 1);
+  const size_t src_n_cells = (src->n_vertices_offsets - 1) + (src->n_lines_offsets - 1) +
+                             (src->n_polygons_offsets - 1) + (src->n_strips_offsets - 1);
+  const int64_t point_offset = static_cast<int64_t>(old_n_points);
+
+  // Points
+  vtk_polydata_require_point_capacity(dst, old_n_points + src_n_points);
+  if (src_n_points > 0) {
+    memcpy(dst->points + (old_n_points * 3), src->points, sizeof(float) * src_n_points * 3);
+  }
+  dst->n_points = old_n_points + src_n_points;
+
+  auto append_connectivity = [point_offset](int64_t* dst_connectivity,
+                                            size_t* dst_n_connectivity,
+                                            int64_t* dst_offsets,
+                                            size_t* dst_n_offsets,
+                                            const int64_t* src_connectivity,
+                                            size_t src_n_connectivity,
+                                            const int64_t* src_offsets,
+                                            size_t src_n_offsets) {
+    const size_t old_n_connectivity = *dst_n_connectivity;
+
+    for (size_t i = 0; i < src_n_connectivity; ++i) {
+      dst_connectivity[*dst_n_connectivity + i] = src_connectivity[i] + point_offset;
+    }
+    *dst_n_connectivity += src_n_connectivity;
+
+    for (size_t i = 1; i < src_n_offsets; ++i) {
+      dst_offsets[*dst_n_offsets] = static_cast<int64_t>(old_n_connectivity) + src_offsets[i];
+      *dst_n_offsets += 1;
+    }
+  };
+
+  // Vertices
+  vtk_polydata_require_connectivity_capacity(&dst->vertices_connectivity,
+                                             &dst->m_vertices_connectivity,
+                                             dst->n_vertices_connectivity +
+                                               src->n_vertices_connectivity,
+                                             &dst->vertices_offsets,
+                                             &dst->m_vertices_offsets,
+                                             dst->n_vertices_offsets + src->n_vertices_offsets - 1);
+  append_connectivity(dst->vertices_connectivity,
+                      &dst->n_vertices_connectivity,
+                      dst->vertices_offsets,
+                      &dst->n_vertices_offsets,
+                      src->vertices_connectivity,
+                      src->n_vertices_connectivity,
+                      src->vertices_offsets,
+                      src->n_vertices_offsets);
+
+  // Lines
+  vtk_polydata_require_connectivity_capacity(
+    &dst->lines_connectivity,
+    &dst->m_lines_connectivity,
+    dst->n_lines_connectivity + src->n_lines_connectivity,
+    &dst->lines_offsets,
+    &dst->m_lines_offsets,
+    dst->n_lines_offsets + src->n_lines_offsets - 1);
+  append_connectivity(dst->lines_connectivity,
+                      &dst->n_lines_connectivity,
+                      dst->lines_offsets,
+                      &dst->n_lines_offsets,
+                      src->lines_connectivity,
+                      src->n_lines_connectivity,
+                      src->lines_offsets,
+                      src->n_lines_offsets);
+
+  // Strips
+  vtk_polydata_require_connectivity_capacity(
+    &dst->strips_connectivity,
+    &dst->m_strips_connectivity,
+    dst->n_strips_connectivity + src->n_strips_connectivity,
+    &dst->strips_offsets,
+    &dst->m_strips_offsets,
+    dst->n_strips_offsets + src->n_strips_offsets - 1);
+  append_connectivity(dst->strips_connectivity,
+                      &dst->n_strips_connectivity,
+                      dst->strips_offsets,
+                      &dst->n_strips_offsets,
+                      src->strips_connectivity,
+                      src->n_strips_connectivity,
+                      src->strips_offsets,
+                      src->n_strips_offsets);
+
+  // Polygons
+  vtk_polydata_require_connectivity_capacity(
+    &dst->polygons_connectivity,
+    &dst->m_polygons_connectivity,
+    dst->n_polygons_connectivity + src->n_polygons_connectivity,
+    &dst->polygons_offsets,
+    &dst->m_polygons_offsets,
+    dst->n_polygons_offsets + src->n_polygons_offsets - 1);
+  append_connectivity(dst->polygons_connectivity,
+                      &dst->n_polygons_connectivity,
+                      dst->polygons_offsets,
+                      &dst->n_polygons_offsets,
+                      src->polygons_connectivity,
+                      src->n_polygons_connectivity,
+                      src->polygons_offsets,
+                      src->n_polygons_offsets);
+
+  // Point-data
+  for (size_t i = 0; i < dst->n_pointdata; ++i) {
+    const size_t ncomp = dst->pointdata_ncomp[i];
+    const size_t old_tuples = old_n_points * ncomp;
+    const size_t src_tuples = src_n_points * ncomp;
+    const size_t new_tuples = old_tuples + src_tuples;
+
+    dst->pointdata_data[i] =
+      static_cast<double*>(realloc(dst->pointdata_data[i], sizeof(double) * new_tuples));
+    assert(dst->pointdata_data[i] != nullptr);
+
+    if (src_tuples > 0) {
+      memcpy(dst->pointdata_data[i] + old_tuples,
+             src->pointdata_data[i],
+             sizeof(double) * src_tuples);
+    }
+  }
+  for (size_t i = 0; i < dst->n_celldata; ++i) {
+    const size_t ncomp = dst->celldata_ncomp[i];
+    const size_t old_tuples = old_n_cells * ncomp;
+    const size_t src_tuples = src_n_cells * ncomp;
+    const size_t new_tuples = old_tuples + src_tuples;
+
+    dst->celldata_data[i] =
+      static_cast<double*>(realloc(dst->celldata_data[i], sizeof(double) * new_tuples));
+    assert(dst->celldata_data[i] != nullptr);
+
+    if (src_tuples > 0) {
+      memcpy(dst->celldata_data[i] + old_tuples,
+             src->celldata_data[i],
+             sizeof(double) * src_tuples);
+    }
+  }
+
+  if (vtk_polydata_number_of_cells(dst) > 0) {
+    dst->points_state = SEALED;
+  }
+  if (dst->n_pointdata > 0 || dst->n_celldata > 0) {
+    dst->connectivity_state = SEALED;
+  }
 }
 
 int64_t
