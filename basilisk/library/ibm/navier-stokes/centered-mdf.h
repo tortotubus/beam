@@ -1,4 +1,4 @@
-  #include "run.h"
+#include "run.h"
 #include "library/timestep.h"
 #include "bcg.h"
 #if EMBED
@@ -11,7 +11,7 @@
 #if TREE
 #include "library/ibm/IBAdapt.h"
 #endif
- 
+
 scalar p[];
 vector u[], g[];
 scalar pf[];
@@ -25,7 +25,6 @@ IBvector eulvel;
 IBscalar eulrho;
 IBscalar sumw2;
 IBvector dforce;
- 
 
 (const) face vector mu = zerof, a = zerof, alpha = unityf;
 (const) scalar rho = unity;
@@ -36,11 +35,11 @@ mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
 
 double alpha_split = 0.5;
 double beta_split = 0.5;
-double ib_force_relaxation = 0.3;
-int ib_richardson_iters = 4; 
+double ib_force_relaxation = 1.0;
+int ib_richardson_iters = 2;
 
 #if EMBED
-#define neumann_pressure(i)                                                    \
+#define neumann_pressure(i)                                                              \
   (alpha.n[i] ? a.n[i] * fm.n[i] / alpha.n[i] : a.n[i] * rho[] / (cm[] + SEPS))
 #else
 #define neumann_pressure(i) (a.n[i] * fm.n[i] / alpha.n[i])
@@ -64,14 +63,12 @@ p[front] = neumann (neumann_pressure (ghost));
 p[back] = neumann (-neumann_pressure (0));
 #endif
 #endif // !AXI
- 
 
 #if TREE && EMBED
 void pressure_embed_gradient (Point point, scalar p, coord* g) {
   foreach_dimension () g->x = rho[] / (cm[] + SEPS) * (a.x[] + a.x[1]) / 2.;
 }
 #endif // TREE && EMBED
- 
 
 event defaults (i = 0) {
   new_ibvector (eulvel);
@@ -93,7 +90,6 @@ event defaults (i = 0) {
   ibnodump (nweight) = true;
 
   ibmeshmanager_init (0);
- 
 
   mgp = (mgstats) {0};
   mgpf = (mgstats) {0};
@@ -101,8 +97,8 @@ event defaults (i = 0) {
   mgu_b = (mgstats) {0};
 
   CFL = 0.8;
- 
-  p.nodump = pf.nodump = true; 
+
+  p.nodump = pf.nodump = true;
 
   if (alpha.x.i == unityf.x.i) {
     alpha = fm;
@@ -111,11 +107,9 @@ event defaults (i = 0) {
     face vector alphav = alpha;
     foreach_face () alphav.x[] = fm.x[];
   }
- 
 
 #if TREE
   uf.x.refine = refine_face_solenoidal;
- 
 
 #if EMBED
   uf.x.refine = refine_face;
@@ -129,17 +123,15 @@ event defaults (i = 0) {
     s.embed_gradient = pressure_embed_gradient;
 #endif // EMBED
 #endif // TREE
- 
+
   foreach ()
     foreach_dimension () dimensional (u.x[] == Delta / t);
 
   foreach ()
     foreach_dimension () ibmf.x[] = 0.;
 }
- 
 
 event default_display (i = 0) display ("squares (color = 'u.x', spread = -1);");
- 
 
 double dtmax;
 
@@ -151,7 +143,7 @@ event init (i = 0) {
 
   trash ({uf});
   foreach_face () uf.x[] = fm.x[] * face_value (u.x, 0);
- 
+
 #if _MPI
   ibmeshmanager_update_pid ();
   ibmeshmanager_boundary ();
@@ -162,17 +154,16 @@ event init (i = 0) {
   dtmax = DT;
   event ("stability");
 }
- 
+
 event set_dtmax (i++, last) dtmax = DT;
 
 event stability (i++, last) {
   dt = dtnext (stokes ? dtmax : timestep (uf, dtmax));
 }
- 
+
 event vof (i++, last);
 event tracer_advection (i++, last);
 event tracer_diffusion (i++, last);
- 
 
 event properties (i++, last) {
   if (!is_constant (mu.x)) {
@@ -215,8 +206,8 @@ void prediction () {
   foreach_face () {
     double un = dt * (u.x[] + u.x[-1]) / (2. * Delta), s = sign (un);
     int i = -(s + 1.) / 2.;
-    uf.x[] = u.x[i] + (g.x[] + g.x[-1]) * dt / 4. +
-             s * (1. - s * un) * du.x[i] * Delta / 2.;
+    uf.x[] =
+      u.x[i] + (g.x[] + g.x[-1]) * dt / 4. + s * (1. - s * un) * du.x[i] * Delta / 2.;
 #if dimension > 1
     if (fm.y[i, 0] && fm.y[i, 1]) {
       double fyy = u.y[i] < 0. ? u.x[i, 1] - u.x[i] : u.x[i] - u.x[i, -1];
@@ -234,7 +225,6 @@ void prediction () {
 
   delete ((scalar*) {du});
 }
- 
 
 event advection_term (i++, last) {
   if (!stokes) {
@@ -243,13 +233,11 @@ event advection_term (i++, last) {
     advection ((scalar*) {u}, uf, dt, (scalar*) {g});
   }
 }
- 
 
 static void correction (double dt) {
   foreach ()
     foreach_dimension () u.x[] += dt * g.x[];
 }
- 
 
 event alpha_viscous_term (i++, last) {
   if (constant (mu.x) != 0. && alpha_split != 0.) {
@@ -410,8 +398,7 @@ event beta_viscous_term (i++, last) {
   }
 }
 
-
-event acceleration (i++, last) { 
+event acceleration (i++, last) {
 
   trash ({uf});
   foreach_face () uf.x[] = fm.x[] * (face_value (u.x, 0) + dt * a.x[]);
@@ -425,23 +412,20 @@ event acceleration (i++, last) {
     foreach_face () af.x[] = 0.;
   }
 }
- 
-void centered_gradient (scalar p, vector g) { 
+
+void centered_gradient (scalar p, vector g) {
 
   face vector gf[];
   foreach_face () gf.x[] = fm.x[] * a.x[] - alpha.x[] * (p[] - p[-1]) / Delta;
- 
 
   trash ({g});
   foreach ()
     foreach_dimension () g.x[] = (gf.x[] + gf.x[1]) / (fm.x[] + fm.x[1] + SEPS);
 }
- 
 
 event projection (i++, last) {
   mgp = project (uf, p, alpha, dt, mgp.nrelax);
   centered_gradient (p, g);
- 
 
   correction (dt);
 
@@ -458,10 +442,10 @@ event projection (i++, last) {
     }
     ibval (sumw2) = lsumw2;
   }
-} 
+}
 
 event end_timestep (i++, last);
- 
+
 #if TREE
 event adapt (i++, last) {
 #if _MPI
@@ -474,4 +458,3 @@ event adapt (i++, last) {
   event ("properties");
 }
 #endif
- 
