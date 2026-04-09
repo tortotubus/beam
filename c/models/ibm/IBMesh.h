@@ -33,6 +33,7 @@ extern "C"
     vertex_t* position;
     vertex_t* velocity;
     vertex_t* forces;
+    double* measure;
   } ib_mesh_t;
 
   /**

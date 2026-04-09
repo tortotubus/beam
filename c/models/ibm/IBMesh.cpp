@@ -12,5 +12,6 @@ extern "C"
     free(mesh->position);
     free(mesh->velocity);
     free(mesh->forces);
+    free(mesh->measure);
   }
 } // extern "C"

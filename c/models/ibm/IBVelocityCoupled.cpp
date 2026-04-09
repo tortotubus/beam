@@ -32,15 +32,17 @@ extern "C"
 
     std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
     std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
+    const auto& measures = mesh.GetMeasures();
     int nm = mesh.GetNumberOfPoints();
 
     ib_mesh_t mesh_str = {
-      .n = nm, .position = NULL, .velocity = NULL, .forces = NULL
+      .n = nm, .position = NULL, .velocity = NULL, .forces = NULL, .measure = NULL
     };
 
     mesh_str.position = (vertex_t*)calloc(nm, sizeof(vertex_t));
     mesh_str.velocity = (vertex_t*)calloc(nm, sizeof(vertex_t));
     mesh_str.forces = (vertex_t*)calloc(nm, sizeof(vertex_t));
+    mesh_str.measure = (double*)calloc(nm, sizeof(double));
 
     for (int i = 0; i < nm; ++i) {
       mesh_str.position[i].x = position[i].x;
@@ -49,6 +51,7 @@ extern "C"
       mesh_str.forces[i].x = forces[i].x;
       mesh_str.forces[i].y = forces[i].y;
       mesh_str.forces[i].z = forces[i].z;
+      mesh_str.measure[i] = measures[i];
     }
 
     return mesh_str;
@@ -81,16 +84,18 @@ extern "C"
     IBMesh& mesh = model->GetMidpoint(velocity_arr, dt);
     std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
     std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
+    const auto& measures = mesh.GetMeasures();
     int nn = mesh.GetNumberOfPoints();
 
     // Pack the IBMesh into our C struct
     ib_mesh_t mesh_str = {
-      .n = nn, .position = NULL, .velocity = NULL, .forces = NULL
+      .n = nn, .position = NULL, .velocity = NULL, .forces = NULL, .measure = NULL
     };
 
     mesh_str.position = (vertex_t*)calloc(nn, sizeof(vertex_t));
     mesh_str.velocity = (vertex_t*)calloc(nn, sizeof(vertex_t));
     mesh_str.forces = (vertex_t*)calloc(nn, sizeof(vertex_t));
+    mesh_str.measure = (double*)calloc(nn, sizeof(double));
 
     for (int i = 0; i < nn; ++i) {
       mesh_str.position[i].x = position[i].x;
@@ -99,6 +104,7 @@ extern "C"
       mesh_str.forces[i].x = forces[i].x;
       mesh_str.forces[i].y = forces[i].y;
       mesh_str.forces[i].z = forces[i].z;
+      mesh_str.measure[i] = measures[i];
     }
 
     return mesh_str;
@@ -130,16 +136,18 @@ extern "C"
     IBMesh& mesh = model->GetNext(velocity_arr, dt);
     std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
     std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
+    const auto& measures = mesh.GetMeasures();
     int nm = mesh.GetNumberOfPoints();
 
     // Pack the IBMesh into our C struct
     ib_mesh_t mesh_str = {
-      .n = nm, .position = NULL, .velocity = NULL, .forces = NULL
+      .n = nm, .position = NULL, .velocity = NULL, .forces = NULL, .measure = NULL
     };
 
     mesh_str.position = (vertex_t*)calloc(nm, sizeof(vertex_t));
     mesh_str.velocity = (vertex_t*)calloc(nm, sizeof(vertex_t));
     mesh_str.forces = (vertex_t*)calloc(nm, sizeof(vertex_t));
+    mesh_str.measure = (double*)calloc(nm, sizeof(double));
 
     for (int i = 0; i < nm; ++i) {
       mesh_str.position[i].x = position[i].x;
@@ -148,6 +156,7 @@ extern "C"
       mesh_str.forces[i].x = forces[i].x;
       mesh_str.forces[i].y = forces[i].y;
       mesh_str.forces[i].z = forces[i].z;
+      mesh_str.measure[i] = measures[i];
     }
 
     return mesh_str;

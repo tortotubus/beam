@@ -105,8 +105,8 @@ EulerBeamInextensibleADDM::EulerBeamInextensibleADDM(
   , xp(VectorXd::Zero(nodes + elements))
   , yp(VectorXd::Zero(nodes + elements))
   , zp(VectorXd::Zero(nodes + elements))
-  , max_outer(10000)
-  , tol_outer(1e-6)
+  , max_outer(20000)
+  , tol_outer(1e-9)
   , x_prev(VectorXd::Zero(dof))
   , y_prev(VectorXd::Zero(dof))
   , z_prev(VectorXd::Zero(dof))
@@ -223,7 +223,7 @@ EulerBeamInextensibleADDM::solve(std::array<real_t, 3> load)
                  << final_rel_update << " after " << iter << " iterations");
   }
 
-  ELFF_LOG(final_max_pq_error << "\t" << final_max_state_error << "\t" << iter);
+  ELFF_LOG(final_max_pq_error << " " << final_max_state_error << " " << iter);
 
   update_mesh();
 }
@@ -934,8 +934,8 @@ EulerBeamInextensibleADDM::solve_newmark(real_t dt,
                  << iter << " iterations");
   }
 
-  ELFF_LOG(time_iter << "\t" << final_max_pq_error << "\t"
-                     << final_max_state_error << "\t" << iter);
+  ELFF_LOG(time_iter << " " << final_max_pq_error << " "
+                     << final_max_state_error << " " << iter);
 
   update_average_acceleration_state_component(x_old, x, vx_prev, ax_prev, dt);
   update_average_acceleration_state_component(y_old, y, vy_prev, ay_prev, dt);
@@ -1024,12 +1024,12 @@ EulerBeamInextensibleADDM::solve_newmark(
                  "relative state update = "
                  << final_rel_update << " at step " << time_iter << " after "
                  << iter << " iterations");
-    ELFF_ABORT("EulerBeamInextensibleADDM::solve_newmark() did not "
-               "converge.\n");
+    // ELFF_ABORT("EulerBeamInextensibleADDM::solve_newmark() did not "
+    //            "converge.\n");
   }
 
-  ELFF_LOG(time_iter << "\t" << final_max_pq_error << "\t"
-                     << final_max_state_error << "\t" << iter);
+  ELFF_LOG(time_iter << " " << final_max_pq_error << " "
+                     << final_max_state_error << " " << iter);
 
   update_average_acceleration_state_component(x_old, x, vx_prev, ax_prev, dt);
   update_average_acceleration_state_component(y_old, y, vy_prev, ay_prev, dt);

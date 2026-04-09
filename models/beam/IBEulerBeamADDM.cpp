@@ -58,6 +58,14 @@ IBEulerBeamADDM::IBEulerBeamADDM(real_t length,
   : EulerBeamInextensibleADDM(length, EI, mu, nodes, bcs, r_penalty)
   , IBForceCoupled(nodes)
 {
+  const size_t beam_nodes = EulerBeam::mesh.get_nodes();
+  const real_t ds = EulerBeam::mesh.get_ds();
+  std::vector<real_t> measures(beam_nodes, ds);
+  if (beam_nodes > 1) {
+    measures.front() *= 0.5;
+    measures.back() *= 0.5;
+  }
+  SetNodalMeasures(measures);
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }

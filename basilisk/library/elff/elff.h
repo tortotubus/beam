@@ -41,10 +41,13 @@ trace void elff_fc_sync (void* ctx, void* mesh) {
 
   for (int ni = 0; ni < ib_nodes_count; ni++) {
     IBNode* node = ib_nodes[ni];
+    const double nodal_measure =
+      elff_mesh.measure ? elff_mesh.measure[ni] : 1.0;
     foreach_dimension () {
       ibval (npos.x) = elff_mesh.position[ni].x;
       ibval (nvel.x) = elff_mesh.velocity[ni].x;
     }
+    ibval (nweight) = nodal_measure;
   }
 
   ib_mesh_free (&elff_mesh);
@@ -74,10 +77,13 @@ trace void elff_fc_advance (void* ctx, void* mesh, double dt) {
 
   for (int ni = 0; ni < ib_nodes_count; ni++) {
     IBNode* node = ib_nodes[ni];
+    const double nodal_measure =
+      elff_mesh.measure ? elff_mesh.measure[ni] : 1.0;
     foreach_dimension () {
       ibval (npos.x) = elff_mesh.position[ni].x;
       ibval (nvel.x) = elff_mesh.velocity[ni].x;
     }
+    ibval (nweight) = nodal_measure;
   }
 
   free (forces);
