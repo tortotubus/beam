@@ -5,6 +5,7 @@ function(elff_basilisk_add_executable SOURCE_FILE)
   file(GLOB_RECURSE basilisk_headers
     CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/basilisk/*.h"
+    "${CMAKE_SOURCE_DIR}/basilisk/templates/*.c"
   )
 
   add_custom_command(

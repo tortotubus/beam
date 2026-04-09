@@ -1,5 +1,4 @@
 #include "library/io/params/params-txt.h"
- 
 
 typedef struct InputFileCLIOptions {
   const char* program_name;
@@ -8,8 +7,7 @@ typedef struct InputFileCLIOptions {
   int had_error;
 } InputFileCLIOptions;
 
-static inline void
-input_file_cli_options_init (InputFileCLIOptions* opts) {
+static inline void input_file_cli_options_init (InputFileCLIOptions* opts) {
   if (!opts)
     return;
   opts->program_name = "program";
@@ -18,20 +16,30 @@ input_file_cli_options_init (InputFileCLIOptions* opts) {
   opts->had_error = 0;
 }
 
-static inline void
-input_file_print_help (const char* program_name, FILE* out) {
+static inline void input_file_print_help (const char* program_name, FILE* out) {
   if (!out)
     return;
   if (!program_name || !program_name[0])
     program_name = "program";
 
-  fprintf (out, "Usage: %s [--help|-h] [input-file]\n", program_name);
-  fprintf (out, "\n");
-  fprintf (out, "Arguments:\n");
-  fprintf (out, "  input-file    Optional params file in [group] key = value format.\n");
-  fprintf (out, "\n");
-  fprintf (out, "Options:\n");
-  fprintf (out, "  -h, --help    Show this help and exit.\n");
+  if (pid () == 0) {
+    fprintf (out, "Usage: %s [--help|-h] [input-file]\n", program_name);
+    fprintf (out, "\n");
+    fprintf (out, "Arguments:\n");
+    fprintf (out,
+             "  input-file    Optional params file in [group] key = value format.\n");
+    fprintf (out, "\n");
+    fprintf (out, "Options:\n");
+    fprintf (out, "  -h, --help    Show this help and exit.\n");
+    fprintf (out, "\n");
+    fprintf (out, "Info:\n");
+    fprintf (out, "  %s\n", GRIDNAME);
+#if _MPI
+    fprintf (out, "  MPI\n");
+#else
+    fprintf (out, "  Serial\n");
+#endif
+  }
 }
 
 /**
@@ -51,20 +59,20 @@ input_file_print_help (const char* program_name, FILE* out) {
  */
 static inline int
 input_file_parse_cli_args (int argc, char** argv, InputFileCLIOptions* opts) {
+
   if (!opts) {
-    fprintf (stderr, "params-cli: options pointer is NULL\n");
+    fprintf (stderr, "%s: options pointer is NULL\n", opts->program_name);
     return -1;
   }
   input_file_cli_options_init (opts);
+  if (argc > 0 && argv[0] && argv[0][0] != '\0')
+    opts->program_name = argv[0];
 
   if (!argv || argc < 0) {
-    fprintf (stderr, "params-cli: invalid argv/argc\n");
+    fprintf (stderr, "%s: invalid argv/argc\n", opts->program_name);
     opts->had_error = 1;
     return -1;
   }
-
-  if (argc > 0 && argv[0] && argv[0][0] != '\0')
-    opts->program_name = argv[0];
 
   int start = argc > 0 ? 1 : 0;
   for (int i = start; i < argc; i++) {
@@ -78,7 +86,7 @@ input_file_parse_cli_args (int argc, char** argv, InputFileCLIOptions* opts) {
     }
 
     if (arg[0] == '-') {
-      fprintf (stderr, "params-cli: unrecognized option '%s'\n", arg);
+      fprintf (stderr, "%s: unrecognized option '%s'\n", opts->program_name, arg);
       opts->had_error = 1;
       return -1;
     }
@@ -86,7 +94,10 @@ input_file_parse_cli_args (int argc, char** argv, InputFileCLIOptions* opts) {
     if (!opts->input_path) {
       opts->input_path = arg;
     } else {
-      fprintf (stderr, "params-cli: unexpected extra positional argument '%s'\n", arg);
+      fprintf (stderr,
+               "%s: unexpected extra positional argument '%s'\n",
+               opts->program_name,
+               arg);
       opts->had_error = 1;
       return -1;
     }
@@ -101,8 +112,7 @@ input_file_parse_cli_args (int argc, char** argv, InputFileCLIOptions* opts) {
  *
  * @return 0 on success/no-op, 1 if help printed, -1 on error.
  */
-static inline int
-input_file_parse_cli (int argc, char** argv) {
+static inline int input_file_parse_cli (int argc, char** argv) {
   InputFileCLIOptions opts;
   if (input_file_parse_cli_args (argc, argv, &opts) != 0)
     return -1;
@@ -114,7 +124,7 @@ input_file_parse_cli (int argc, char** argv) {
 
   if (opts.input_path) {
     if (input_file_parse (opts.input_path) != 0) {
-      fprintf (stderr, "params-cli: failed to parse '%s'\n", opts.input_path);
+      fprintf (stderr, "%s: failed to parse '%s'\n", opts.program_name, opts.input_path);
       return -1;
     }
   }

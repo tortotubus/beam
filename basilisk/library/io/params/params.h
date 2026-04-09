@@ -1,4 +1,4 @@
- 
+
 
 /* Type definitions */
 
@@ -42,17 +42,18 @@ InputFile input_file = {0};
 /**
  * @define register_option
  */
-#define input_file_register_option(group_name, option_name, type_name) \
-  _input_file_register_option((group_name), #option_name, (void*) &(option_name), (type_name))
+#define input_file_register_option(group_name, option_name, type_name)                   \
+  _input_file_register_option (                                                          \
+    (group_name), #option_name, (void*) &(option_name), (type_name))
 
 /* Function Declarations */
 
 void input_file_free ();
 void _input_file_register_group (const char* group_name);
 void _input_file_register_option (const char* group_name,
-                                 const char* option_name,
-                                 void* value_ptr,
-                                 ParamValueType option_value_type);
+                                  const char* option_name,
+                                  void* value_ptr,
+                                  ParamValueType option_value_type);
 int input_file_apply_option (const char* group_name, const char* option_name);
 int input_file_apply_options ();
 void input_file_print_options ();
@@ -86,8 +87,7 @@ void input_file_free () {
       free (g->option_names[oi]);
       g->option_names[oi] = NULL;
 
-      if (!g->option_values[oi].unset &&
-          g->option_values[oi].type == 3) {
+      if (!g->option_values[oi].unset && g->option_values[oi].type == 3) {
         free (g->option_values[oi].as.s);
       }
       g->option_values[oi].as.s = NULL;
@@ -144,9 +144,9 @@ void _input_file_register_group (const char* group_name) {
  * @note The group name will be automatically created if it does not exist
  */
 void _input_file_register_option (const char* group_name,
-                                 const char* option_name,
-                                 void* value_ptr,
-                                 ParamValueType option_value_type) {
+                                  const char* option_name,
+                                  void* value_ptr,
+                                  ParamValueType option_value_type) {
   if (!group_name || !option_name)
     return;
 
@@ -279,24 +279,47 @@ static int _input_group_find_option (const InputGroup* group, const char* option
 /**
  * @brief Prints proccessed options
  */
-void input_file_print_options() {
-  printf ("Processed options:\n");
-  for (int gi = 0; gi < input_file.input_group_count; gi++) {
-    InputGroup* g = &input_file.input_groups[gi];
-    printf ("[%s]\n", g->group_name ? g->group_name : "(null)");
+void input_file_print_options () {
+  if (pid () == 0) {
+    printf ("Processed options:\n");
+    for (int gi = 0; gi < input_file.input_group_count; gi++) {
+      InputGroup* g = &input_file.input_groups[gi];
+      printf ("[%s]\n", g->group_name ? g->group_name : "(null)");
 
-    for (int oi = 0; oi < g->option_count; oi++) {
-      const char* option_name =
-        g->option_names[oi] ? g->option_names[oi] : "(null)";
-      ParamValue* v = &g->option_values[oi];
+      for (int oi = 0; oi < g->option_count; oi++) {
+        const char* option_name = g->option_names[oi] ? g->option_names[oi] : "(null)";
+        ParamValue* v = &g->option_values[oi];
 
-      printf ("  %s = ", option_name);
-      if (v->unset) {
-        printf ("<unset>\n");
-        continue;
-      }
+        printf ("  %s = ", option_name);
+        if (v->unset) {
+          if (!v->ptr) {
+            printf ("<unset>\n");
+            continue;
+          }
 
-      switch (v->type) {
+          switch (v->type) {
+          case 0:
+            printf ("%ld <default>\n", *((long*) v->ptr));
+            break;
+          case 1:
+            printf ("%g <default>\n", *((double*) v->ptr));
+            break;
+          case 2:
+            printf ("%s <default>\n", *((bool*) v->ptr) ? "true" : "false");
+            break;
+          case 3: {
+            char* s = *((char**) v->ptr);
+            printf ("%s <default>\n", s ? s : "(null)");
+            break;
+          }
+          default:
+            printf ("<unknown-type>\n");
+            break;
+          }
+          continue;
+        }
+
+        switch (v->type) {
         case 0:
           printf ("%ld\n", v->as.i);
           break;
@@ -312,6 +335,7 @@ void input_file_print_options() {
         default:
           printf ("<unknown-type>\n");
           break;
+        }
       }
     }
   }
