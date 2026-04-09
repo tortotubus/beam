@@ -1,9 +1,12 @@
+
 #include "grid/quadtree.h" 
 #include "library/ibm/IBMeshManager.h"
-#include "library/ibm/navier-stokes/unserious/centered-split-rich.h"
+#include "library/ibm/navier-stokes/centered-mdf.h"
 #include "library/elff/elff.h"
 #include "library/ibm/IBOutput.h"
 #include "library/io/output-vtk.h"
+
+#define basenamestr "mpi_huang_two_fibres_Re300_Mu0001_T0003_d3"
 
 #define L_fluid 16.
 #define maxlevel 10
@@ -11,21 +14,21 @@
 #define ibmlevel 11
 #define h_fluid (L_fluid / (1 << maxlevel))
 
-#define huang_Re 200.
+#define huang_Re 300.
 #define huang_gamma 0.001
 #define huang_Fr 0.5
 #define huang_rho 1.5
 
+#define b_d 0.15
 #define b_length 1.
 #define b_EI huang_gamma
 #define b_mu huang_rho
-#define b_nodes ((int)65)               //((b_length / b_ds) + 1.))
-#define b_ds (b_length / (b_nodes - 1)) // (2. * h_fluid)
+#define b_nodes ((int)65)               
+#define b_ds (b_length / (b_nodes - 1)) 
 #define b_r 1e3
 #define b_theta (0.1 * pi)
 #define b_gravity (b_mu * huang_Fr)
 
-#define basenamestr "mpi_huang_Re200_Mu001_T0003"
 
 face vector muv[];
 int Reynolds = huang_Re;
@@ -41,6 +44,7 @@ main()
   display_control(Reynolds, 10, 1000);
   DT = 0.0003;
 
+  install_shutdown_handlers();
   run();
 }
 
@@ -62,10 +66,13 @@ pf[right] = dirichlet(0.);
 event
 init(i = 0)
 {
-  int m_id = ibmeshmanager_add_mesh();
-  IBMeshModel beam_model =
-    elff_euler_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta);
-  ibmeshmanager_set_model(m_id, beam_model);
+  int m_id1 = ibmeshmanager_add_mesh();
+  IBMeshModel beam_model1 = elff_euler_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta, {0.,b_d,0.});
+  ibmeshmanager_set_model(m_id1, beam_model1);
+
+  int m_id2 = ibmeshmanager_add_mesh();
+  IBMeshModel beam_model2 = elff_euler_beam_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta, {0.,-b_d,0.});
+  ibmeshmanager_set_model(m_id2, beam_model2);
 
   foreach_ibnode_per_ibmesh()
   {
@@ -93,30 +100,32 @@ logfile(i++) {
 event
 statsfile(i++)
 {
-  double x_tip = 0.;
-  double y_tip = 0.;
+  double x_tip[2];
+  double y_tip[2];
+
+  foreach_ibmesh()
   {
-    IBNode* node = ibmm.pool.active.ptrs[0];
-    x_tip = ibval(npos.y);
-    y_tip = ibval(npos.y);
+    IBNode* node = mesh->nodes.ptrs[0];
+    x_tip[mesh_id] = ibval(npos.x);
+    y_tip[mesh_id] = ibval(npos.y);
   }
 
   if (pid() == 0) {
     FILE *fp = NULL;
     create_path(basenamestr);
     char fname[4096];
-    snprintf(fname, sizeof(fname), "%s/tip.txt", basenamestr);
+    snprintf(fname, sizeof(fname), "%s/tips.txt", basenamestr);
     fp = fopen(fname, "a");
-    fprintf(fp, "%d %g %g %g\n", i, t, x_tip, y_tip);
+    fprintf(fp, "%d %g %g %g %g %g\n", i, t, x_tip[0], y_tip[0], x_tip[1], y_tip[1]);
+    fprintf(stderr, "[basilisk] %d %g %g %g %g %g\n", i, t, x_tip[0], y_tip[0], x_tip[1], y_tip[1]);
     fclose(fp);
   }
 }
 
-scalar omega[];
-
 event
 output(t += 0.05; t <= 50)
 {
+  scalar omega[];
   vorticity(u, omega);
 #if TREE
   output_hdf_htg({omega,p}, {u,ibmf}, basenamestr);
@@ -125,6 +134,7 @@ output(t += 0.05; t <= 50)
 #endif
   output_hdf_pd(NULL, (IBvector[]){eulvel, nforce, nvel, {{-1}}}, basenamestr);
 }
+
 
 #if TREE
 event

@@ -2,7 +2,7 @@
 // #include "grid/multigrid.h"
 
 #include "library/ibm/IBMeshManager.h"
-#include "library/ibm/navier-stokes/unserious/centered-split-rich.h"
+#include "library/ibm/navier-stokes/centered-mdf.h"
 #include "tracer.h"
 #include "library/io/output-vtk.h"
 #include "library/io/output-dump.h"
