@@ -99,6 +99,7 @@ set(ELFF_DIRS
   io/CXX 
   models/beam
   models/ibm 
+  models/rigidbody
   mpi 
   fem
 )
