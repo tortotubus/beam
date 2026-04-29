@@ -6,7 +6,8 @@ namespace ELFF {
 namespace Models {
 
 /**
- * @brief Solid sphere rigid body with a Fibonacci-sphere surface discretization.
+ * @brief Solid sphere rigid body with a Fibonacci-sphere surface
+ * discretization.
  *
  * Reference markers are generated on a sphere of radius \f( R \f) centered at
  * the origin \f( \mathbf{x}_{\mathrm{cog,ref}} = \mathbf{0} \f). The nodal
@@ -33,12 +34,16 @@ public:
   real_t density() const { return density_; }
 
 protected:
-  void define_reference_configuration(std::vector<Vec3>& points_ref,
-                                      std::vector<real_t>& ds,
-                                      Vec3& cog_ref,
-                                      std::vector<Vec3>& normals_ref) const override;
+  void define_reference_configuration(
+    std::vector<Vec3>& points_ref,
+    std::vector<real_t>& ds,
+    Vec3& cog_ref,
+    std::vector<Vec3>& normals_ref) const override;
 
   void define_mass_properties(real_t& mass, Mat3& I_body) const override;
+  Vec3 angular_momentum_rhs_body(const Vec3& tau_body,
+                                 const Vec3& omega_body,
+                                 const Vec3& L_body) const override;
 
 private:
   real_t radius_;

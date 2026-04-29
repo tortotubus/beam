@@ -1,9 +1,9 @@
-#include "elff/models/rigidbody/RigidBodyFromReference.hpp"
+#include "elff/models/rigidbody/RigidBody3DFromReference.hpp"
 
 namespace ELFF {
 namespace Models {
 
-RigidBodyFromReference::RigidBodyFromReference(
+RigidBody3DFromReference::RigidBody3DFromReference(
   const std::vector<Vec3>& points_ref,
   const std::vector<real_t>& ds,
   const Vec3& cog_ref,
@@ -21,7 +21,7 @@ RigidBodyFromReference::RigidBodyFromReference(
 }
 
 void
-RigidBodyFromReference::define_reference_configuration(
+RigidBody3DFromReference::define_reference_configuration(
   std::vector<Vec3>& points_ref,
   std::vector<real_t>& ds,
   Vec3& cog_ref,
@@ -34,7 +34,8 @@ RigidBodyFromReference::define_reference_configuration(
 }
 
 void
-RigidBodyFromReference::define_mass_properties(real_t& mass, Mat3& I_body) const
+RigidBody3DFromReference::define_mass_properties(real_t& mass,
+                                                 Mat3& I_body) const
 {
   mass = mass_;
   I_body = I_body_;

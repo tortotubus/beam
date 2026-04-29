@@ -1,37 +1,29 @@
+#include "elff/models/rigidbody/RigidBody2DFromReference.hpp"
 #include "elff/general/error.hpp"
-#include "elff/models/rigidbody/RigidBody3DFromReference.hpp"
 
 #include <cmath>
 #include <gtest/gtest.h>
+
+#include <vector>
 
 namespace ELFF {
 namespace Models {
 namespace {
 
-using Vec3 = RigidBody3DModel::Vec3;
-using Mat3 = RigidBody3DModel::Mat3;
+using Vec3 = RigidBodyModel::Vec3;
 
-class TestRigidBody : public RigidBody3DFromReference
+class TestRigidBody2DFromReference : public RigidBody2DFromReference
 {
 public:
-  using RigidBody3DFromReference::RigidBody3DFromReference;
+  using RigidBody2DFromReference::RigidBody2DFromReference;
 
-  void set_state(const Vec3& x,
-                 const Vec3& v,
-                 const std::array<real_t, 4>& q,
-                 const Vec3& w)
+  void set_state(const Vec3& x, const Vec3& v, real_t theta, real_t omega_z)
   {
-    set_initial_state(x, v, q, w);
+    set_initial_state(x, v, theta, omega_z);
   }
 };
 
-Mat3
-diagonal_inertia(real_t ixx, real_t iyy, real_t izz)
-{
-  return { { { ixx, 0., 0. }, { 0., iyy, 0. }, { 0., 0., izz } } };
-}
-
-TEST(RigidBody3DMeshTest, RejectsInvalidDS)
+TEST(RigidBody2DMeshTest, RejectsInvalidDS)
 {
   std::vector<Vec3> points = { { 0., 0., 0. }, { 1., 0., 0. } };
   std::vector<real_t> ds_bad = { 1., -1. };
@@ -39,35 +31,26 @@ TEST(RigidBody3DMeshTest, RejectsInvalidDS)
 
 #ifdef ELFF_USE_EXCEPTIONS
   ELFF::set_error_action(ELFF::ELFF_ERROR_THROW);
-  EXPECT_ANY_THROW({
-    (void)RigidBody3DFromReference(
-      points, ds_bad, cog, 1., diagonal_inertia(1., 1., 1.));
-  });
+  EXPECT_ANY_THROW({ (void)RigidBody2DFromReference(points, ds_bad, cog, 1., 1.); });
 #else
-  EXPECT_DEATH(
-    {
-      (void)RigidBody3DFromReference(
-        points, ds_bad, cog, 1., diagonal_inertia(1., 1., 1.));
-    },
-    "DS entries must be positive");
+  EXPECT_DEATH({ (void)RigidBody2DFromReference(points, ds_bad, cog, 1., 1.); },
+               "DS entries must be positive");
 #endif
 }
 
-TEST(RigidBody3DMeshTest, TransformIdentityAndRotation)
+TEST(RigidBody2DMeshTest, TransformIdentityAndRotation)
 {
   std::vector<Vec3> points = { { 1., 0., 0. }, { 0., 1., 0. } };
   std::vector<real_t> ds = { 1., 1. };
   Vec3 cog = { 0., 0., 0. };
 
-  TestRigidBody rb(points, ds, cog, 1., diagonal_inertia(1., 1., 1.));
+  TestRigidBody2DFromReference rb(points, ds, cog, 1., 1.);
 
   const auto& p0 = rb.mesh().world_points()[0];
   EXPECT_NEAR(p0[0], 1., 1e-12);
   EXPECT_NEAR(p0[1], 0., 1e-12);
 
-  const real_t c = std::sqrt(0.5);
-  rb.set_state(
-    { 0., 0., 0. }, { 0., 0., 0. }, { c, 0., 0., c }, { 0., 0., 0. });
+  rb.set_state({ 0., 0., 0. }, { 0., 0., 0. }, std::acos(-1.) / 2., 0.);
 
   const auto& r0 = rb.mesh().world_points()[0];
   EXPECT_NEAR(r0[0], 0., 1e-12);
@@ -75,13 +58,13 @@ TEST(RigidBody3DMeshTest, TransformIdentityAndRotation)
   EXPECT_NEAR(r0[2], 0., 1e-12);
 }
 
-TEST(RigidBody3DIntegrationTest, UniformTractionSymmetry)
+TEST(RigidBody2DIntegrationTest, UniformTractionSymmetry)
 {
   std::vector<Vec3> points = { { 1., 0., 0. }, { -1., 0., 0. } };
   std::vector<real_t> ds = { 1., 1. };
+  const Vec3 cog = { 0., 0., 0. };
 
-  RigidBody3DFromReference rb(
-    points, ds, { 0., 0., 0. }, 1., diagonal_inertia(1., 1., 1.));
+  RigidBody2DFromReference rb(points, ds, cog, 1., 1.);
 
   std::vector<Vec3> traction = { { 2., 3., 0. }, { 2., 3., 0. } };
 
@@ -98,13 +81,13 @@ TEST(RigidBody3DIntegrationTest, UniformTractionSymmetry)
   EXPECT_NEAR(T[2], 0., 1e-12);
 }
 
-TEST(RigidBody3DIntegrationTest, PureCoupleTorque)
+TEST(RigidBody2DIntegrationTest, PureCoupleTorque)
 {
   std::vector<Vec3> points = { { 1., 0., 0. }, { -1., 0., 0. } };
   std::vector<real_t> ds = { 1., 1. };
+  const Vec3 cog = { 0., 0., 0. };
 
-  RigidBody3DFromReference rb(
-    points, ds, { 0., 0., 0. }, 1., diagonal_inertia(1., 1., 1.));
+  RigidBody2DFromReference rb(points, ds, cog, 2., 4.);
 
   std::vector<Vec3> traction = { { 0., 1., 0. }, { 0., -1., 0. } };
 
@@ -121,42 +104,36 @@ TEST(RigidBody3DIntegrationTest, PureCoupleTorque)
   EXPECT_NEAR(T[2], 2., 1e-12);
 }
 
-TEST(RigidBody3DDynamicsTest, ZeroTractionPreservesLinearAndAngularMomentum)
+TEST(RigidBody2DDynamicsTest, ZeroTractionPreservesLinearAndAngularMomentum)
 {
   std::vector<Vec3> points = { { 0., 0., 0. } };
   std::vector<real_t> ds = { 1. };
 
-  TestRigidBody rb(
-    points, ds, { 0., 0., 0. }, 2., diagonal_inertia(1., 1., 1.));
-  rb.set_state({ 1., 2., 3. },
-               { 0.5, -0.25, 0.75 },
-               { 1., 0., 0., 0. },
-               { 0.1, 0.2, 0.3 });
+  TestRigidBody2DFromReference rb(points, ds, { 0., 0., 0. }, 2., 3.);
+  rb.set_state({ 1., 2., 3. }, { 0.5, -0.25, 0.75 }, 0.2, 0.3);
 
-  const Vec3 L0 = rb.angular_momentum_body();
   const Vec3 v0 = rb.com_velocity();
+  const real_t Lz0 = rb.angular_momentum_z();
 
   rb.step(0.1, std::vector<Vec3>{ { 0., 0., 0. } });
 
-  const Vec3 L1 = rb.angular_momentum_body();
   const Vec3 v1 = rb.com_velocity();
+  const real_t Lz1 = rb.angular_momentum_z();
 
   EXPECT_NEAR(v1[0], v0[0], 1e-12);
   EXPECT_NEAR(v1[1], v0[1], 1e-12);
   EXPECT_NEAR(v1[2], v0[2], 1e-12);
 
-  EXPECT_NEAR(L1[0], L0[0], 1e-12);
-  EXPECT_NEAR(L1[1], L0[1], 1e-12);
-  EXPECT_NEAR(L1[2], L0[2], 1e-12);
+  EXPECT_NEAR(Lz1, Lz0, 1e-12);
 }
 
-TEST(RigidBody3DDynamicsTest, ConstantTractionAcceleratesCOM)
+TEST(RigidBody2DDynamicsTest, ConstantTractionAcceleratesCOM)
 {
   std::vector<Vec3> points = { { 0., 0., 0. } };
   std::vector<real_t> ds = { 2. };
+  const Vec3 cog = { 0., 0., 0. };
 
-  RigidBody3DFromReference rb(
-    points, ds, { 0., 0., 0. }, 4., diagonal_inertia(1., 1., 1.));
+  RigidBody2DFromReference rb(points, ds, cog, 4., 1.);
 
   rb.step(0.2, std::vector<Vec3>{ { 1., 0., 0. } });
 
@@ -172,13 +149,12 @@ TEST(RigidBody3DDynamicsTest, ConstantTractionAcceleratesCOM)
   EXPECT_NEAR(x[2], 0., 1e-12);
 }
 
-TEST(RigidBody3DContractTest, OrderingIsStable)
+TEST(RigidBody2DContractTest, OrderingIsStable)
 {
   std::vector<Vec3> points = { { 0., 0., 0. }, { 1., 0., 0. }, { 2., 0., 0. } };
   std::vector<real_t> ds = { 0.5, 1.0, 1.5 };
 
-  RigidBody3DFromReference rb(
-    points, ds, { 0., 0., 0. }, 1., diagonal_inertia(1., 1., 1.));
+  RigidBody2DFromReference rb(points, ds, { 0., 0., 0. }, 1., 1.);
 
   const auto& ref = rb.mesh().reference_points();
   const auto& world = rb.mesh().world_points();

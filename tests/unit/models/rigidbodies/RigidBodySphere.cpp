@@ -88,7 +88,7 @@ TEST(RigidBodySphereTest, PlotMeshWithGnuplot)
     GTEST_SKIP() << "no DISPLAY/WAYLAND_DISPLAY available for qt terminal";
   }
 
-  RigidBodySphere sphere(1.0, 300, 1.0);
+  RigidBodySphere sphere(1.0, 1000, 1.0);
   const auto& pts = sphere.mesh().reference_points();
 
   FILE* pipe = popen("gnuplot -persist", "w");

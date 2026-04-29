@@ -40,11 +40,26 @@ InputFile input_file = {0};
 /* Macros */
 
 /**
- * @define register_option
+ * @def input_file_register_option
  */
-#define input_file_register_option(group_name, option_name, type_name)                   \
+#define input_file_register_option(group_name, option_variable, type_name)               \
   _input_file_register_option (                                                          \
-    (group_name), #option_name, (void*) &(option_name), (type_name))
+    (group_name), #option_variable, (void*) &(option_variable), (type_name))
+
+/**
+ * @def input_file_register_option_named
+ * @param group_name (string) The group name
+ * @param option_name (string) The option name
+ * @param option_variable (int, double, bool, or string) The variable holding the option
+ * value
+ * @param type_name (ParamValueType) The data type of the option value
+ *
+ * @note The option_variable is automatically cast to a void pointer
+ */
+#define input_file_register_option_named(                                                \
+  group_name, option_name, option_variable, type_name)                                   \
+  _input_file_register_option (                                                          \
+    (group_name), option_name, (void*) &(option_variable), (type_name))
 
 /* Function Declarations */
 
