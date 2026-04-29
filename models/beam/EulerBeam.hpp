@@ -24,8 +24,7 @@ namespace Models {
  * - Spatial discretization (mesh)
  * - Dimension (2D or 3D)
  */
-class EulerBeam
-{
+class EulerBeam {
 public:
   /**
    * @brief Boundary-condition types for Euler–Bernoulli / elastica beams.
@@ -40,8 +39,7 @@ public:
    * @see EulerBeamBC for how these are carried with magnitudes/locations.
    * @memberof EulerBeamBCs
    */
-  typedef enum
-  {
+  typedef enum {
     free_bc,
     simple_bc,
     clamped_bc,
@@ -59,8 +57,7 @@ public:
    *
    * @memberof EulerBeamBCs
    */
-  typedef enum
-  {
+  typedef enum {
     left,
     right,
   } EulerBeamBCEnd;
@@ -75,8 +72,7 @@ public:
    *
    * @memberof EulerBeamBCs
    */
-  typedef struct
-  {
+  typedef struct {
     double position[3];
     double slope[3];
     double force[3];
@@ -91,31 +87,45 @@ public:
    * @see EulerBeamBCType for the type of boundary conditions supported.
    * @memberof EulerBeam
    */
-  typedef struct
-  {
+  typedef struct {
     EulerBeamBCEnd end[2];
     EulerBeamBCType type[2];
     EulerBeamBCVals vals[2];
   } EulerBeamBCs;
 
   /**
-   * @brief Denotes the type of loading applied to the beam at nodes. In
-   * particular, we support uniform (spatially invariant) loads represented as
-   * constants as well as nonuniform (spatially depdendent) loads at the nodes.
-   *
-   * For more details, see the solve() methods in EulerBeam base class.
+   * @brief Boundary values for time-dependent boundary conditions including
+   * imposed values and kinematic data
    */
-  typedef enum
-  {
-    INVALID = -1,
-    NONE,
-    UNIFORM,
-    NONUNIFORM,
-    // UNIFORM_TIME_INDEPENDENT,
-    // NONUNIFORM_TIME_INDEPENDENT,
-    // UNIFORM_TIME_DEPENDENT,
-    // NONUNIFORM_TIME_DEPENDENT,
-  } EulerBeamLoadType;
+  typedef struct {
+    std::vector<std::array<real_t, 3>> position_history;
+    std::vector<std::array<real_t, 3>> slope_history;
+    std::vector<std::array<real_t, 3>> force_history;
+    std::vector<std::array<real_t, 3>> torque_history;
+    std::vector<std::array<real_t, 3>> velocity_history;
+    std::vector<std::array<real_t, 3>> acceleration_history;
+  } EulerBeamBoundaryHistory;
+
+  /**
+   * @brief The boundary condition struct contains user-supplied time-dependent
+   * boundary conditions to be applied to the problem solved.
+   *
+   * The normal structs are used for current time boundary conditions, and
+   * historical values are kept in the history member. Derived classes will
+   * impose the number of historical time-steps required at each time step,
+   * compare this to time_zero_idx, and throw errors if this is not satisfied.
+   * If solve() is called and runs out of prescribed values, errors will also be
+   * thrown.
+   *
+   * @see EulerBeamBCType for the type of boundary conditions supported.
+   * @memberof EulerBeam
+   */
+  typedef struct {
+    EulerBeamBCEnd end[2];
+    EulerBeamBCType type[2];
+    EulerBeamBoundaryHistory history[2];
+    size_t time_zero_idx;
+  } EulerBeamTimeDependentBCs;
 
   /**
    * @brief Solves the beam problem with no external loading.
@@ -171,6 +181,17 @@ public:
                      std::vector<std::array<real_t, 3>> nonuniform_load);
 
   /**
+   * @brief Updates the beam boundary conditions.
+   *
+   * Derived classes may override this to refresh any cached operators or time
+   * integration history tied to constrained degrees of freedom.
+   *
+   * @param bcs New boundary conditions to apply
+   */
+  virtual void
+  set_time_dependent_boundary_conditions(EulerBeamTimeDependentBCs bcs);
+
+  /**
    * @brief Applies initial conditions to the beam mesh.
    *
    * Derived classes must implement this method to set the initial
@@ -178,29 +199,14 @@ public:
    *
    * @param mesh The beam mesh to initialize
    */
-  virtual void apply_initial_condition(EulerBeamMesh& mesh) = 0;
-
-  /**
-   * @brief Plots the current beam configuration using gnuplot.
-   *
-   * Creates a visualization of the beam's centerline with default title.
-   */
-  virtual void plot();
-
-  /**
-   * @brief Plots the current beam configuration using gnuplot with custom
-   * title.
-   *
-   * @param title The title to display on the plot
-   */
-  virtual void plot(std::string title);
+  virtual void apply_initial_condition(EulerBeamMesh &mesh) = 0;
 
   /**
    * @brief Gets a mutable reference to the beam mesh.
    *
    * @return Reference to the EulerBeamMesh object containing the beam geometry
    */
-  virtual EulerBeamMesh& get_mesh();
+  virtual EulerBeamMesh &get_mesh();
 
   /**
    * @brief Gets a const reference to the beam mesh.
@@ -208,7 +214,7 @@ public:
    * @return Const reference to the EulerBeamMesh object containing the beam
    * geometry
    */
-  virtual const EulerBeamMesh& get_mesh() const;
+  virtual const EulerBeamMesh &get_mesh() const;
 
 protected:
   bool is_time_dependent;
@@ -222,6 +228,8 @@ protected:
 
   EulerBeamMesh mesh;
   EulerBeamBCs boundary_conditions;
+  EulerBeamTimeDependentBCs time_dependent_boundary_conditions;
+  bool have_time_dependent_boundary_conditions;
 
   /**
    * @brief Default constructor for static 3D beam.
@@ -254,8 +262,23 @@ protected:
    * @param nodes Number of nodes in the discretization
    * @param bcs Boundary conditions at both ends
    */
-  EulerBeam(real_t length, real_t EI, real_t mu, size_t nodes, EulerBeamBCs bcs);
+  EulerBeam(real_t length, real_t EI, real_t mu, size_t nodes,
+            EulerBeamBCs bcs);
+
+/**
+ * @brief Constructor for dynamic 3D beam with custom parameters and
+ * time-dependent boundary conditions
+ *
+ * @param length The length of the beam
+ * @param EI The flexural rigidity
+ * @param mu Mass per unit length
+ * @param nodes Number of nodes in the discretization
+ * @param bcs Boundary conditions at both ends
+ */
+ EulerBeam(real_t length, real_t EI, real_t mu, size_t nodes,
+                     EulerBeamTimeDependentBCs bcs);
+
 };
 
 } // namespace Models
-} // namespace ELFF 
+} // namespace ELFF

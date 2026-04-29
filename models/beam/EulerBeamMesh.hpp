@@ -32,6 +32,7 @@ protected:
 
   std::vector<std::array<real_t, 3>> centerline, slope;
   std::vector<std::array<real_t, 3>> centerline_velocity;
+  std::vector<std::array<real_t, 3>> centerline_acceleration;
 
 public:
   /**
@@ -48,6 +49,8 @@ public:
    * @param length Physical length L of the centerline.
    */
   EulerBeamMesh(size_t nodes, real_t length);
+
+  EulerBeamMesh() : EulerBeamMesh(40, 1) {};
 
   /**
    * @brief Returns a reference to the entire centerline \f(\{\vec{r}_0,
@@ -99,6 +102,18 @@ public:
   inline std::vector<std::array<real_t, 3>>& get_centerline_velocity()
   {
     return centerline_velocity;
+  }
+
+  /**
+   * @brief Returns a reference to the entire centerline velocity
+   * \f(\{\ddot{\vec{r}}_0,
+   * \dots,\ddot{\vec{r}}_n\}\f).
+   *
+   * @return Reference to the vector of centerline accelerations
+   */
+  inline std::vector<std::array<real_t, 3>>& get_centerline_acceleration()
+  {
+    return centerline_acceleration;
   }
 
   /**

@@ -12,6 +12,7 @@ EulerBeamMesh::EulerBeamMesh(size_t nodes, real_t length)
   , centerline(nodes)
   , slope(nodes)
   , centerline_velocity(nodes)
+  , centerline_acceleration(nodes)
 {
   set_curvilinear_axis();
   set_centerline_x_axis_aligned();
@@ -33,7 +34,7 @@ EulerBeamMesh::plot_gnuplot(std::string title)
   fprintf(pipe, "set grid\n");
   fprintf(pipe, "set size square\n");
   fprintf(pipe,
-          "plot '-' using 1:2 with lines title 'beam' smooth csplines\n");
+          "plot '-' using 1:2 with lines title 'beam'\n");
 
   // Send the data points
   for (size_t i = 0; i < centerline.size(); ++i) {
