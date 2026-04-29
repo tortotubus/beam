@@ -53,6 +53,9 @@
               criterion
               gnuplot_qt
             ];
+            shellHook = ''
+              export GCOV="gcov -i"
+            '';
           };
         });
 

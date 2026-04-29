@@ -173,6 +173,37 @@ set_target_properties(ELFF PROPERTIES
 )
 
 #
+# Coverage instrumentation
+#
+if (ELFF_USE_COVERAGE)
+  if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    message(FATAL_ERROR
+      "ELFF_USE_COVERAGE requires a GNU or Clang compiler. "
+      "Detected CXX compiler: ${CMAKE_CXX_COMPILER_ID}"
+    )
+  endif()
+
+  if (CMAKE_CONFIGURATION_TYPES)
+    message(WARNING
+      "ELFF_USE_COVERAGE is ON. Prefer running tests with a Debug configuration "
+      "for meaningful line coverage."
+    )
+  elseif (NOT CMAKE_BUILD_TYPE MATCHES "^[Dd]ebug$")
+    message(WARNING
+      "ELFF_USE_COVERAGE is ON with CMAKE_BUILD_TYPE='${CMAKE_BUILD_TYPE}'. "
+      "Coverage is typically most useful in Debug builds."
+    )
+  endif()
+
+  target_compile_options(ELFF PUBLIC --coverage)
+  if (CMAKE_VERSION VERSION_LESS 3.13)
+    target_link_libraries(ELFF PUBLIC --coverage)
+  else()
+    target_link_options(ELFF PUBLIC --coverage)
+  endif()
+endif()
+
+#
 # OpenMP
 #
 if (ELFF_USE_OPENMP)

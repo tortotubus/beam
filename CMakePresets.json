@@ -29,7 +29,8 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug",
         "ELFF_BUILD_DOC": "On",
-        "ELFF_BUILD_TESTS": "On"
+        "ELFF_BUILD_TESTS": "On",
+        "ELFF_USE_COVERAGE": "On"
       }
     },
     {
