@@ -1,0 +1,13 @@
+*
+!.gitignore
+!*.tex
+!*.bib
+!header
+!figure
+!figure/**/
+!figure/gnuplot/*.csv
+!figure/gnuplot/*.gp
+figure/vector/*.pdf
+figure/vector/*.tex
+!CMakeLists.txt
+!.latexindent.yaml

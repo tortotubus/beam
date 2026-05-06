@@ -92,6 +92,13 @@ public:
                      std::vector<std::array<real_t, 3>> load) override;
 
   /**
+   * @brief Advance one step with a nodal load that is already averaged over
+   * the Newmark time interval.
+   */
+  void solve_averaged_load(
+      real_t dt, const std::vector<std::array<real_t, 3>> &averaged_load);
+
+  /**
    * @brief
    */
   void solve_newmark(real_t dt, std::array<real_t, 3> load, real_t beta,
@@ -102,6 +109,13 @@ public:
    */
   void solve_newmark(real_t dt, std::vector<std::array<real_t, 3>> load,
                      real_t beta, real_t gamma);
+
+  /**
+   * @brief
+   */
+  void solve_newmark_averaged_load(
+      real_t dt, const std::vector<std::array<real_t, 3>> &averaged_load,
+      real_t beta, real_t gamma);
 
   /**
    * @brief
@@ -189,7 +203,7 @@ protected:
   VectorXd ax_prev;
   VectorXd ay_prev;
   VectorXd az_prev;
-  VectorXd mass_diag;
+  SparseMatrix<real_t> mass_matrix;
   std::array<real_t, 3> load_prev;
   std::vector<std::array<real_t, 3>> nodal_load_prev;
   bool have_prev_uniform_load;
@@ -352,6 +366,12 @@ protected:
   void
   assemble_system_newmark_rhs(const std::vector<std::array<real_t, 3>> &load,
                               real_t dt);
+
+  /**
+   * @brief
+   */
+  void assemble_system_newmark_rhs_averaged(
+      const std::vector<std::array<real_t, 3>> &averaged_load, real_t dt);
 
   /**
    * @brief

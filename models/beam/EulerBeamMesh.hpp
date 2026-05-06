@@ -33,6 +33,8 @@ protected:
   std::vector<std::array<real_t, 3>> centerline, slope;
   std::vector<std::array<real_t, 3>> centerline_velocity;
   std::vector<std::array<real_t, 3>> centerline_acceleration;
+  std::vector<std::array<real_t, 3>> slope_velocity;
+  std::vector<std::array<real_t, 3>> slope_acceleration;
 
 public:
   /**
@@ -117,6 +119,28 @@ public:
   }
 
   /**
+   * @brief Returns a reference to the entire slope velocity
+   * \f(\{\partial_t \vec{r}'_0, \dots, \partial_t \vec{r}'_n\}\f).
+   *
+   * @return Reference to the vector of slope velocities
+   */
+  inline std::vector<std::array<real_t, 3>>& get_slope_velocity()
+  {
+    return slope_velocity;
+  }
+
+  /**
+   * @brief Returns a reference to the entire slope acceleration
+   * \f(\{\partial_{tt} \vec{r}'_0, \dots, \partial_{tt} \vec{r}'_n\}\f).
+   *
+   * @return Reference to the vector of slope accelerations
+   */
+  inline std::vector<std::array<real_t, 3>>& get_slope_acceleration()
+  {
+    return slope_acceleration;
+  }
+
+  /**
    * @brief Returns one vector \f(\dot{\vec{r}}_i\f) contained in the centerline
    * velocity.
    *
@@ -126,6 +150,30 @@ public:
   inline std::array<real_t, 3>& get_centerline_velocity(size_t i)
   {
     return centerline_velocity[i];
+  }
+
+  /**
+   * @brief Returns one vector \f(\partial_t \vec{r}'_i\f) contained in the
+   * slope velocity.
+   *
+   * @param i Index of the requested slope velocity (0..nodes-1)
+   * @return Reference to the 3-component slope velocity
+   */
+  inline std::array<real_t, 3>& get_slope_velocity(size_t i)
+  {
+    return slope_velocity[i];
+  }
+
+  /**
+   * @brief Returns one vector \f(\partial_{tt} \vec{r}'_i\f) contained in the
+   * slope acceleration.
+   *
+   * @param i Index of the requested slope acceleration (0..nodes-1)
+   * @return Reference to the 3-component slope acceleration
+   */
+  inline std::array<real_t, 3>& get_slope_acceleration(size_t i)
+  {
+    return slope_acceleration[i];
   }
 
   /**

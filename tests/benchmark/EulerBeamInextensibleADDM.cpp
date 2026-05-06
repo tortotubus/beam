@@ -1,6 +1,9 @@
 #include <cmath>
+#include <cstdio>
+
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
 #include <elff/models/beam/EulerBeamInextensibleADDM.hpp>
+#include <elff/models/beam/EulerBeamInextensibleADDMTestHarness.hpp>
 #include <elff/models/beam/EulerBeamInextensibleMoM.hpp>
 
 #include <fstream>
@@ -16,50 +19,73 @@ namespace ELFF {
 using namespace IO::CXX;
 using namespace Models;
 
-std::vector<real_t> logspace(double xmin, double xmax, std::size_t N)
-{
-    std::vector<real_t> values;
-    values.reserve(N);
+std::vector<real_t> logspace(double xmin, double xmax, std::size_t N) {
+  std::vector<real_t> values;
+  values.reserve(N);
 
-    if (N == 0) {
-        return values;
-    }
-
-    if (N == 1) {
-        values.push_back(xmin);
-        return values;
-    }
-
-    const real_t log_min = std::log10(xmin);
-    const real_t log_max = std::log10(xmax);
-
-    for (std::size_t i = 0; i < N; ++i) {
-        const real_t theta = static_cast<real_t>(i) / static_cast<real_t>(N - 1);
-        const real_t exponent = (1.0 - theta) * log_min + theta * log_max;
-        values.push_back(std::pow(10.0, exponent));
-    }
-
+  if (N == 0) {
     return values;
+  }
+
+  if (N == 1) {
+    values.push_back(xmin);
+    return values;
+  }
+
+  const real_t log_min = std::log10(xmin);
+  const real_t log_max = std::log10(xmax);
+
+  for (std::size_t i = 0; i < N; ++i) {
+    const real_t theta = static_cast<real_t>(i) / static_cast<real_t>(N - 1);
+    const real_t exponent = (1.0 - theta) * log_min + theta * log_max;
+    values.push_back(std::pow(10.0, exponent));
+  }
+
+  return values;
 }
 
 TEST(EulerBeamInextensibleADDMTest, NonlinearMMF1) {
 
-  std::ofstream csv("mmf1_addm.csv");
+  std::string csv_filename = "addm-nonlinear-convergence.csv";
+  std::string tex_filename = "addm-nonlinear-convergence.tex";
+  std::string gp_filename = "addm-nonlinear-convergence.gp";
+  std::string filename = "addm-nonlinear-convergence.vtkhdf";
+
+  std::ofstream gp(gp_filename);
+
+  gp << "if (!exists(\"csv_file\")) csv_file = \"" << csv_filename << "\"\n";
+  gp << "if (!exists(\"plot_output\")) plot_output = \"../vector/"
+     << tex_filename << "\"\n";
+
+  gp << R"gnuplot(
+set datafile separator comma
+set terminal cairolatex pdf size 4.8in,3.2in color colortext font ",10"
+set output plot_output
+)gnuplot";
+
+  gp << R"gnuplot(
+set xlabel "$\\log{(1/\\Delta t)}$"
+set ylabel "$\\log{\\lVert \\vec x(T) - \\vec x_h(T)\\rVert}$"
+set grid
+set key outside right 
+plot)gnuplot";
+
+  std::ofstream csv(csv_filename);
   csv << std::setprecision(16);
   csv << "dt,epsilon,L2_error,log_inv_dt,log_error\n";
 
-  std::vector<real_t> stopping_tolerances = {5e-4, 1e-4, 5e-5, 1e-5, 5e-6, 1e-6, 5e-7, 1e-7};
-  std::vector<real_t> dt_values = {0.2, 0.1, 0.05, 0.025, 0.0125, 0.00625};
-
+  std::vector<real_t> stopping_tolerances = {1e-7, 1e-8, 1e-9};
+  // std::vector<real_t> dt_values = {0.2, 0.1, 0.05, 0.025, 0.0125, 0.00625};
+  std::vector<real_t> dt_values = logspace(0.00625, 0.05, 10);
 
   real_t length = M_PI_2;
-  size_t nodes = 241;
+  size_t nodes = 451;
   EulerBeamMesh mmf_mesh(nodes, length);
   real_t ds = mmf_mesh.get_ds();
 
   real_t EI = 1.;
   real_t mu = 1.;
-  real_t r_penalty = 1e2;
+  real_t r_penalty = 1e3;
   real_t tf = 1.0;
 
   int time_history_required = 3;
@@ -76,12 +102,17 @@ TEST(EulerBeamInextensibleADDMTest, NonlinearMMF1) {
       std::vector<std::array<real_t, 3>> slope_history_l;
       std::vector<std::array<real_t, 3>> velocity_history_l;
       std::vector<std::array<real_t, 3>> acceleration_history_l;
+      std::vector<std::array<real_t, 3>> slope_velocity_history_l;
+      std::vector<std::array<real_t, 3>> slope_acceleration_history_l;
 
       std::vector<std::array<real_t, 3>> position_history_r;
       std::vector<std::array<real_t, 3>> slope_history_r;
       std::vector<std::array<real_t, 3>> velocity_history_r;
       std::vector<std::array<real_t, 3>> acceleration_history_r;
+      std::vector<std::array<real_t, 3>> slope_velocity_history_r;
+      std::vector<std::array<real_t, 3>> slope_acceleration_history_r;
 
+      // real_t epsilon = stopping_tolerances[tol_idx] * std::pow(dt,2);
       real_t epsilon = stopping_tolerances[tol_idx];
 
       for (int time_idx = -time_history_required + 1; time_idx <= Nt;
@@ -93,46 +124,91 @@ TEST(EulerBeamInextensibleADDMTest, NonlinearMMF1) {
         auto &current_acceleration = mmf_mesh.get_centerline_acceleration();
         size_t l_idx = 0;
         size_t r_idx = mmf_mesh.get_nodes() - 1;
+        const real_t s_left = mmf_mesh.get_curvilinear_axis(l_idx);
+        const real_t s_right = mmf_mesh.get_curvilinear_axis(r_idx);
         position_history_l.push_back(current_position[l_idx]);
         slope_history_l.push_back(current_slope[l_idx]);
         velocity_history_l.push_back(current_velocity[l_idx]);
         acceleration_history_l.push_back(current_acceleration[l_idx]);
+        slope_velocity_history_l.push_back(
+            ManufacturedDynamicResult1SlopeVelocity(s_left, time_idx * dt));
+        slope_acceleration_history_l.push_back(
+            ManufacturedDynamicResult1SlopeAcceleration(s_left, time_idx * dt));
         position_history_r.push_back(current_position[r_idx]);
         slope_history_r.push_back(current_slope[r_idx]);
         velocity_history_r.push_back(current_velocity[r_idx]);
         acceleration_history_r.push_back(current_acceleration[r_idx]);
+        slope_velocity_history_r.push_back(
+            ManufacturedDynamicResult1SlopeVelocity(s_right, time_idx * dt));
+        slope_acceleration_history_r.push_back(
+            ManufacturedDynamicResult1SlopeAcceleration(s_right,
+                                                        time_idx * dt));
       }
 
-      EulerBeam::EulerBeamTimeDependentBCs bcs = {
+      EulerBeam::EulerBeamTimeDependentBCs bcs_time_dependent = {
           .end = {EulerBeam::left, EulerBeam::right},
           .type = {EulerBeam::clamped_bc, EulerBeam::clamped_bc},
           .history = {{.position_history = position_history_l,
                        .slope_history = slope_history_l,
                        .velocity_history = velocity_history_l,
-                       .acceleration_history = acceleration_history_l},
+                       .acceleration_history = acceleration_history_l,
+                       .slope_velocity_history = slope_velocity_history_l,
+                       .slope_acceleration_history =
+                           slope_acceleration_history_l},
                       {.position_history = position_history_r,
                        .slope_history = slope_history_r,
                        .velocity_history = velocity_history_r,
-                       .acceleration_history = acceleration_history_r}},
+                       .acceleration_history = acceleration_history_r,
+                       .slope_velocity_history = slope_velocity_history_r,
+                       .slope_acceleration_history =
+                           slope_acceleration_history_r}},
           .time_zero_idx = static_cast<size_t>(time_history_required - 1),
       };
 
+      // EulerBeam::EulerBeamBCs bcs_static = {
+      //   .end = {EulerBeam::left, EulerBeam::right},
+      //   .type = {EulerBeam::clamped_bc, EulerBeam::free_bc},
+      //   .vals = {
+      //     {
+      //       .slope = slope_history_l[2],
+      //       .position = position_history_l[2],
+      //     } , {}
+      //   }
+      // };
+
       mmf_mesh = ManufacturedDynamicResult1(nodes, 0.0);
-      EulerBeamInextensibleADDM beam(length, EI, mu, nodes, bcs, r_penalty);
+      EulerBeamInextensibleADDMTestHarness beam(length, EI, mu, nodes,
+                                                bcs_time_dependent, r_penalty);
 
       beam.apply_initial_condition(mmf_mesh);
 
-      beam.set_outer_relaxation(1.);
+      beam.set_outer_relaxation(1.0);
       beam.set_outer_tolerance(epsilon);
-      beam.set_outer_iter_max(200);
+      beam.set_outer_iter_max(30000);
 
       ELFF_LOG("Epsilon = " << epsilon << ", dt = " << dt);
 
       for (int time_idx = 0; time_idx < Nt; time_idx++) {
-        beam.solve(dt);
+        const auto linear_old = ManufacturedDynamicResult1LinearLoad(
+            static_cast<int>(nodes), time_idx * dt, EI, mu);
+        const auto linear_new = ManufacturedDynamicResult1LinearLoad(
+            static_cast<int>(nodes), (time_idx + 1) * dt, EI, mu);
+        const auto nonlinear_new = ManufacturedDynamicResult1NonlinearLoad(
+            static_cast<int>(nodes), (time_idx + 1) * dt, EI, mu);
+
+        std::vector<std::array<real_t, 3>> desired_averaged_load(nodes);
+        for (size_t i = 0; i < nodes; ++i) {
+          for (size_t d = 0; d < 3; ++d) {
+            const real_t internal_new = nonlinear_new[i][d] - linear_new[i][d];
+            desired_averaged_load[i][d] =
+                0.5 * (linear_old[i][d] + linear_new[i][d]) + internal_new;
+          }
+        }
+
+        beam.solve_averaged_load(dt, desired_averaged_load);
       }
 
-      mmf_mesh = ManufacturedDynamicResult1(nodes, tf);
+      mmf_mesh = ManufacturedDynamicResult1(nodes, Nt * dt);
       real_t err2 = 0.;
       const auto &xh = beam.get_mesh().get_centerline();
       const auto &xex = mmf_mesh.get_centerline();
@@ -147,39 +223,190 @@ TEST(EulerBeamInextensibleADDMTest, NonlinearMMF1) {
         err2 += w * (dx * dx + dy * dy);
       }
 
-      csv << dt << "," << epsilon << "," << std::sqrt(err2) << ","
-          << std::log10(1.0 / dt) << "," << std::log10(std::sqrt(err2)) << "\n";
+      csv << dt << "," << stopping_tolerances[tol_idx] << "," << std::sqrt(err2)
+          << "," << std::log10(1.0 / dt) << "," << std::log10(std::sqrt(err2))
+          << "\n";
     }
+    gp << " \\\n\tcsv_file every ::1 using ($2 == "
+       << stopping_tolerances[tol_idx]
+       << " ? $4 : 1/0):5 with linespoints title \"$\\\\epsilon = "
+       << stopping_tolerances[tol_idx] << "$\",";
   }
 
   csv.close();
+  gp.close();
+}
 
+TEST(EulerBeamInextensibleADDMTest, LinearMMF1) {
 
-  std::ofstream gp("plot_mmf1_addm.gp");
+  std::string csv_filename = "addm-linear-convergence.csv";
+  std::string tex_filename = "addm-linear-convergence.tex";
+  std::string gp_filename = "addm-linear-convergence.gp";
+  std::string filename = "addm-linear-convergence.vtkhdf";
+
+  std::ofstream gp(gp_filename);
+
+  gp << "if (!exists(\"csv_file\")) csv_file = \"" << csv_filename << "\"\n";
+  gp << "if (!exists(\"plot_output\")) plot_output = \"../vector/"
+     << tex_filename << "\"\n";
 
   gp << R"gnuplot(
-  set datafile separator comma
-  set terminal pngcairo size 1000,750 enhanced font "Arial,14"
-  set output "mmf1_addm.png"
+set datafile separator comma
+set terminal cairolatex pdf size 4.8in,3.2in color colortext font ",10"
+set output plot_output
+)gnuplot";
 
-  set title "Convergence rate in time"
-  set xlabel "log(1/Delta t)"
-  set ylabel "log(||x(T) - x_h(T)||)"
+  gp << R"gnuplot(
+set xlabel "$\\log{(1/\\Delta t)}$"
+set ylabel "$\\log{\\lVert \\vec x(T) - \\vec x_h(T)\\rVert}$"
+set grid
+set key off 
+plot)gnuplot";
 
-  set grid
-  set key outside right
-  set border linewidth 1.2
+  std::ofstream csv(csv_filename);
+  csv << std::setprecision(16);
+  csv << "dt,epsilon,L2_error,log_inv_dt,log_error\n";
 
-  plot \
-      "mmf1_addm.csv" every ::1 using ($2 == 1e-4 ? $4 : 1/0):5 with linespoints title "epsilon = 1e-4", \
-      "mmf1_addm.csv" every ::1 using ($2 == 5e-5 ? $4 : 1/0):5 with linespoints title "epsilon = 5e-5", \
-      "mmf1_addm.csv" every ::1 using ($2 == 1e-5 ? $4 : 1/0):5 with linespoints title "epsilon = 1e-5", \
-      "mmf1_addm.csv" every ::1 using ($2 == 5e-6 ? $4 : 1/0):5 with linespoints title "epsilon = 5e-6", \
-      "mmf1_addm.csv" every ::1 using ($2 == 1e-6 ? $4 : 1/0):5 with linespoints title "epsilon = 1e-6", \
-      "mmf1_addm.csv" every ::1 using ($2 == 5e-7 ? $4 : 1/0):5 with linespoints title "epsilon = 5e-7", \
-      "mmf1_addm.csv" every ::1 using ($2 == 1e-7 ? $4 : 1/0):5 with linespoints title "epsilon = 1e-7"
-  )gnuplot";
+  real_t stopping_tolerance = 1e-1;
+  // std::vector<real_t> dt_values = logspace(.2, .00625, 6);
+  std::vector<real_t> dt_values = logspace(0.00625, 0.05, 10);
 
+  real_t length = M_PI_2;
+  size_t nodes = 451;
+  EulerBeamMesh mmf_mesh(nodes, length);
+  real_t ds = mmf_mesh.get_ds();
+
+  real_t EI = 1.;
+  real_t mu = 1.;
+  real_t r_penalty = 1;
+  real_t tf = 1.0;
+
+  int time_history_required = 3;
+
+  std::vector<real_t> error_measure;
+
+  for (int dt_idx = 0; dt_idx < dt_values.size(); dt_idx++) {
+    real_t dt = dt_values[dt_idx];
+    int Nt = static_cast<int>(std::ceil(tf / dt));
+
+    std::vector<std::array<real_t, 3>> position_history_l;
+    std::vector<std::array<real_t, 3>> slope_history_l;
+    std::vector<std::array<real_t, 3>> velocity_history_l;
+    std::vector<std::array<real_t, 3>> acceleration_history_l;
+    std::vector<std::array<real_t, 3>> slope_velocity_history_l;
+    std::vector<std::array<real_t, 3>> slope_acceleration_history_l;
+
+    std::vector<std::array<real_t, 3>> position_history_r;
+    std::vector<std::array<real_t, 3>> slope_history_r;
+    std::vector<std::array<real_t, 3>> velocity_history_r;
+    std::vector<std::array<real_t, 3>> acceleration_history_r;
+    std::vector<std::array<real_t, 3>> slope_velocity_history_r;
+    std::vector<std::array<real_t, 3>> slope_acceleration_history_r;
+
+    // real_t epsilon = stopping_tolerances[tol_idx] * std::pow(dt,2);
+    real_t epsilon = stopping_tolerance;
+
+    for (int time_idx = -time_history_required + 1; time_idx <= Nt;
+         time_idx++) {
+      mmf_mesh = ManufacturedDynamicResult1(nodes, time_idx * dt);
+      auto &current_position = mmf_mesh.get_centerline();
+      auto &current_slope = mmf_mesh.get_slope();
+      auto &current_velocity = mmf_mesh.get_centerline_velocity();
+      auto &current_acceleration = mmf_mesh.get_centerline_acceleration();
+      size_t l_idx = 0;
+      size_t r_idx = mmf_mesh.get_nodes() - 1;
+      const real_t s_left = mmf_mesh.get_curvilinear_axis(l_idx);
+      const real_t s_right = mmf_mesh.get_curvilinear_axis(r_idx);
+      position_history_l.push_back(current_position[l_idx]);
+      slope_history_l.push_back(current_slope[l_idx]);
+      velocity_history_l.push_back(current_velocity[l_idx]);
+      acceleration_history_l.push_back(current_acceleration[l_idx]);
+      slope_velocity_history_l.push_back(
+          ManufacturedDynamicResult1SlopeVelocity(s_left, time_idx * dt));
+      slope_acceleration_history_l.push_back(
+          ManufacturedDynamicResult1SlopeAcceleration(s_left, time_idx * dt));
+      position_history_r.push_back(current_position[r_idx]);
+      slope_history_r.push_back(current_slope[r_idx]);
+      velocity_history_r.push_back(current_velocity[r_idx]);
+      acceleration_history_r.push_back(current_acceleration[r_idx]);
+      slope_velocity_history_r.push_back(
+          ManufacturedDynamicResult1SlopeVelocity(s_right, time_idx * dt));
+      slope_acceleration_history_r.push_back(
+          ManufacturedDynamicResult1SlopeAcceleration(s_right, time_idx * dt));
+    }
+
+    EulerBeam::EulerBeamTimeDependentBCs bcs_time_dependent = {
+        .end = {EulerBeam::left, EulerBeam::right},
+        .type = {EulerBeam::clamped_bc, EulerBeam::clamped_bc},
+        .history = {{.position_history = position_history_l,
+                     .slope_history = slope_history_l,
+                     .velocity_history = velocity_history_l,
+                     .acceleration_history = acceleration_history_l,
+                     .slope_velocity_history = slope_velocity_history_l,
+                     .slope_acceleration_history =
+                         slope_acceleration_history_l},
+                    {.position_history = position_history_r,
+                     .slope_history = slope_history_r,
+                     .velocity_history = velocity_history_r,
+                     .acceleration_history = acceleration_history_r,
+                     .slope_velocity_history = slope_velocity_history_r,
+                     .slope_acceleration_history =
+                         slope_acceleration_history_r}},
+        .time_zero_idx = static_cast<size_t>(time_history_required - 1),
+    };
+ 
+
+    mmf_mesh = ManufacturedDynamicResult1(nodes, 0.0);
+    EulerBeamInextensibleADDMTestHarness beam(length, EI, mu, nodes,
+                                              bcs_time_dependent, r_penalty);
+
+    beam.apply_initial_condition(mmf_mesh);
+
+    beam.set_outer_relaxation(1.);
+    beam.set_outer_tolerance(epsilon);
+    beam.set_outer_iter_max(30000);
+
+    ELFF_LOG("Epsilon = " << epsilon << ", dt = " << dt);
+
+    for (int time_idx = 0; time_idx < Nt; time_idx++) {
+      const auto linear_old = ManufacturedDynamicResult1LinearLoad(
+          static_cast<int>(nodes), time_idx * dt, EI, mu);
+      const auto linear_new = ManufacturedDynamicResult1LinearLoad(
+          static_cast<int>(nodes), (time_idx + 1) * dt, EI, mu);
+
+      std::vector<std::array<real_t, 3>> averaged_load(nodes);
+      for (size_t i = 0; i < nodes; ++i) {
+        for (size_t d = 0; d < 3; ++d) {
+          averaged_load[i][d] = 0.5 * (linear_old[i][d] + linear_new[i][d]);
+        }
+      }
+
+      beam.solve_linear(dt, averaged_load);
+    }
+
+    mmf_mesh = ManufacturedDynamicResult1(nodes, Nt * dt);
+    real_t err2 = 0.;
+    const auto &xh = beam.get_mesh().get_centerline();
+    const auto &xex = mmf_mesh.get_centerline();
+
+    for (size_t node_idx = 0; node_idx < nodes; ++node_idx) {
+      real_t w = ds;
+      if (node_idx == 0 || node_idx == nodes - 1) {
+        w *= .5;
+      }
+      const real_t dx = xh[node_idx][0] - xex[node_idx][0];
+      const real_t dy = xh[node_idx][1] - xex[node_idx][1];
+      err2 += w * (dx * dx + dy * dy);
+    }
+
+    csv << dt << "," << stopping_tolerance << "," << std::sqrt(err2)
+        << "," << std::log10(1.0 / dt) << "," << std::log10(std::sqrt(err2))
+        << "\n";
+  }
+
+  gp << " \\\n\tcsv_file every ::1 using 4:5 with linespoints";
+
+  csv.close();
   gp.close();
 }
 

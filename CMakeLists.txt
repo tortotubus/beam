@@ -93,6 +93,7 @@ set(ELFF_DIRS
   c/general
   c/models/beam
   c/models/ibm
+  c/models/rigidbody
   config 
   general 
   io/C
@@ -276,14 +277,7 @@ endif()
 # Documentation
 #
 if (ELFF_BUILD_DOC)
-  find_package(Doxygen)
-  if (DOXYGEN_FOUND)
-      add_custom_target(docs ALL
-          ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile
-          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-          COMMENT "Generating API documentation with Doxygen"
-          VERBATIM)
-  endif()
+  add_subdirectory(docs)
 endif()
 
 #

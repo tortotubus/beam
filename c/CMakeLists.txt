@@ -4,6 +4,7 @@ list(APPEND SRCS
   models/ibm/IBMesh.cpp
   models/ibm/IBVelocityCoupled.cpp
   models/ibm/IBRuntime.cpp
+  models/rigidbody/IBRigidBody.cpp
 )
 
 list(APPEND HDRS 
@@ -12,6 +13,7 @@ list(APPEND HDRS
   models/ibm/IBMesh.h
   models/ibm/IBVelocityCoupled.h
   models/ibm/IBRuntime.h
+  models/rigidbody/IBRigidBody.h
 )
 
 convert_filenames_to_full_paths(SRCS)

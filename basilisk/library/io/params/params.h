@@ -237,7 +237,7 @@ int input_file_apply_option (const char* group_name, const char* option_name) {
 
   switch (v->type) {
   case 0:
-    *((long*) v->ptr) = v->as.i;
+    *((int*) v->ptr) = (int) v->as.i;
     return 0;
   case 1:
     *((double*) v->ptr) = v->as.d;
@@ -314,7 +314,7 @@ void input_file_print_options () {
 
           switch (v->type) {
           case 0:
-            printf ("%ld <default>\n", *((long*) v->ptr));
+            printf ("%d <default>\n", *((int*) v->ptr));
             break;
           case 1:
             printf ("%g <default>\n", *((double*) v->ptr));

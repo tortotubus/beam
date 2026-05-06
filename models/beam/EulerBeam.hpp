@@ -104,6 +104,8 @@ public:
     std::vector<std::array<real_t, 3>> torque_history;
     std::vector<std::array<real_t, 3>> velocity_history;
     std::vector<std::array<real_t, 3>> acceleration_history;
+    std::vector<std::array<real_t, 3>> slope_velocity_history;
+    std::vector<std::array<real_t, 3>> slope_acceleration_history;
   } EulerBeamBoundaryHistory;
 
   /**

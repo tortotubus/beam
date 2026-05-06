@@ -1,0 +1,23 @@
+set(THESIS_SOURCE_VECTOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vector")
+set(THESIS_BINARY_VECTOR_DIR "${CMAKE_CURRENT_BINARY_DIR}/vector")
+
+add_subdirectory(gnuplot)
+
+set(THESIS_GENERATED_FIGURES
+  ${THESIS_GNUPLOT_GENERATED_FIGURES}
+)
+set(THESIS_FIGURE_INPUTS
+  ${THESIS_GNUPLOT_INPUTS}
+)
+
+add_custom_target(thesis_figures)
+add_dependencies(thesis_figures thesis_gnuplot_figures)
+
+set(THESIS_GENERATED_FIGURES
+  ${THESIS_GENERATED_FIGURES}
+  PARENT_SCOPE
+)
+set(THESIS_FIGURE_INPUTS
+  ${THESIS_FIGURE_INPUTS}
+  PARENT_SCOPE
+)

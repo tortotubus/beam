@@ -1,0 +1,22 @@
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{derivative}
+\usepackage{mathtools}
+\usepackage{bm}
+
+% bold vector: keep arrow version as \arrowvec, redefine \vec to bold
+\let\arrowvec\vec
+\renewcommand{\vec}[1]{\mathbf{#1}}
+\newcommand{\mat}[1]{\mathbf{#1}}
+\newcommand{\tens}[1]{\mathbf{#1}}
+\newcommand{\cddot}{:}
+\newcommand{\transp}{\intercal}
+
+% norm macro
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\seminorm}[1]{\left| #1 \right|}
+\newcommand{\abs}[1]{\left| #1 \right|}
+
+\newcommand{\Reynolds}{{\text {Re}}}
+
+% Theorems
+\input{header/theorem}

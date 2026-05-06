@@ -45,6 +45,7 @@ protected:
   virtual void update_derived_state() = 0;
 
   void reset_time_integration_state();
+  void set_time_integration_state(real_t t, size_t time_iter);
   void set_mass(real_t mass);
   real_t mass() const { return mass_; }
 

@@ -3,6 +3,7 @@
   "direnv.restart.automatic": true,
   "direnv.watchForChanges": true,
   "editor.tabSize": 4,
+  "scm.repositories.selectionMode": "single",
   "github.copilot.nextEditSuggestions.enabled": false,
   "github.copilot.enable": {
     "*": false,
@@ -11,13 +12,31 @@
     "scminput": false
   }, 
   "[c]": {
-    "editor.defaultFormatter": "xaver.clang-format"
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
   },
   "[cpp]": {
-    "editor.defaultFormatter": "xaver.clang-format"
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
   },
   "cmake.debugConfig": {
     "miDebuggerPath": "/nix/store/n0cf9vad3va0js6606gcra8xhsnr0js7-gdb-16.3/bin/gdb"
   },
-  "cmake.ctestArgs": ["-V"]
+  "cmake.ctestArgs": [
+    "-V"
+  ],
+  "[latex]": {
+    "editor.defaultFormatter": "James-Yu.latex-workshop",
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file"
+  },
+  "latex-workshop.formatting.latex": "latexindent",
+  "latex-workshop.formatting.latexindent.args": [
+    "-c",
+    "%DIR%/",
+    "%TMPFILE%",
+    "-l=%DIR%/.latexindent.yaml",
+    "-m"
+  ],
+  "latex-workshop.intellisense.citation.backend": "biblatex",
+  "latex-workshop.latex.autoBuild.run": "onSave",
+  "latex-workshop.latex.autoClean.run": "onBuilt"
 }

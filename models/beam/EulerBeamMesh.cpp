@@ -13,6 +13,8 @@ EulerBeamMesh::EulerBeamMesh(size_t nodes, real_t length)
   , slope(nodes)
   , centerline_velocity(nodes)
   , centerline_acceleration(nodes)
+  , slope_velocity(nodes)
+  , slope_acceleration(nodes)
 {
   set_curvilinear_axis();
   set_centerline_x_axis_aligned();

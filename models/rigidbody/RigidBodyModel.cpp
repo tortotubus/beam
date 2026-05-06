@@ -84,6 +84,16 @@ RigidBodyModel::reset_time_integration_state()
 }
 
 void
+RigidBodyModel::set_time_integration_state(real_t t, size_t time_iter)
+{
+  ELFF_VERIFY(t >= 0.,
+              "RigidBodyModel::set_time_integration_state(): time must be "
+              "nonnegative.\n");
+  t_ = t;
+  time_iter_ = time_iter;
+}
+
+void
 RigidBodyModel::mark_initialized()
 {
   initialized_ = true;

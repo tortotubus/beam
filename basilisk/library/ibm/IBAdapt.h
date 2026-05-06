@@ -2,6 +2,12 @@
 #include "library/ibm/IBMacros.h"
 #include "library/ibm/IBLocate.h"
 
+#include "utils.h"
+
+// ============================================================================
+// Type definitions
+// ============================================================================
+
 struct Adapt2 {
   scalar* slist; // list of scalars
   double* max;   // tolerance for each scalar
@@ -9,27 +15,27 @@ struct Adapt2 {
   int minlevel;  // minimum level of refinement (default 1)
   scalar* list;  // list of fields to update (default all)
 };
- 
 
-astats adapt_wavelet_ibm (scalar* slist,
-                          double* max,
-                          int maxlevel,
-                          int minlevel = 1,
-                          scalar* list = all);
+// ============================================================================
+// Function declarations
+// ============================================================================
 
-astats adapt_wavelet2 (scalar* slist,
-                       double* max,
-                       int* maxlevel,
-                       int minlevel = 1,
-                       scalar* list = all);
+astats adapt_wavelet_ibm (
+  scalar* slist, double* max, int maxlevel, int minlevel = 1, scalar* list = all, bool init = false);
 
-astats adapt_wavelet_ibm (scalar* slist,
-                          double* max,
-                          int maxlevel,
-                          int minlevel = 1,
-                          scalar* list = all) {
-                            
-  scalar ib_noise_0[]; int iblevel_0 = 0;
+astats adapt_wavelet2 (
+  scalar* slist, double* max, int* maxlevel, int minlevel = 1, scalar* list = all);
+
+// ============================================================================
+// Function definitions
+// ============================================================================
+
+astats adapt_wavelet_ibm (
+  scalar* slist, double* max, int maxlevel, int minlevel = 1, scalar* list = all, bool init = false) {
+
+  astats st;
+  scalar ib_noise_0[];
+  int iblevel_0 = 0;
   // scalar ib_noise_1[]; int iblevel_1;
   // scalar ib_noise_2[]; int iblevel_2;
 
@@ -46,75 +52,92 @@ astats adapt_wavelet_ibm (scalar* slist,
   int* maxlevel_c = (int*) malloc ((size_t) n * sizeof (int));
   assert (max_c && maxlevel_c);
 
-  for (int i = 0; i < n - 1; i++) {
-    max_c[i] = max[i];
-    maxlevel_c[i] = maxlevel;
-  }
-  max_c[n - 1] = 1e-6;
-  maxlevel_c[n - 1] = iblevel_0;
+  int max_level_or_ibm = (iblevel_0 > maxlevel) ? iblevel_0 : maxlevel;
+  int max_iter = init ? max_level_or_ibm : 1;
 
-  foreach_cell () {
-    ib_noise_0[] = 0.;
-  }
-  boundary ({ib_noise_0});
+  minlevel = init ? grid->depth : minlevel;
 
-  foreach_ibnode_per_ibmesh () {
-    int r = PESKIN_SUPPORT_RADIUS;
-    double d = L0 / (1 << node->depth);
-#if dimension == 1
-    for (int i = -r; i <= r; i++) {
-      coord e = {pos.x + i * d, pos.y, pos.z};
-      coord_periodic_boundary (e);
-      Point point = locate_nonlocal (e.x, e.y, e.z);
-      int ig = 0, jg = 0, kg = 0;
-      NOT_UNUSED (ig);
-      NOT_UNUSED (jg);
-      NOT_UNUSED (kg);
-      if (point.level >= 0) {
-        double rd = sq (x - c.x);
-        ib_noise_0[] += exp (-rd / (2 * Delta));
-      }
+  for (int i = 0; i < max_iter; i++) {
+    for (int li = 0; li < n - 1; li++) {
+      max_c[li] = max[li];
+      maxlevel_c[li] = maxlevel;
     }
-#elif dimension == 2
-    for (int i = -r; i <= r; i++) {
-      for (int j = -r; j <= r; j++) {
-        coord e = {pos.x + i * d, pos.y + j * d, pos.z};
+
+    max_c[n - 1] = 1e-6;
+    maxlevel_c[n - 1] = iblevel_0;
+
+    foreach_cell () {
+      ib_noise_0[] = 0.;
+    }
+    boundary ({ib_noise_0});
+
+    foreach_ibnode_per_ibmesh () {
+      int r = PESKIN_SUPPORT_RADIUS;
+      double d = L0 / (1 << node->depth);
+#if dimension == 1
+      for (int i = -r; i <= r; i++) {
+        coord e = {pos.x + i * d, pos.y, pos.z};
         coord_periodic_boundary (e);
         Point point = locate_nonlocal (e.x, e.y, e.z);
         int ig = 0, jg = 0, kg = 0;
         NOT_UNUSED (ig);
         NOT_UNUSED (jg);
         NOT_UNUSED (kg);
-        POINT_VARIABLES ();
         if (point.level >= 0) {
-          double rd = sq (x - pos.x) + sq (y - pos.y);
+          double rd = sq (x - c.x);
           ib_noise_0[] += exp (-rd / (2 * Delta));
         }
       }
-    }
-#else
-    for (int i = -r; i <= r; i++) {
-      for (int j = -r; j <= r; j++) {
-        for (int k = -r; k <= r; k++) {
-          coord e = {pos.x + i * d, pos.y + j * d, pos.z + k * d};
+#elif dimension == 2
+      for (int i = -r; i <= r; i++) {
+        for (int j = -r; j <= r; j++) {
+          coord e = {pos.x + i * d, pos.y + j * d, pos.z};
           coord_periodic_boundary (e);
           Point point = locate_nonlocal (e.x, e.y, e.z);
           int ig = 0, jg = 0, kg = 0;
           NOT_UNUSED (ig);
           NOT_UNUSED (jg);
           NOT_UNUSED (kg);
+          POINT_VARIABLES ();
           if (point.level >= 0) {
-            double rd = sq (x - c.x) + sq (y - c.y) + sq (z - c.z);
+            double rd = sq (x - pos.x) + sq (y - pos.y);
             ib_noise_0[] += exp (-rd / (2 * Delta));
           }
         }
       }
-    }
+#else
+      for (int i = -r; i <= r; i++) {
+        for (int j = -r; j <= r; j++) {
+          for (int k = -r; k <= r; k++) {
+            coord e = {pos.x + i * d, pos.y + j * d, pos.z + k * d};
+            coord_periodic_boundary (e);
+            Point point = locate_nonlocal (e.x, e.y, e.z);
+            int ig = 0, jg = 0, kg = 0;
+            NOT_UNUSED (ig);
+            NOT_UNUSED (jg);
+            NOT_UNUSED (kg);
+            POINT_VARIABLES ();
+            if (point.level >= 0) {
+              double rd = sq (x - pos.x) + sq (y - pos.y) + sq (z - pos.z);
+              ib_noise_0[] += exp (-rd / (2 * Delta));
+            }
+          }
+        }
+      }
 #endif
-  }
-  boundary ({ib_noise_0});
+    }
+    boundary ({ib_noise_0});
 
-  astats st = adapt_wavelet2 (slist_c, max_c, maxlevel_c, minlevel, list);
+    // astats st_i = adapt_wavelet2 (slist_c, max_c, maxlevel_c, minlevel, list);
+    astats st_i = adapt_wavelet(slist_c, max_c, max_level_or_ibm, minlevel, list);
+
+    st.nc += st_i.nc;
+    st.nf += st_i.nf;
+
+    if (st_i.nf == 0) {
+      break;
+    }
+  }
 
   free (slist_c);
   free (max_c);
@@ -128,11 +151,8 @@ astats adapt_wavelet_ibm (scalar* slist,
   return st;
 }
 
-trace astats adapt_wavelet2 (scalar* slist,
-                             double* max,
-                             int* maxlevel,
-                             int minlevel = 1,
-                             scalar* list = all) {
+trace astats adapt_wavelet2 (
+  scalar* slist, double* max, int* maxlevel, int minlevel = 1, scalar* list = all) {
   scalar* ilist = list;
 
   if (is_constant (cm)) {

@@ -1,12 +1,12 @@
 PROJECT_NAME = "ELFF"
 PROJECT_BRIEF = "A C++ library for beam mechanics FSI"
-OUTPUT_DIRECTORY = docs
+OUTPUT_DIRECTORY = docs/doxygen
 CREATE_SUBDIRS = YES
 EXTRACT_ALL = YES
 EXTRACT_PRIVATE = YES
 INPUT = models/beam models/ibm models/spring modles/rigidbody mpi io general fem
 RECURSIVE = YES
-USE_MDFILE_AS_MAINPAGE = manual/index.md
+USE_MDFILE_AS_MAINPAGE = docs/manual/index.md
 GENERATE_LATEX = YES
 GENERATE_HTML = YES
 HTML_OUTPUT = html
@@ -31,4 +31,4 @@ TYPEDEF_HIDES_STRUCT = YES
 # LaTeX Configurations
 USE_MATHJAX = YES
 MATHJAX_EXTENSIONS = TeX/AMSmath TeX/AMSsymbols
-CITE_BIB_FILES = bibliography.bib
+CITE_BIB_FILES = docs/thesis/bibliography.bib

@@ -153,6 +153,10 @@ event init (i = 0) {
 
   dtmax = DT;
   event ("stability");
+
+#if TREE 
+  adapt_wavelet_ibm(NULL,NULL,0,1,all,true);
+#endif
 }
 
 event set_dtmax (i++, last) dtmax = DT;
