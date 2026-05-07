@@ -52,5 +52,10 @@ function(elff_basilisk_add_executable SOURCE_FILE)
     BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}"
     BUILD_RPATH "${CMAKE_BINARY_DIR}"
   )
+
+  install(TARGETS ${source_name}
+    RUNTIME DESTINATION ${ELFF_INSTALL_BINDIR}
+    COMPONENT ElFF_Runtime
+  )
 endfunction()
 
