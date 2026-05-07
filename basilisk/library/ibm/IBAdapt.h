@@ -33,7 +33,8 @@ astats adapt_wavelet2 (
 astats adapt_wavelet_ibm (
   scalar* slist, double* max, int maxlevel, int minlevel = 1, scalar* list = all, bool init = false) {
 
-  astats st;
+  bool list_is_all = (list == all);
+  astats st = {0, 0};
   scalar ib_noise_0[];
   int iblevel_0 = 0;
   // scalar ib_noise_1[]; int iblevel_1;
@@ -128,8 +129,10 @@ astats adapt_wavelet_ibm (
     }
     boundary ({ib_noise_0});
 
-    // astats st_i = adapt_wavelet2 (slist_c, max_c, maxlevel_c, minlevel, list);
-    astats st_i = adapt_wavelet(slist_c, max_c, max_level_or_ibm, minlevel, list);
+    // Temporary scalars can reallocate Basilisk's global `all` list.
+    scalar* adapt_list = list_is_all ? all : list;
+    // astats st_i = adapt_wavelet2 (slist_c, max_c, maxlevel_c, minlevel, adapt_list);
+    astats st_i = adapt_wavelet(slist_c, max_c, max_level_or_ibm, minlevel, adapt_list);
 
     st.nc += st_i.nc;
     st.nf += st_i.nf;

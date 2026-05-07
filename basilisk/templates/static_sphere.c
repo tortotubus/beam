@@ -16,7 +16,7 @@ int minlevel = 5;
 double Reynolds = 100.;
 double U0 = 1.;
 double L_fluid = 40;
-double dt_fluid = 0.0001;
+double dt_fluid = 0.001;
 double t_end = 60.;
 
 int ibmlevel = 10;
@@ -43,7 +43,7 @@ face vector muv[];
 
 u.n[left] = dirichlet(U0);
 p[left] = neumann(0.);
-pf[left] = neumann(0.); 
+pf[left] = neumann(0.);
 
 u.n[right] = neumann(0.);
 p[right] = dirichlet(0.);
@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
   L0 = L_fluid;
   origin(-5 * D_sphere, -L0 / 2., -L0 / 2);
   N = 1 << minlevel;
-  // DT = dt_fluid;
+  DT = dt_fluid;
   mu = muv;
   display_control(Reynolds, 10, 1000);
 
@@ -92,8 +92,8 @@ event properties(i++) {
 event init(i = 0) {
   int m_id = ibmeshmanager_add_mesh();
 
-  IBMeshModel sphere_model =
-      elff_pinned_rigid_body_sphere_new(R_sphere, N_sphere, 1., c_sphere, 1., {0.}, 0);
+  IBMeshModel sphere_model = elff_pinned_rigid_body_sphere_new(
+      R_sphere, N_sphere, 1., c_sphere, 1., {0.}, 0);
   ibmeshmanager_set_model(m_id, sphere_model);
 
   foreach_ibnode_per_ibmesh() {
@@ -112,13 +112,53 @@ event logfile(i++) {
   fprintf(stderr, "%d %g %d %d %d\n", i, t, mgp.i, mgu_a.i, mgu_b.i);
 }
 
-event output(i += 1; t<=t_end) 
-{ 
-  scalar l2[];
-  lambda2(u,l2);
+event csvfile(i++) {
+  double Cd = 0., Cl = 0.;
+  double fx = 0., fy = 0., fz = 0.;
+  foreach (reduction(+ : fx) reduction(+ : fy) reduction(+ : fz)) {
+    fx += -ibmf.x[] * dv();
+    fy += -ibmf.y[] * dv();
+    fz += -ibmf.z[] * dv();
+  }
 
-  scalar * slist  = {l2, p};
-  vector * vlist = {u,ibmf};
+  double qA = 0.5 * sq(U0) * pi * sq(R_sphere);
+  Cd = fx / qA;
+  Cl = sqrt(sq(fy) + sq(fz)) / qA;
+  if (pid() == 0) {
+    if (!base_path) {
+      fprintf(stderr, "warning: base_path is NULL; skipping sphere stats output\n");
+      return 0;
+    }
+    if (create_path(base_path) != 0) {
+      fprintf(stderr, "warning: failed to create output path %s; skipping sphere stats output\n", base_path);
+      return 0;
+    }
+
+    char fname[4096];
+    snprintf(fname, sizeof(fname), "%s/sphere_stats_Re_%f.csv", base_path, Reynolds);
+
+    FILE *fp = NULL;
+    if (i == 0)
+      fp = fopen(fname, "w");
+    else
+      fp = fopen(fname, "a");
+    if (!fp) {
+      fprintf(stderr, "warning: failed to open %s for write\n", fname);
+      return 0;
+    }
+    if (i == 0)
+      fprintf(fp, "t,fx,fy,fz,Cd,Cl\n");
+    fprintf(fp, "%f,%f,%f,%f,%f,%f\n", t, fx, fy, fz, Cd, Cl);
+    fclose(fp);
+  }
+}
+
+event output(i += 10; t <= t_end) {
+  scalar l2[];
+  lambda2(u, l2);
+
+  scalar *slist = {l2, p};
+  vector *vlist = {u, ibmf};
 
 #if TREE
   output_hdf_htg(slist, vlist, base_path);

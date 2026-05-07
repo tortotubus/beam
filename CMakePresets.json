@@ -39,26 +39,13 @@
       "description": "Release build for Sockeye with specific compiler and flags.",
       "generator": "Unix Makefiles",
       "binaryDir": "${sourceDir}/build/sockeye_release",
-      "environment": {
-        "CC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
-        "CXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
-        "GCC_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef",
-        "MPICC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin/mpicc",
-        "MPICXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin/mpic++",
-        "OPENMPI_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn",
-        "HDF5_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf"
-      },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/sockeye_release",
         "ELFF_USE_SUBMODULES": "ON",
         "ELFF_BUILD_THIRD_PARTY_BASILISK": "ON",
-        "ELFF_BUILD_TESTS": "OFF",
-        "ELFF_BUILD_DOC": "OFF",
-        "CMAKE_C_COMPILER": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
-        "CMAKE_CXX_COMPILER": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
-        "CMAKE_PREFIX_PATH" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo/.",
-        "MPI_HOME": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn"
+	"ELFF_BUILD_DOC": "OFF",
+        "ELFF_BUILD_TESTS": "OFF"
       }
     },
     {

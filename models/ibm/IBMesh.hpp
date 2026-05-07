@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
+
 #include "elff/config/config.hpp"
 
 namespace ELFF {
