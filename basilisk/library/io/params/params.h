@@ -232,7 +232,9 @@ int input_file_apply_option (const char* group_name, const char* option_name) {
     return -1;
 
   ParamValue* v = &g->option_values[oi];
-  if (v->unset || !v->ptr)
+  if (v->unset)
+    return 0;
+  if (!v->ptr)
     return -1;
 
   switch (v->type) {
