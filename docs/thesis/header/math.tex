@@ -1,22 +1,45 @@
 \usepackage{amsmath,amssymb,amsfonts}
+
+% derivatives
 \usepackage{derivative}
+
+% misc math tools (e.g. bmatrix)
 \usepackage{mathtools}
+
+% bold math 
 \usepackage{bm}
 
 % bold vector: keep arrow version as \arrowvec, redefine \vec to bold
 \let\arrowvec\vec
+
+% vector
 \renewcommand{\vec}[1]{\mathbf{#1}}
+
+% matrix
 \newcommand{\mat}[1]{\mathbf{#1}}
+
+% tensor
 \newcommand{\tens}[1]{\mathbf{#1}}
+
+% double-dot product
 \newcommand{\cddot}{:}
+
+% transpose macro
 \newcommand{\transp}{\intercal}
 
 % norm macro
 \newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+
+% semi-norm macro
 \newcommand{\seminorm}[1]{\left| #1 \right|}
+
+% absolute-value
 \newcommand{\abs}[1]{\left| #1 \right|}
 
+% Reynolds "Re" macro
 \newcommand{\Reynolds}{{\text {Re}}}
+
+\DeclareMathOperator*{\minloc}{minloc}
 
 % Theorems
 \input{header/theorem}

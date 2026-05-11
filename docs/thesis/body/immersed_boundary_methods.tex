@@ -1,0 +1,205 @@
+\chapter{Immersed Boundary Methods}
+
+\section{Introduction}
+
+Fluid--structure interaction (FSI) problems couple the motion of a fluid to the
+motion or deformation of an immersed solid. The two subsystems are not
+independent: the fluid exerts hydrodynamic traction on the structure, while the
+structure changes the admissible fluid velocity through no-slip,
+no-penetration, or more general interfacial conditions. Numerical FSI methods
+are therefore usually distinguished less by the governing equations themselves
+than by how the interface is represented and how strongly the fluid and
+structural subproblems are coupled during each time step.
+
+The physical coupling may be one-way or two-way. In a one-way calculation, the
+structure is prescribed or is advanced using fluid loads without allowing its
+motion to feed back onto the fluid. This is useful for imposed kinematics or
+post-processing force estimates, but it is not a fully coupled FSI problem. In
+two-way FSI, the fluid and structure mutually determine one another: fluid
+tractions drive the structural motion, and the resulting structural
+configuration changes the fluid domain, boundary condition, or body-force
+field. The remaining classifications in this section mainly concern how this
+two-way coupling is represented numerically.
+
+One broad distinction is between boundary-fitted and non-boundary-fitted
+methods. In a boundary-fitted formulation, the fluid mesh conforms to the
+fluid--solid interface. Arbitrary Lagrangian--Eulerian (ALE) methods are the
+standard example: the structure is represented in Lagrangian coordinates, while
+the fluid mesh moves or deforms to track the interface. This gives a sharp
+representation of the boundary conditions and hydrodynamic tractions, but mesh
+quality becomes a central issue when the structure undergoes large
+displacements, rotations, contact, or topology changes. In contrast,
+non-boundary-fitted methods keep the fluid grid independent of the solid
+geometry. Immersed boundary, immersed interface, fictitious-domain, cut-cell,
+and related embedded-boundary methods all fall into this class. These methods
+avoid remeshing and are particularly attractive for large motion or many
+particles, at the cost of introducing additional machinery to transfer
+velocity, force, or constraint information between the Eulerian fluid grid and
+the Lagrangian solid description.
+
+FSI methods are also commonly categorized by their coupling architecture. In a
+monolithic method, the fluid unknowns, structural unknowns, and interface
+constraints are assembled into a single nonlinear algebraic system at each time
+step. This formulation treats the coupled problem as one system, which can be
+advantageous for stability and for problems with strong added-mass effects, but
+it requires solvers and preconditioners for a large multiphysics system. In a
+partitioned method, existing fluid and structural solvers are retained as
+separate modules and communicate through interface data. The fluid solver may
+provide tractions or body forces to the structure, while the structural solver
+returns displacements, velocities, or constraint targets to the fluid. This
+modularity is attractive in practice, especially when mature solvers already
+exist for each subsystem, but the coupling algorithm must be designed carefully
+so that splitting errors do not dominate the dynamics.
+
+Within partitioned methods, a further distinction is made between weak and
+strong coupling. A weakly coupled or explicit scheme advances each subsystem
+once per time step using interface data extrapolated from the previous time
+level or from an intermediate predictor. Such schemes are simple and cheap, but
+they can suffer from severe stability restrictions when the structural inertia
+is small compared with the displaced fluid inertia. This is the classical
+added-mass difficulty. A strongly coupled or implicit partitioned scheme
+instead iterates between the fluid and structure within a time step until the
+interface velocity, displacement, and traction conditions are satisfied to a
+chosen tolerance. Strong coupling reduces splitting error and is usually more
+robust for light or flexible structures, but it increases the cost of each time
+step and requires convergence criteria, relaxation, or quasi-Newton
+acceleration.
+
+Another useful taxonomy concerns how the interface conditions are imposed. Some
+methods impose them strongly by making the fluid and structure share the same
+interface degrees of freedom, as in many boundary-fitted finite-element
+formulations. Other methods impose the interface equations in a variational or
+algebraic sense, for example through Nitsche terms, penalty forces, feedback
+laws, or Lagrange multipliers. In immersed boundary methods, the coupling is
+commonly expressed through spreading and interpolation operators: a Lagrangian
+force density is spread to the Eulerian fluid equations, and the Eulerian
+velocity is interpolated back to the Lagrangian markers. Direct-forcing
+variants choose the force so that the marker velocity approximately satisfies
+the desired no-slip constraint after the fluid update
+\autocite{uhlmann_immersed_2005}. For flexible filaments or beams, the same
+framework can be combined with a structural evolution equation and additional
+internal constraints, such as inextensibility \autocite{huang_simulation_2007}.
+From this viewpoint, the immersed-boundary force plays the role of an
+interfacial constraint force: it is not simply an external load, but the
+numerical mechanism by which the fluid and structure are made kinematically
+compatible.
+
+These classifications are not mutually exclusive. A single FSI algorithm may be
+non-boundary-fitted, partitioned, weakly coupled in time, and based on a
+penalty or direct-forcing approximation of the no-slip constraint. Another may
+be boundary-fitted, monolithic, fully implicit, and impose interface continuity
+strongly. The choice is therefore problem dependent. Boundary-fitted and
+monolithic approaches offer a sharp and tightly coupled description of the
+interface, while immersed and partitioned approaches trade some interface
+sharpness or implicitness for algorithmic simplicity, robustness under large
+motion, and compatibility with fixed-grid flow solvers. The direct-forcing
+immersed-boundary methods considered in this work belong to the latter family:
+the fluid is solved on an Eulerian grid, the structure or immersed surface is
+represented by Lagrangian markers, and the coupling force is constructed to
+reduce the slip between the two descriptions.
+
+\section{Immersed Boundary Methods}
+
+Peskin's original immersed boundary method was developed for problems in which
+thin elastic structures move inside an incompressible viscous fluid, with heart
+valves as the motivating example
+% \autocite{peskin_flow_patterns_heart_valves_1972,peskin_immersed_boundary_acta_numerica_2002}
+.
+
+The central idea is to avoid constructing a body-fitted mesh around the moving
+structure. Instead, the fluid variables are stored on a fixed Eulerian grid,
+while the immersed structure is represented by Lagrangian material points. The
+two descriptions communicate through a regularized delta function. Forces
+computed on the Lagrangian structure are spread to the surrounding fluid grid,
+and the Eulerian fluid velocity is interpolated back to the Lagrangian
+structure to update its motion.
+
+In this formulation, the immersed boundary force is usually determined from a
+constitutive law for the structure. For example, if the boundary is an elastic
+fiber or membrane, its stretching, bending, or tethering energy defines a
+Lagrangian force density. This force is then applied to the Navier--Stokes
+equations as a singular body force, regularized over a few grid cells in the
+discrete method. The no-slip condition is therefore not imposed by explicitly
+solving for a constraint force but rather, implicitly. This is because the
+structure is moved with the local fluid velocity (thereby satisfying no-slip)
+where after, the elastic force generated by the structural model feeds back
+onto the fluid. This gives a compact and robust framework for moving deformable
+boundaries without remeshing.
+
+This viewpoint is important because it separates two ingredients that later
+methods modify independently: the Eulerian--Lagrangian transfer operators and
+the rule used to choose the interaction force. In Peskin's method, the force is
+primarily a physical structural force. In direct-forcing immersed boundary
+methods, the force is instead chosen so that the interpolated velocity at the
+immersed markers satisfies a prescribed boundary velocity after the fluid
+update
+% \autocite{fadlun_combined_ib_fd_direct_forcing_2000,uhlmann_immersed_2005}
+.
+Thus the immersed force becomes closer to a discrete constraint force enforcing
+no-slip. Multi-direct forcing extends this idea by repeatedly applying the
+interpolation, force correction, and spreading operations within a time step,
+so that the residual slip left by a single direct-forcing pass is reduced
+% \autocite{wang_fan_luo_multi_direct_forcing_ibm_2008}
+.
+In this sense, direct forcing and multi-direct forcing can be viewed as
+descendants of Peskin's Eulerian--Lagrangian coupling framework, with a
+different choice of how the coupling force is computed.
+
+\section{Multi-Direct Forcing Immersed Boundary Method}
+
+\subsection{Validation}
+
+\subsubsection{Two-Dimensional Validation}
+
+\paragraph{Flow over a Stationairy Cylinder}
+
+\subsubsection{Three-Dimensional Validation}
+
+\paragraph{Flow over a fixed isolated sphere}
+
+To validate the DF-IBM method in three dimensions, we consider the case of
+uniform flow past a fixed sphere, where we may interpret the immersed boundary
+force required to enforce no-slip as the hydrodynamic force on the sphere. We
+may then compare the numerical drag coefficient to the Schiller-Naumann
+correlation, which is typically reported \cite[84]{michaelides_multiphase_2022}
+\begin{equation}
+    C_D(\Reynolds_p) = \frac{24}{\Reynolds_p} \left(1 + 0.15 \Reynolds_p^{0.687}\right),
+\end{equation}
+and for which we may compare our scheme for the values \(\Reynolds_p \in \{10,50,100,200,250\}\).
+
+For this case, we use a cubic fluid domain \(L_x = L_y = L_z = 40D\) with a
+sphere of diameter \(D\) fixed at \(x_c = 5D\) from the inlet and centered in
+\(y\) and \(z\) domain. The imposed far-field flow is
+\begin{gather*}
+    \vec u_{\infty} = U_\infty \vec e_x \qquad \text{at inlet,} \\
+    \pdv*{\vec u}{x} = 0,\quad  p = 0, \qquad \text{at outlet.}
+\end{gather*}
+Then the particle Reynolds number is
+\begin{equation*}
+    \Reynolds_p = \frac{\rho_f U_\infty D}{\mu_f}.
+\end{equation*}
+
+Next we discuss the Lagrangian markers on the sphere; unlike the case for a
+disc, the problem of choosing a 'uniform' distribution of makers remains an
+open problem\autocite{saff_distributing_1997}; even the choice of what
+constitutes 'uniform' is unclear. In this experiment, we distribute the points
+according to a "fibbonaci spiral" algorithm:
+
+% TODO: Describe the sphere algorithm used in RigidBodySphere.cpp
+
+\begin{figure}[H]
+    \centering
+    \def\svgwidth{\textwidth}
+    \import{figure/vector}{dfibm-schiller-naumann-validation-domain.pdf_tex}
+    \caption{Fluid domain and flow configuration for the flow over the isolated sphere. The particle is placed \(5\) particle diameters from the inlet where uniform inflow velocity \(\vec u_\infty\) is applied.}
+    \label{fig:mdfibm-schiller-naumann-validation-domain-setup}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \import{figure/vector}{static-sphere-Re-sweep.tex}
+    \caption{With \(\Delta t = 0.001\) and \(\Delta x = \) at the finest level.}
+    \label{fig:mdfibm-schiller-naumann-validation-Re-sweep}
+\end{figure}
+
+% \printbibliography

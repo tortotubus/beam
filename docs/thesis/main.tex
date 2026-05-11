@@ -1,942 +1,103 @@
-\documentclass{report}
+\documentclass[masc,oneside]{ubcthesis}
+
+% Some packages that are necessary and that may be useful. Be careful about removing any as it may cause some formatting errors.
+
+
+\usepackage{afterpage}
+% \usepackage{float}
+% \usepackage{pdflscape}
+% \usepackage[numbers,sort&compress]{natbib}
+% \usepackage{psfrag}
+% \usepackage{parskip} 
+% \usepackage{lipsum}
 
 \input{header/main}
 
-\title{}
-\author{}
+\newcommand{\committeeMember}[4]{#1, #2, #3\\\textit{#4}}
+
+\def \theAuthor {Conor Olive}
+\def \theTitle {A Sample Thesis Title for Those Writing their Theses} 
+\def \theDegree {Master of Degree Title} 
+\def \theProgramTitle {Program}
+\def \theCopyrightyear {2026}
+\def \theSubmitdate {December 2026} 
+
+
+\institution{The University Of British Columbia}
+\faculty{The Faculty of Graduate and Postdoctoral Studies}
+\institutionaddress{Vancouver}
+\previousdegree{B.Sc., University of British Columbia, 2024}
+% \degreetitle{Jack of All Trades}
+
+
+\title{\theTitle}
+% \subtitle{\theSubtitle}
+\author{\theAuthor}
+\copyrightyear{\theCopyrightyear}
+\submitdate{\theSubmitdate}
+\program{\theProgramTitle}
+
+% These commands make the page numbering consistent with G+PS 
+\renewcommand\thepart         {\Roman{part}}
+\renewcommand\thechapter      {\arabic{chapter}}
+\renewcommand\thesection      {\thechapter.\arabic{section}}
+\renewcommand\thesubsection   {\thesection.\arabic{subsection}}
+\renewcommand\thesubsubsection{\thesubsection.\arabic{subsubsection}}
+\renewcommand\theparagraph    {\thesubsubsection.\arabic{paragraph}}
+\renewcommand\thesubparagraph {\theparagraph.\arabic{subparagraph}}
+
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{2}
+
+\floatstyle{ruled}
+\newfloat{Program}{htbp}{lop}[chapter] 
 
 \begin{document}
 
-\hypersetup{pageanchor=false}
+% =============================================================================
+% Front Matter
+% =============================================================================
+
+\frontmatter
+
 \maketitle
-\hypersetup{pageanchor=true}
-\pagenumbering{roman}
+
+\include{admin/committee}
+
+\begin{abstract}
+    The abstract is a concise and accurate summary of the research contained in the thesis. It states the problem, the methods of investigation, and the general conclusions, and should not contain tables, graphs or illustrations. It must not exceed 350 words, and should contain relevant keywords that will make your thesis more likely to be found in an electronic search. Do not put a separate list of keywords. There must be a single abstract for the entire thesis.
+\end{abstract}
+
+\include{admin/lay}
+\include{admin/preface}
+
 \tableofcontents
-\clearpage
-\pagenumbering{arabic}
 
-\chapter{Euler-Bernoulli Beam Theory}
+% Lists 
+\listoftables
+\listoffigures
+\include{admin/listofabbreviations}
+\include{admin/listofsymbols}
 
-\section{Derivation}
+\include{admin/acknowledgements}
+\include{admin/dedication}
 
-\begin{figure}[t]
-    \centering
-    \def\svgwidth{.9\textwidth}
-    \import{figure/vector}{beam-diagram-with-R.pdf_tex}
-    \caption{Diagram of the coordinate system and orthonormal frame of a three-dimensional beam: Material centerline \(\vec r(s)\) maps \(s \in [0,L]\) to Cartesian \(\mathbb{R}^3\), and the orthonormal directors \(\{\vec t, \vec n, \vec b\}\).}
-    \label{fig:coordinate-system}
-\end{figure}
+% =============================================================================
+% Main Matter
+% =============================================================================
 
-\begin{table}[b]
-    \centering
-    \begin{tabularx}{\textwidth}{X*{2}{>{\arraybackslash}X}}
-        Unshearable         & Sections remain plane and orthogonal to \(\vec t\). This gives us a mapping \(\vec R = \vec r + \eta \vec n + \beta \vec b\) with shear strains \(\varepsilon_{tn}= \varepsilon_{tb}=0\) (and thus \(\tau_{t n}=\tau_{t b} = 0\)). \\
-        Inextensible        & \(\varepsilon_m(s)=0\) (midline/membrane strain), equivalently \(\abs{\vec r'(s)}=1\) and axial force \(N=0\).                                                                                                                     \\
-        No torsion          & Bishop frame: twist rate \(\kappa_t = \vec \kappa \cdot \vec t=0\) and torsional moment \(T=0\).                                                                                                                                   \\
-        Isotropic bending   & \(I_{\beta\beta}=I_{\eta\eta}\equiv I\) with homogeneous \(E\).                                                                                                                                                                    \\
-        No off-axis bending & Choose principal bending axes s.t. \(I_{\eta\beta}=0\)                                                                                                                                                                             \\
-        Small strain        & Use \(\sigma_{tt} = E \varepsilon_{tt}\) and \(\psi = \frac12 E \varepsilon_{tt}^2\).                                                                                                                                              \\
-    \end{tabularx}
-    \caption{Table of assumptions}
-    \label{tab:assumptions}
-\end{table}
+\mainmatter
 
-Consider a beam with a centerline curve \(\vec r(s)\) that exists in
-three-dimensional space, i.e.
-\begin{equation*}
-    \vec r (s) = (x(s),y(s),z(s)).
-\end{equation*}
-The space curve \(\vec r\) is equipped with tangent \(\vec t(s) = \vec r'(s)\) in addition to a normal vector \(\vec n(s)\) and binormal vector \(\vec b(s)\). We then define the orthonormal triad \(\{\vec t, \vec n, \vec b\}\). Then the \href{https://en.wikipedia.org/wiki/Darboux_vector}{Darboux vectors} are \(\vec t ' = \vec \kappa \times \vec t \), \(\vec n ' = \vec \kappa \times \vec n\) and \(\vec b ' = \vec \kappa \times \vec b\) where \(\vec \kappa = \vec t \kappa_t + \vec n \kappa_n + \vec b \kappa_b \) with \(\kappa_t = 0\) since we assume no rotation around the neutral axis. Then we obtain
-\begin{align}
-    \vec t'        & = \kappa_n \vec n - \kappa_b \vec b \label{eq:t-prime-darboux} \\
-    \qquad \vec n' & = -\kappa_b \vec t \label{eq:n-prime-darboux}                  \\
-    \qquad \vec b' & = \kappa_n \vec t \label{eq:b-prime-darboux}
-\end{align}
-Using this, we can define a mapping \(\vec{R} : (s,\eta,\beta) \mapsto (x,y,z)\) for any material point in the cross section plane along \((\vec n, \vec b)\) of our beam to Cartesian space. We define this as
-\begin{equation}\label{eq:material-mapping}
-    \vec R (s,\eta, \beta) = \vec r (s) + \eta \: \vec n(s) + \beta \:\vec b(s).
-\end{equation}
-Then, for a fixed value of \((\eta, \beta)\) we have from \eqref{eq:t-prime-darboux}-\eqref{eq:material-mapping} that
-\begin{align*}
-    \pdif{s} \vec R & = \vec r' + \eta \: \vec n' + \beta \: \vec b'                  \\
-                    & = \vec t + \eta \: \vec n' + \beta \: \vec b'                   \\
-                    & = \vec t + \eta \: (-\kappa_b \vec t) + \beta (\kappa_n \vec t) \\
-    \pdif{s} \vec R & = (1 - \eta \kappa_b + \beta \kappa_n) \vec t
-\end{align*}
-Then it follows that we have stretch ratio along the neutral axis which is
-\begin{equation*}
-    \lambda(s,\eta,\beta) = \norm{ \pdif{s} \vec R } = 1 - \eta \kappa_b + \beta \kappa_b.
-\end{equation*}
-Under the assumptions of small strains (\(\abs{\eta \kappa_b}, \abs{\beta \kappa_n} \ll 1\)), we use the engineering axial strain and
-\begin{equation*}
-    \varepsilon_{tt}(s,\eta,\beta) = \lambda - 1 = \varepsilon_{m}(s) -\eta \kappa_n(s) - \beta \kappa_b(s).
-\end{equation*}
-where \(\varepsilon_{m}(s) = 0\) under our assumption of inextensibility, e.g.
-\begin{equation} \label{eq:strain-tt}
-    \varepsilon_{tt}(s,\eta,\beta) = \lambda - 1 = -\eta \kappa_n(s) - \beta \kappa_b(s).
-\end{equation}
-We then obtain for our stresses
-\begin{equation*}
-    \sigma_{tt}(s, \eta, \beta) = E \varepsilon_{tt}(s,\eta,\beta)
-\end{equation*}
-which is equivalent to \(\tens \sigma_{tt} \: \vec t \otimes \vec t\), with \(\sigma_{tn} = \sigma_{nt} = 0\), \(\sigma_{tb} = \sigma_{bt} = 0\) and \(\sigma_{nn} = \sigma_{bb} = 0\). Then define the second moments of area
-\begin{equation*}
-    I_{\eta\eta} = \int_A \eta^2 \odif{A}, \quad I_{\beta\beta} = \int_{A} \beta^2 \odif{A}, \quad I_{\eta\beta} = \int_{A} \eta \beta \odif{A}, \quad A = \int_A\odif{A}
-\end{equation*}
-about the neutral axis in the material cross section. Define our resultant force \(N(s)\) as
-\begin{equation*}
-    N(s) = \int_A \tens \sigma_{tt} \odif{A} = 0,
-\end{equation*}
-and our second moment of inertia \(\vec M(s)\) as
-\begin{equation*}
-    \vec M(s) = \int_A \vec r_{\perp} \times \vec p \odif{A}, \quad \vec r_{\perp} = \eta \vec n + \beta \vec b.
-\end{equation*}
-With \(\vec r_{\perp} \times \vec t = - \eta \vec b + \beta \vec n\) and \(\tens \sigma_{tt} = E( - \eta \kappa_b + \beta \kappa_n)\), then
-\begin{equation*}
-    N(s) = EA\varepsilon_m(s),
-\end{equation*}
-where \(\varepsilon_m(s)\) is zero due to an assumption of no axial strain, and so
-\begin{equation*}
-    N(s) = 0.
-\end{equation*}
-In addition,
-\begin{equation*}
-    \vec M(s) = E \left[\left(I_{\eta\eta} \kappa_b - I_{\eta\beta} \kappa_b\right) \vec b + \left(-I_{\eta\beta} \kappa_b + I_{\beta\beta}\kappa_{n}\right)\vec n\right].
-\end{equation*}
-If we treat \((\eta,\beta)\) as principle bending axis, then \(I_{\eta\beta} = 0\) and this decouples to
-\begin{equation*}
-    M_b = E I_{\eta\eta} \kappa_{\beta}, \quad M_n = E I_{\beta\beta} \kappa_{n},
-\end{equation*}
-which are the familiar moment-curvature laws. At a point, the strain energy is the area under the \(\sigma\)--\(\varepsilon\) curve
-\begin{equation*}
-    \psi = \int_0^{\varepsilon} \sigma(\tilde \varepsilon) \odif{\tilde \varepsilon}.
-\end{equation*}
-with Hooke's law \(\sigma = E \varepsilon\),
-\begin{equation*}
-    \psi = \int_0^{\varepsilon_{tt}} E \tilde \varepsilon \odif{\tilde \varepsilon} = \frac12 E \varepsilon_{tt}^2.
-\end{equation*}
-We may compute the energy per unit length, by the section integral
-\begin{equation*}
-    w(s) = \int_A \psi \odif{A} = \frac{1}{2} E \int_A \varepsilon_{tt}^2 \odif{A}.
-\end{equation*}
-Using \eqref{eq:strain-tt} then our energy per unit length is
-\begin{equation*}
-    w(s) = \frac12 E (I_{\eta\eta} \kappa_b^2 + I_{\beta\beta} \kappa_n^2 - 2I_{\eta\beta}\kappa_b \kappa_n) = \frac12 E (I_{\eta\eta}\kappa_b^2 + I_{\beta\beta}\kappa_n^2),
-\end{equation*}
-under the assumption of in-plane bending only, and thus setting \(I_{\eta\beta} = 0\). In addition, we assume that the beam is isotropic in such a way that we may write \(I_{\eta\eta} = I_{\beta\beta} = I\) and then we may write
-\begin{equation}
-    w(s) = \frac12 EI (\kappa_b^2 + \kappa_n^2) = \frac12 EI \abs{\vec t'(s)}^2  = \frac12 EI \abs{\vec r''(s)}^2.
-\end{equation}
+\include{body/euler_bernoulli}
+\include{body/addm}
+\include{body/navier_stokes}
+\include{body/immersed_boundary_methods}
 
-\section{Small Angle Euler-Bernoulli Beam}
-To complete the derivation of the classic Euler-Bernoulli beam, we may make a
-small-angle or small slope argument: The exact scalar curvature \(\kappa\) for
-the in-plane bending of the beam is
-\begin{equation*}
-    \kappa = \norm{\odv{\vec t}{s}} = \norm{ \odv{\vec t}{x} \odv{x}{s}}
-\end{equation*}
-\begin{equation*}
-    w_y(x) = \frac{1}{2} EI (y''(x))^2
-\end{equation*}
-and that this is balanced by a body force \(q_y(x)\) (for \(x\in(0,L)\)) that is applied orthogonally in the principal Cartesian axis \(y\). Then the total potential energy of the beam is
-\begin{equation*}
-    \Pi[y] = \int_0^L \left(\frac12 EI (y''(x))^2 - q(x)y\right) \odif{x}
-\end{equation*}
-Take the first variation and integrate by parts twice to obtain
-\begin{equation*}
-    EI y^{(4)}(x) = q(x), \quad x \in (0,L).
-\end{equation*}
+% =============================================================================
+% Appendix
+% =============================================================================
 
-\subsection{Variational Problem}
-
-The strong form of the Euler--Bernoulli beam theory is
-\begin{equation*}
-    \odv*[2]{\left[EI \odv[2]{y}{x}\right]}{x} = q(x)
-\end{equation*}
-Multiply the above by a test function \(v\in V\) and integrate over the domain \([0,L]\) of the beam to obtain
-\begin{equation*}
-    \int_0^L \odv*[2]{\left[EI \odv[2]{y}{x}\right]}{x} v(x) \odif {x} = \int_0^L q(x) v(x)\odif{x}
-\end{equation*}
-Using integration by parts on the left hand side,
-\begin{align*}
-    \int_0^L \odv*[2]{\left[EI \odv[2]{y}{x}\right]}{x} v(x) \odif {x} & = \left[\odv{}{x}\left(EI \odv[2]{y}{x}\right) v(x)\right]_0^L - \int_0^L \odv*{\left[EI \odv[2]{y}{x}\right]}{x} \odv{v}{x} \odif{x}                            \\
-                                                                       & = \left[\odv*{\left(EI \odv[2]{y}{x}\right)}{x} v(x)\right]_0^L - \left[EI\odv[2]{y}{x} \odv{v}{x}\right]_0^L + \int_0^L EI \odv[2]{y}{x} \odv[2]{v}{x} \odif{x} \\
-                                                                       & = \int_0^L EI \odv[2]{y}{x} \odv[2]{v}{x} \odif{x} + \left[\odv*{\left(EI \odv[2]{y}{x}\right)}{x} v(x)- EI\odv[2]{y}{x} \odv{v}{x}\right]_0^L
-\end{align*}
-Then we can rewrite the equation as
-\begin{equation*}
-    \int_0^L EI \odv[2]{y}{x} \odv[2]{v}{x} \odif{x}  = \int_0^L qv\odif{x} - \left[\odv*{\left(EI \odv[2]{y}{x}\right)}{x} v- EI\odv[2]{y}{x} \odv{v}{x}\right]_0^L, \qquad \forall v \in V.
-\end{equation*}
-Therefore, our variational problem is:
-
-\begin{weakform}
-    Find \(y \in \overline{y} + V\) such that
-    \begin{equation*}
-        a(y,v) = \ell(v) + \ell_{\rm{tip}}(v), \quad \forall v \in V
-    \end{equation*}
-    with our bilinear form \(a\) defined as
-    \begin{equation*}
-        a(y,v) = \int_0^L EI y'' v'' \odif{x}
-    \end{equation*}
-    and our linear functionals \(\ell\) and \(\ell_{\rm{tip}}\) defined as
-    \begin{equation*}
-        \ell(v) = \int_0^L qv \odif{x} \qquad \text{and} \qquad \ell_{\rm{tip}}(v) = [(EI y''')v - EIy''v']_0^L.
-    \end{equation*}
-\end{weakform}
-
-\section{Large Angle Euler-Bernoulli Beam}
-
-We consider the strong form
-\begin{equation}
-    \odv*[2]{\left(EI(s) \odv[2]{\vec{w}}{s}\right)}{s} - \odv*{\left(\lambda \odv{\vec{w}}{s}\right)}{s} = \vec{q}(s).
-\end{equation}
-subject to an inextensibility constraint
-\begin{equation*}
-    \norm{\odv{\vec{w}}{s}} = 1.
-\end{equation*}
-Multiply the equilibrium equation by \(\vec{v} \in V_0\) and integrate over \((0,L)\) to get
-\begin{equation*}
-    \int_0^L \left(\left(EI\:\vec{w}^{(2)}\right)'' - (\lambda \vec{w}')'\right) \cdot \vec{v} \odif{s} = \int_0^L \vec{q} \cdot \vec{v} \odif{s}.
-\end{equation*}
-Then let \(\vec{B} \coloneqq EI \vec{w}''\)
-\begin{align*}
-    \int_0^L \vec{B}'' \cdot \vec{v} \odif{s}         & = \left[\vec{B}' \cdot \vec{v}\right]_0^L - \int_0^L \vec{B}' \cdot \vec{v}' \odif{s}                                             \\
-                                                      & = [\vec{B}' \cdot \vec{v} - \vec{B} \cdot \vec{v}']_0^L + \int_0^L \vec{B} \cdot \vec{v}'' \odif{s}                               \\
-    \int_0^L (EI\:\vec{w}'')'' \cdot \vec{v} \odif{s} & = \int_0^L EI \vec{w}'' \cdot \vec{v}'' \odif{s} + \left[(EI \vec{w}'')' \cdot \vec{v} - (EI \vec{w}'') \cdot \vec{v}'\right]_0^L
-\end{align*}
-For the multiplier term
-\begin{align*}
-    -\int_0^L (\lambda \vec{w}')' \cdot \vec{v} \odif{s} & = - \left[\lambda \vec{w} \cdot \vec{v}\right]_0^L + \int_0^L \lambda \vec{w} \cdot \vec{v} \odif{s}.
-\end{align*}
-To treat the inextensibility constraint, multiply the constraint by a test function \(\mu \in \Lambda\). Then
-\begin{equation*}
-    \int_0^L \mu(\norm{\vec w'}^2 - 1) \odif{s} = 0.
-\end{equation*}
-
-\begin{weakform}
-    Then our weak problem is to find \((\vec w, \lambda) \in V \times \Lambda\) sicj that for all \((\vec v, \mu) \in V_0 \times \Lambda\)
-    \begin{equation*}
-        a(\vec{w},\vec{v}) + b(\lambda; \vec{w},\vec{v}) = \ell(\vec{v})
-    \end{equation*}
-    with
-    \begin{equation*}
-        a(\vec{w},\vec{v}) = \int_0^L EI \vec{w}'' \cdot \vec{v}'' \odif{s}, \qquad b(\lambda ;\vec{w}, \vec{v}) = \int_0^L \lambda \vec{w}' \cdot \vec{v}' \odif{s}
-    \end{equation*}
-    and
-    \begin{equation*}
-        \ell(\vec{v}) = \int_0^L \vec{q} \cdot \vec{v} \odif{s} + \left[(EI \vec{w}'')' \cdot \vec{v} - (EI \vec{w}'') \cdot \vec{v}' - \lambda \vec{w}' \cdot \vec{v}\right]_0^L
-    \end{equation*}
-    subject to
-    \begin{equation*}
-        \int_0^L \mu (\norm{\vec{w'}}^2 - 1) \odif{s} = 0.
-    \end{equation*}
-\end{weakform}
-
-\section{Numerical Schemes}
-
-\subsection{Alternating Direction Method of Multipliers}
-
-\subsubsection{Temporal Integrators}
-
-\paragraph{\texorpdfstring{Newmark-\(\beta\)}{Newmark-beta}}
-
-For a general second-order in time dynamical system
-\begin{equation*}
-    \mat M \ddot{\vec u} + \mat C \dot{\vec u} + f^{\rm int}(\vec u) = f^{\rm ext}
-\end{equation*}
-where \(\mat M\) is a mass matrix, and \(\mat C\) is a damping matrix. Newmark-\(\beta\) scheme provides for the update
-\begin{align*}
-    \vec u_{n+1}        & = \vec u_n + \Delta t \dot{\vec u}_n + \frac12 \Delta t^2 \ddot {\vec u}_\beta \\
-    \dot {\vec u}_{n+1} & = \dot{\vec u}_n + \Delta t \dot{\vec u}_\gamma
-\end{align*}
-where the acceleration vector \(\ddot{\vec u}_\beta\) and the velocity vector \(\ddot{\vec u}_\gamma\) are defined as
-\begin{align*}
-    \ddot{\vec u}_\beta   & = (1-2\beta) \ddot{\vec u}_n + 2\beta\ddot{\vec u}_{n+1}  \\
-    \dot{\vec u}_{\gamma} & = (1- \gamma)\ddot{\vec u}_n + \gamma \ddot{\vec u}_{n+1}
-\end{align*}
-Substituted into the updates we have
-\begin{align*}
-    \vec u_{n+1}        & = \vec u_n + \Delta t \dot{\vec u}_n + \frac12 \Delta t^2  \left[(1-2\beta) \ddot{\vec u}_n + 2\beta \ddot{\vec u}_{n+1}\right] \\
-    \dot {\vec u}_{n+1} & = \dot{\vec u}_n + \Delta t \left[(1- \gamma)\ddot{\vec u}_n + \gamma \ddot{\vec u}_{n+1}\right]
-\end{align*}
-which gives us a stencils for \(\ddot{\vec u}_{n+1}\) and \(\dot{\vec u}_{n+1}\) which are
-\begin{align*}
-    \ddot{\vec u}_{n+1} & = \frac{1}{\beta \Delta t^2}(\vec u_{n+1} - \vec{u}_n - \Delta t \dot{\vec u}_n) - \frac{1-2\beta}{2\beta}\ddot{\vec u}_n \\
-    \dot{\vec u}_{n+1}  & = \dot{\vec u}_n + \Delta t[(1-\gamma)\ddot{\vec u}_n + \gamma \ddot{\vec u}_{n+1}]
-\end{align*}
-In our time dependent E-B problem we have
-\begin{equation*}
-    \mu \ddot{\vec r}(s) + \underbrace{EI \vec{r}^{(4)}(s) - (\lambda(s) \vec r'(s))'}_{\vec f^{\rm int}} =  \underbrace{\vec F(s,t)}_{\vec f^{\rm ext}}
-\end{equation*}
-which has no damping. Therefore, we only need to discretize \(\ddot{\vec r}^{n+1}\):
-\begin{equation*}
-\end{equation*}
-
-\subsubsection{Convergence Study}
-
-We test the temporal convergence of the Newmark integrator using the method of
-manufactured solutions. The manufactured motion is chosen to satisfy the
-inextensibility constraint exactly, so that the observed error is dominated by
-the time discretization and by the nonlinear solve tolerance rather than by a
-constraint-inconsistent reference trajectory.
-
-\paragraph{Pinned Manufactured Solution}
-
-The reference solution used in the benchmark is the shifted circular arc
-implemented in \texttt{ManufacturedDynamicResult1}. We take
-\begin{equation*}
-    \vec r_{\rm ex}(s,t)
-    =
-    \frac1{\phi(t)}
-    \begin{bmatrix}
-        \cos(s\phi(t)) - 1 \\
-        \sin(s\phi(t))
-    \end{bmatrix},
-    \qquad
-    \phi(t)=e^t,
-    \qquad
-    s\in[0,\pi/2].
-\end{equation*}
-The implementation uses this as a planar solution with zero third component.
-The shift in the first component pins the left endpoint,
-\(\vec r_{\rm ex}(0,t)=\vec 0\), but does not affect any spatial derivative.
-
-Let \(\theta(s,t) = s\phi(t)\),
-\begin{equation*}
-    \vec e_r = \begin{bmatrix}\cos{\theta} \\ \sin{\theta} \end{bmatrix}, \qquad
-    \vec e_\theta = \begin{bmatrix}-\sin{\theta} \\ \cos{\theta}\end{bmatrix}, \qquad
-    \vec e_x = \begin{bmatrix}1 \\ 0\end{bmatrix}.
-\end{equation*}
-Then the manufactured solution can be written as
-\begin{equation*}
-    \vec r_{\rm ex}(s,t) = \frac1\phi \left(\vec e_r - \vec e_x\right).
-\end{equation*}
-The relevant spatial derivatives of the moving basis are
-\begin{equation*}
-    \pdv{\vec e_r}{s} = \phi \vec e_\theta, \qquad
-    \pdv{\vec e_\theta}{s} = -\phi \vec e_r.
-\end{equation*}
-Therefore
-\begin{equation*}
-    \pdv{\vec r_{\rm ex}}{s} = \vec e_\theta,
-    \qquad
-    \pdv[2]{\vec r_{\rm ex}}{s} = -\phi\vec e_r,
-    \qquad
-    \pdv[3]{\vec r_{\rm ex}}{s} = -\phi^2\vec e_\theta,
-    \qquad
-    \pdv[4]{\vec r_{\rm ex}}{s} = \phi^3\vec e_r.
-\end{equation*}
-In particular,
-\begin{equation*}
-    \norm{\pdv{\vec r_{\rm ex}}{s}} = 1.
-\end{equation*}
-Thus the reference motion is exactly inextensible for any sufficiently smooth
-choice of \(\phi\). The bending term is
-\begin{equation*}
-    EI \vec r_{\rm ex}^{(4)} = EI \phi^3 \vec e_r.
-\end{equation*}
-
-For the inertial term, the time-dependence of the endpoint shift must be
-retained. Since
-\begin{equation*}
-    \pdv{\vec e_r}{t} = s\dot{\phi}\vec e_\theta, \qquad
-    \pdv{\vec e_\theta}{t} = -s\dot{\phi}\vec e_r.
-\end{equation*}
-Differentiating once in time gives
-\begin{equation*}
-    \pdv{\vec r_{\rm ex}}{t}
-    =
-    -\frac{\dot{\phi}}{\phi^2}\left(\vec e_r-\vec e_x\right)
-    + \frac{s\dot{\phi}}{\phi}\vec e_\theta.
-\end{equation*}
-Differentiating again gives
-\begin{equation*}
-    \pdv[2]{\vec r_{\rm ex}}{t}
-    =
-    \left(-\frac{\ddot{\phi}}{\phi^2}
-    + \frac{2\dot{\phi}^2}{\phi^3}
-    - \frac{s^2\dot{\phi}^2}{\phi}\right)\vec e_r
-    +
-    \left(\frac{\ddot{\phi}}{\phi^2}
-    - \frac{2\dot{\phi}^2}{\phi^3}\right)\vec e_x
-    +
-    \left(\frac{s\ddot{\phi}}{\phi}
-    - \frac{2s\dot{\phi}^2}{\phi^2}\right)\vec e_\theta.
-\end{equation*}
-For the choice \(\phi(t)=\exp{(t)}\), so that \(\dot{\phi}=\ddot{\phi}=\phi\), this reduces to
-\begin{equation*}
-    \ddot{\vec r}_{\rm ex}
-    =
-    \left(\frac1\phi - s^2\phi\right)\vec e_r
-    - \frac1\phi \vec e_x
-    - s\vec e_\theta.
-\end{equation*}
-This is the acceleration used by the reference solution, written in the moving
-basis.
-
-For the linear dynamic Euler--Bernoulli equation
-\begin{equation*}
-    \rho \ddot{\vec r} + EI \vec r^{(4)} = \vec f
-\end{equation*}
-the corresponding manufactured load is
-\begin{equation*}
-    \vec f_{\rm linear}
-    =
-    \rho\left[
-        \left(\frac1\phi - s^2\phi\right)\vec e_r
-        - \frac1\phi \vec e_x
-        - s\vec e_\theta
-        \right]
-    + EI\phi^3\vec e_r.
-\end{equation*}
-Equivalently, this can be written as
-\begin{equation*}
-    \vec f_{\rm linear}
-    =
-    \left[\rho\left(\frac1\phi - s^2\phi\right)+EI\phi^3\right]\vec e_r
-    - \frac{\rho}{\phi}\vec e_x
-    - \rho s\vec e_\theta.
-\end{equation*}
-
-For the nonlinear inextensible benchmark, the load convention used in the
-reference implementation is
-\begin{equation*}
-    \vec f_{\rm nonlinear}
-    =
-    \rho\ddot{\vec r}_{\rm ex}
-    + EI\vec r_{\rm ex}^{(4)}
-    + \pdv*{\left(\lambda \pdv{\vec r_{\rm ex}}{s}\right)}{s}.
-\end{equation*}
-The multiplier contribution is
-\begin{equation*}
-    \pdv*{\left(\lambda \pdv{\vec r_{\rm ex}}{s}\right)}{s}
-    =
-    \pdv{\lambda}{s}\vec e_\theta - \lambda\phi\vec e_r.
-\end{equation*}
-With the manufactured choice \(\lambda=1\), this contribution is
-\(-\phi\vec e_r\), and hence
-\begin{equation*}
-    \vec f_{\rm nonlinear}
-    =
-    \vec f_{\rm linear} - \phi\vec e_r,
-\end{equation*}
-or equivalently
-\begin{equation*}
-    \vec f_{\rm nonlinear}
-    =
-    \left[\rho\left(\frac1\phi - s^2\phi\right)+EI\phi^3-\phi\right]\vec e_r
-    - \frac{\rho}{\phi}\vec e_x
-    - \rho s\vec e_\theta.
-\end{equation*}
-
-\paragraph{Linear Convergence Study}
-In the linear study, the multiplier field is not solved for explicitly. The
-boundary values of \(\vec r\) and \(\pdv{\vec r}{s}\) are prescribed from
-\(\vec r_{\rm ex}\), and the body force is set to \(\vec f_{\rm linear}\). We
-fix the spatial resolution at \(\Delta s=(\pi/2)/350\) and vary the time step
-over
-\begin{equation*}
-    \log{1/\Delta t} \in \{1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,2.1,2.2\}.
-\end{equation*}
-At the final time \(T=1\), the error is measured against the manufactured
-solution using the discrete beam norm
-\begin{equation*}
-    E_h(\Delta t) = \norm{\vec r_h(\cdot,T) - \vec r_{\rm ex}(\cdot,T)}_2.
-\end{equation*}
-The spatial grid is kept fixed and sufficiently fine so that the measured slope
-primarily reflects temporal error.
-
-\begin{figure}[H]
-    \centering
-    \import{figure/vector}{addm-linear-convergence.tex}
-    \caption{The convergence rate for linear case.}
-    \label{fig:newmark-addm-linear-convergence}
-\end{figure}
-
-Figure~\ref{fig:newmark-addm-linear-convergence} shows the expected monotone
-decrease in error as the time step is refined. On the logarithmic axes, the
-points should lie close to a straight line if the asymptotic temporal regime
-has been reached. For the average-acceleration Newmark method and a smooth
-manufactured load, the expected temporal order is second order. The final
-discussion should compare the fitted slope against this expected value and
-identify whether the coarsest or finest time steps should be excluded from the
-fit.
-% TODO: Insert the fitted linear-study slope and the exact data range used for
-% the regression. TODO: Check whether the finest time step is affected by the
-% fixed spatial resolution or roundoff before reporting the final observed
-% order.
-
-\paragraph{Nonlinear Convergence Study}
-
-In the nonlinear study, the same manufactured trajectory is used, but the
-multiplier field is solved simultaneously with the beam position. The external
-forcing is set to \(\vec f_{\rm nonlinear}\), corresponding to the manufactured
-choice \(\lambda=1\). This test exercises both the Newmark discretization and
-the nonlinear ADDM iteration used to enforce inextensibility.
-
-The time-step sequence and final-time error measurement are the same as in the
-linear study. The nonlinear tolerances used are \(\epsilon =
-\{10^{-7},10^{-8},10^{-9}\}\), along with \(r=10^3\).
-% TODO: Record the nonlinear tolerance, relaxation parameter, and maximum outer
-% iteration count used for the finalized run. TODO: Decide whether to report a
-% constraint error alongside the displacement error. 
-
-\begin{figure}[H]
-    \centering
-    \import{figure/vector}{addm-nonlinear-convergence.tex}
-    \caption{Convergence of the nonlinear case.}
-    \label{fig:newmark-addm-nonlinear-convergence}
-\end{figure}
-
-% TODO: Insert the fitted nonlinear-study slope and compare it directly with the
-% linear-study slope. TODO: Discuss any plateau, non-monotone point, or outlier
-% once the finalized convergence data are fixed.
-
-\subsection{Constrained Mechanics}
-
-Differential-algebraic equations (DAEs) are systems of equations involving both
-differential and algebraic relations. In contrast to ordinary differential
-equations (ODEs), a DAE does not in general determine all time derivatives
-explicitly from the current state alone. Instead, some variables are linked by
-constraints that must be satisfied throughout the evolution.
-
-A key practical consequence is that not every initial condition is admissible.
-The algebraic equations define a \emph{constraint manifold} on which valid
-solutions must lie, and the dynamics must evolve in such a way that the
-solution remains on this manifold for all time.
-
-Constrained mechanical systems provide a canonical example. When the
-configuration is described using redundant coordinates, the equations of motion
-are accompanied by constraint equations enforcing geometric relations between
-the coordinates. As a result, the motion is not free in the ambient coordinate
-space, but is instead confined to the manifold defined by the constraints.
-
-An important class of constraints in mechanics is that of \emph{holonomic
-constraints}. A holonomic constraint depends only on the configuration
-variables and may be written in the form
-\begin{equation*}
-    g(q) = 0,
-\end{equation*}
-where \(q\) denotes the generalized coordinates. Such constraints restrict the set of admissible configurations to a manifold. Velocity and acceleration are not prescribed independently, but must remain compatible with the configuration constraint so that the motion stays on the manifold over time.
-
-This compatibility becomes clearer upon differentiating the constraint in time.
-If \(g:\mathbb{R}^n \to \mathbb{R}^m\) is smooth and \(J_g(q)\) denotes its
-Jacobian with respect to \(q\), then from
-\begin{equation*}
-    g(q(t)) = 0,
-\end{equation*}
-one obtains the velocity-level constraint
-\begin{equation*}
-    J_g(q)\,\pdv{q}{t} = 0,
-\end{equation*}
-and differentiating once more yields the acceleration-level constraint
-\begin{equation*}
-    J_g(q)\,\pdv[2]{q}{t}
-    +
-    \odv{}{t}\!\left(J_g(q)\right)\pdv{q}{t}
-    = 0.
-\end{equation*}
-Thus, although a holonomic constraint is imposed at the level of configuration, it also induces hidden constraints on the allowable velocities and accelerations.
-
-A simple example is the planar pendulum written in Cartesian coordinates. If
-the bob position is given by \(q = (x,y)\), then the fixed rod length \(L\)
-imposes the holonomic constraint
-\begin{equation*}
-    x^2 + y^2 - L^2 = 0.
-\end{equation*}
-The motion is therefore restricted to the circle of radius \(L\), rather than the full plane \(\mathbb{R}^2\). In this way, the pendulum equations consist not only of differential equations describing the dynamics, but also an algebraic equation enforcing the geometric constraint, and hence naturally form a DAE system.
-
-The appearance of these hidden compatibility conditions motivates the notion of
-the \emph{index} of a differential-algebraic system. Roughly speaking, the
-index measures how many times the algebraic constraints must be differentiated
-in time before an explicit differential system is obtained. In constrained
-mechanical systems, this provides a convenient way of characterizing how
-strongly the algebraic constraints are coupled to the dynamics.
-
-For holonomically constrained systems, the constraint is imposed at the
-configuration level,
-\begin{equation*}
-    g(q)=0.
-\end{equation*}
-Differentiating once gives the velocity-level compatibility condition, and differentiating a second time yields an acceleration-level relation involving \(\ddot q\). Since the equations of motion also involve accelerations, it is only at this stage that the constraint can be combined directly with the dynamics to determine the Lagrange multipliers and admissible accelerations. For this reason, the standard redundant-coordinate formulation of constrained mechanical systems is typically classified as an index-3 DAE.
-
-\chapter{Navier-Stokes}
-
-\chapter{Immersed Boundary Methods}
-
-\section{Introduction}
-
-\section{Acta Numerica}
-
-\section{Direct Forcing Immersed Boundary Method}
-
-\subsection{Validation}
-
-\subsubsection{Two-Dimensional Validation}
-
-\paragraph{Flow over a Stationairy Cylinder}
-
-\subsubsection{Three-Dimensional Validation}
-
-\paragraph{Flow over a Sphere}
-
-To validate the DF-IBM method in three dimensions, we consider the case of
-uniform flow past a fixed sphere, where we may interpret the immersed boundary
-force required to enforce no-slip as the hydrodynamic force on the sphere. We
-may then compare the numerical drag coefficient to the Schiller-Naumann
-correlation, which is typically reported \cite[84]{michaelides_multiphase_2022}
-\begin{equation}
-    C_D(\Reynolds_p) = \frac{24}{\Reynolds_p} \left(1 + 0.15 \Reynolds_p^{0.687}\right),
-\end{equation}
-and for which we may compare our scheme to in a "safe" range \(\Reynolds_p \in \{1,5,10,20,50,100,150,200\}\).
-
-For this case, we use a cubic fluid domain \(L_x = L_y = L_z = 25D\) with a
-sphere of diameter \(D\) fixed at \(x_c = 10D\) from the inlet and centered in
-\(y\) and \(z\) domain. The imposed far-field flow is
-\begin{gather*}
-    \vec u_{\infty} = U_\infty \vec e_x \qquad \text{at inlet,} \\
-    \pdv*{\vec u}{x} = 0,\quad  p = 0, \qquad \text{at outlet.}
-\end{gather*}
-Then the particle Reynolds number is
-\begin{equation*}
-    \Reynolds_p = \frac{\rho U_\infty D}{\mu}.
-\end{equation*}
-
-Next we discuss the Lagrangian markers on the sphere; unlike the case for a
-disc, the problem of choosing a 'uniform' distribution of makers remains an
-open problem\autocite{saff_distributing_1997}; even the choice of what
-constitutes 'uniform' is unclear. In this experiment, we distribute the points
-according to a "fibbonaci spiral" algorithm:
-
-% TODO: Describe the sphere algorithm used in RigidBodySphere.cpp
-
-\begin{figure}[H]
-    \centering
-    \def\svgwidth{.6\textwidth}
-    \import{figure/vector}{dfibm-schiller-naumann-validation-domain.pdf_tex}
-    \caption{Fluid domain and flow configuration for the flow over the isolated sphere. The particle is placed \(5\) particle diameters from the inlet where uniform inflow velocity \(\vec u_\infty\) is applied.}
-    \label{fig:difm-schiller-naumann-validation-domain-setup}
-\end{figure}
-
-\section{Immersed Boundary Method}
-
-\begin{align}
-    \rho_f \mdv{\vec{u}}{t}                  & = - \nabla p + \rho_f \vec{g} + \mu_f \nabla^2 \vec{u} + \int_{0}^{L} \vec F(s,t) \: \delta(\vec{x} - \vec{r}(s,t)) \odif{s} \\
-    \nabla \cdot \vec u                      & = 0                                                                                                                          \\
-    \mu_s \: \pdv[2]{\vec r}{t}              & =  EI \pdv[4]{\vec r}{s} - \pdv*{\left( \lambda(s) \pdv{\vec r}{s} \right)}{s}  - \vec F(s,t)                                \\
-    \left\lVert \pdv{\vec r}{s} \right\rVert & = 1                                                                                                                          \\
-    \pdv{\vec r}{t}                          & = \vec{u}(\vec{r}(s,t),t)
-\end{align}
-
-First, it is worthwhile to recognize that the \(\vec F\) term acts as a
-Lagrange multiplier to satisfy the kinematic no-slip constraint. Specifically,
-if \(\mat J\) is an adjoint linear operator (in our case, \(\delta\)), then we
-seek to enforce
-\begin{equation*}
-    (\mat J \vec u^{n+1})_i = \dot{\vec r}_i^{n+1}.
-\end{equation*}
-In general, we can consider the fluid correction step enforcing this on the fluid as
-\begin{equation*}
-    \rho_f \frac{\vec u^{n+1} - \vec u^*}{\Delta t} = \vec F(s,t) = \mat {J}^T \vec \lambda_{\rm IB}
-\end{equation*}
-which can be written as the update
-\begin{equation*}
-    \vec u^{n+1} = \vec u^* + \Delta t \: \mat{M}^{-1}_f \mat J^T \vec \lambda_{\rm IB}.
-\end{equation*}
-where \(\mat{M}^{-1}_f = \mat I \:\rho_f^{-1}\) in the case that the fluid has uniform density. Substitution into the correction formula gives
-\begin{equation*}
-    \mat J(\vec u^* + \Delta t \: \mat M_f^{-1} \mat J^T \vec \lambda_{\rm IB} ) = \dot{\vec r}^{n+1} \implies \underbrace{\Delta t \: \mat J \mat M^{-1}_{f} \mat J^{T}}_{\mat A} \vec \lambda_{\rm IB} = \underbrace{\dot{\vec r}^{n+1} - \mat J \vec u^*}_{\vec b}.
-\end{equation*}
-% Strong coupling: \begin{enumerate} \item Set \(\vec F(s_i,t^{n+1})\) equal to
-% \(\vec F(s_i,t^{n})\). \item Compute \(\vec{u}(\vec{x},t_{n+1})\) using \(\vec
-% F(s,t^{n+1})\) \item Compute \(\vec{r}(s_i,t_{n+1})\) and
-% \(\vec{r}_t(s_i,t_{n+1})\) using \(\vec F(s_i,t^{n+1})\) % \item Interpolate
-% local fluid velocity \(\vec{u}(\vec{x}_i = \vec r_i,t^{n+1})\) \item Compute
-% the kinematic residual \(\vec R(s_i, t^{n+1}) = \displaystyle \pdv{\vec
-% r(s_i,t^{n+1})}{s} - \vec u(\vec{r}(s_i,t^{n+1}),t^{n+1})\). \item If
-% \(\norm{\vec R} \leq \varepsilon\), stop; otherwise set \(\vec F(s_i,t^{n+1})
-% \coloneqq \vec F(s_i, t^{n+1}) + \alpha \vec R(s_i)\) and go to step 2.
-% \end{enumerate}
-
-% \begin{algorithm}[H] \DontPrintSemicolon \LinesNumbered \ForAll{\(n \in
-% \{0,\dots, N\}\)} { \(\vec F^{n+1} \gets \vec F^{n} \)\; \Repeat{\(\varepsilon
-% \leq E\)} { \(\vec u_i^{n+1} \gets \mathtt{SolveNS} \left(\vec{u}_i^{n},
-% \Delta t, \vec{x}_i, \vec F^{n+1}\right)\)\; %\(\vec u_i^{(m)} \gets \vec
-% u(\vec x_i, t^{n+1}, \vec F^{(m)})\) \; \(\vec r^{n+1}_i, \displaystyle
-% \pdv{\vec r^{n+1}_i}{t} \gets \mathtt{SolveEB}\left(\vec{r}_i^{n},
-% \displaystyle \pdv{\vec r^{n}_i}{t}, \Delta t, s_i, \vec F_i^{n+1}\right)\)\;
-% %\(\vec U_i \gets \int_{\Omega} \vec u(\vec x, t^{n+1}) \delta_h (\vec x -
-% \vec r_i(t)) \odif{\vec x} \)\; \(\vec U_i \gets \mathtt{DeltaInterp}(\vec
-% u^{n+1}, \vec r_i^{n+1})\)\; %\(\vec U_i^{(m)} \gets \displaystyle \sum_{j}
-% \vec u_j^{(m)} \delta_h(\vec x_j - \vec{r}_i^{(m)}) \Delta V_j\)\; \(\vec R_i
-% \gets \displaystyle \pdv{\vec r_i^{n+1}}{t} - \vec{U}^{n+1}_i\)\;
-% \(\varepsilon \gets \norm{\vec{R}}\)\; \(\vec F^{n+1}_i \gets \vec F^{n+1}_i +
-% \displaystyle \frac{\alpha}{\Delta t} \vec{R}_i\)\; } } \caption{Strong
-% force-coupled and partitioned immersed boundary algorithm.} \end{algorithm}
-
-% \begin{algorithm}[H] \DontPrintSemicolon % \(\vec F^{0} \gets \vec 0\);
-% \ForAll{\(n\in \{0,\dots,N\}\)} { \(\left(\vec r_i^{n+1}, \displaystyle
-% \pdv{\vec{r}^{n+1}_i}{t}\right) \gets \mathtt{SolveEB}\left(\vec r_i^n,
-% \pdv{\vec{r}_i^{n}}{t}, \Delta t, s_i, \vec{F}^{n}_i\right)\)\;
-% \(\vec{u}_i^{*} \gets \mathtt{PredictNS}(\vec u_i^n, \Delta t, \vec x_i)\)\;
-% \(\vec U^*_i \gets \mathtt{DeltaInterp}(\vec u_i^{*}, \vec r_i^{n+1})\)\;
-% \(\vec F_i^{n+1} \gets \displaystyle \frac{\rho_f}{\Delta t}
-% \left(\pdv{\vec{r}^{n+1}}{t} - \vec{U}^*_i\right)\)\; \(\vec{u}_i^{n+1} \gets
-% \mathtt{CorrectNS}\left(\vec{u}_i^{*}, \Delta t, \vec{x}_i,
-% \vec{F}_i^{n+1}\right)\) } \caption{Weak force-coupled and partitioned
-% immersed boundary algorithm.} \end{algorithm}
-
-% \begin{algorithm}[H] \DontPrintSemicolon \ForAll{\(n \in \{0,\dots,N-1\}\)}{
-% \(\vec U_k^{\,n} \gets \mathtt{DeltaInterp}\bigl(\vec u_i^{\,n}, \vec
-% r_k^{\,n}\bigr)\)\; \(\bigl(\vec r_k^{\,n+1}, \partial_t \vec
-% r_k^{\,n+1}\bigr) \gets \mathtt{SolveEBNext}\bigl(\vec r_k^{\,n}, \partial_t
-% \vec r_k^{\,n}, \vec U_k^{\,n}, \Delta t\bigr)\)\;
-% \(\mathtt{BuildStencil}\bigl(\vec r_k^{\,n+1}\bigr) \to
-% \mathcal{S}_k^{\,n+1}\)\; \(\vec u_i^{*} \gets \mathtt{PredictNS}\bigl(\vec
-% u_i^{\,n}, \Delta t\bigr)\)\; \(\vec F_k^{\,n+\frac{1}{2}} \gets
-% \mathtt{SolveEBMidpoint}\bigl(\vec r_k^{\,n+1}, \partial_t \vec r_k^{\,n+1},
-% \vec U_k^{\,n}, \Delta t\bigr)\)\; \(\vec f_i^{\,n+\frac{1}{2}} \gets
-% \mathtt{SpreadLagToEul}\bigl(\vec F_k^{\,n+\frac{1}{2}}, \vec r_k^{\,n+1},
-% \mathcal{S}_k^{\,n+1}\bigr)\)\; \(\vec u_i^{\,n+1} \gets
-% \mathtt{CorrectNS}\bigl(\vec u_i^{*}, \Delta t, \vec
-% f_i^{\,n+\frac{1}{2}}\bigr)\)\; } \caption{Explicit force-coupled immersed
-% boundary algorithm matching the Basilisk event ordering. Lagrangian velocities
-% \(\vec U_k^{\,n}\) sampled from \(\vec u^n\) are reused for both structural
-% update and force computation in time step \(n\).} \end{algorithm}
-
-\section {Uhlmann 1-Stage Algorithm}
-
-Using \(\alpha = 1/2\), \(\gamma = 1\), \(\zeta = 0\), (12a) of Uhlmann becomes
-\begin{equation*}
-    \tilde{\vec u} = \vec u^n + \Delta t \Big( \nu \nabla^2 \vec u^n - \nabla p^n - (\vec u \cdot \nabla \vec u)^n \Big).
-\end{equation*}
-Then, unmodified, we interpolate \(\tilde{\vec u}\) as in (12b):
-\begin{equation}
-    \tilde{\vec U}_\beta (\vec X^{(m)}_l)
-    =
-    \sum_{\vec x \in g^{(\beta)}_h}
-    \tilde{\vec u}_\beta (\vec x)\,
-    \delta_h (\vec x - \vec X^{(m)}_l)\,h^3.
-\end{equation}
-Next, we compute the direct-forcing density at each Lagrangian marker as in (12c):
-\begin{equation}
-    \vec F(\vec X^{(m)}_l)
-    =
-    \frac{\vec U^{(d)}(\vec X^{(m)}_l) - \tilde{\vec U}(\vec X^{(m)}_l)}{\Delta t}.
-\end{equation}
-Spreading this forcing back to the Eulerian grid gives the body-force field \(\vec f\) (cf.\ (12d)):
-\begin{equation}
-    \vec f_\beta(\vec x)
-    =
-    \sum_{m=1}^{N_p}\sum_{l=1}^{N_L}
-    \vec F_\beta(\vec X^{(m)}_l)\,
-    \delta_h(\vec x - \vec X^{(m)}_l)\,
-    \Delta V^{(m)}_l,
-    \qquad \vec x \in g^{(\beta)}_h.
-\end{equation}
-With \(\alpha = 1/2\), the viscous/forcing step (12e) reduces to a Helmholtz problem for an intermediate velocity \(\vec u^\ast\):
-\begin{equation}
-    \left(I - \frac{\nu \Delta t}{2}\nabla^2\right)\vec u^\ast
-    =
-    \left(I + \frac{\nu \Delta t}{2}\nabla^2\right)\vec u^n
-    - \Delta t\,(\vec u \cdot \nabla \vec u)^n
-    - \Delta t\,\nabla p^n
-    + \Delta t\,\vec f.
-\end{equation}
-We then enforce incompressibility via a projection. First solve the Poisson problem (12f):
-\begin{equation}
-    \nabla^2 \phi
-    =
-    \frac{\nabla \cdot \vec u^\ast}{\Delta t},
-\end{equation}
-and correct the velocity (12g) to obtain the divergence-free update:
-\begin{equation}
-    \vec u^{n+1}
-    =
-    \vec u^\ast - \Delta t\,\nabla \phi.
-\end{equation}
-Finally, update the pressure using (12h), which for \(\alpha=1/2\) reads
-\begin{equation}
-    p^{n+1}
-    =
-    p^n + \phi - \frac{\nu \Delta t}{2}\nabla^2 \phi.
-\end{equation}
-
-\section {Anthony's Whiteboard Scheme}
-\begin{enumerate}
-    \item Fluid predidctor
-          \begin{equation*}
-              \rho \frac{\vec u^* - \vec u^n}{\Delta t} + \nabla p^n - \alpha \mu \Delta \vec{\tilde u} + (\vec{\tilde u} \cdot \nabla) \vec u^n = 0.
-          \end{equation*}
-    \item Compute interface slip
-          \begin{equation*}
-              \vec F_k = \frac {\mathcal{I}[\vec u^*](\vec X^n_k) - \vec U^n_k}{\Delta t }
-          \end{equation*}
-    \item Advance beam using \(F_k\)
-    \item Spread Lagrangian force:
-          \begin{equation*}
-              f_h(x) = \sum _k \delta (\vec x - \vec X_k) \vec F_k \Delta s_k
-          \end{equation*}
-    \item Fluid correction
-          \begin{equation*}
-              \rho \frac{\vec u^{**} - \vec u^{*}}{\Delta t} - \beta \mu \Delta \vec u^{**} = f_h
-          \end{equation*}
-    \item Projection
-          \begin{equation*}
-              \Delta \phi = \frac{1}{\Delta t} \nabla \cdot \vec u^{**}, \qquad \vec u^{n+1} = \vec u^{**} - \nabla \phi
-          \end{equation*}
-\end{enumerate}
-
-Starting from time \(n\), we have the following Eulerian quantities: Fluid
-velocity \(\vec u^n\) and pressure \(p^n\). We have the Lagrangian markers
-\(\vec X^n\) for nodal position, \(\vec U^n\) denoting nodal velocity, and
-\(w\). The method is parameterized by nondimensional constants \(\alpha\) and
-\(\beta\).
-
-\paragraph{Fluid Predictor }
-The first step is to predict the fluid velocity: For the advection term, we
-have an explicit treatment with
-
-...
-
-Giving us a provisional velocity that is not constrained by the IBM force
-density nor is divergence free. The pressure \(p^n\) from the previous time
-\(n\) is used as a guess. If we have \(\alpha = 0\) then this is a simple
-explicit update, and if we set \(\alpha > 0\) then we perform a Helholtz-type
-solve for \(\vec u^*\). For \(\tilde {\vec u}\), we can set it equal to \(\vec
-u^n\) and linearize the problem.
-
-\paragraph{Interface Constraint}
-Next, we compute the interface slip correction force \(\vec F_k\) where \(k\)
-is the discrete nodal index along our fibre. \(\mathcal I\) is our discrete
-interpolation operator (our peskin cosine kernel), and we compute this as
-\begin{equation*}
-    \vec F_k = \frac {\mathcal I[\vec u^*] (\vec X^n_k) - \vec U^n_k}{\Delta t},
-\end{equation*}
-which is a continuous approximation of \(\vec f_{\rm ib} = \rho \displaystyle \frac{\vec U - \vec u^*}{\Delta t}\).
-
-\paragraph{Fibre Advancement}
-Using \(-\vec F_k\) as a nodal force, the fibre is advanced according to its
-own kinematic laws.
-
-\paragraph{}
-
-\section{Current Basilisk Scheme}
-
-\paragraph{Governing equations.}
-Consider the incompressible, variable-viscosity Navier--Stokes equations with
-an immersed-boundary (IBM) force density \(\mathbf{f}\),
-\begin{align}
-    \rho\left(\partial_t \mathbf{u} + \mathbf{u}\cdot\nabla \mathbf{u}\right)
-                           & = -\nabla p + \nabla\cdot\!\left(2\mu \mathbf{D}(\mathbf{u})\right) + \mathbf{f},
-    \label{eq:ns-momentum}                                                                                     \\
-    \nabla\cdot \mathbf{u} & = 0,
-    \label{eq:ns-incomp}
-\end{align}
-where the rate-of-deformation tensor is
-\(\mathbf{D}(\mathbf{u})=\tfrac12(\nabla \mathbf{u}+(\nabla \mathbf{u})^\top)\).
-We denote by \(\mathbf{u}^n(\mathbf{x})\) and \(p^n(\mathbf{x})\) the velocity and pressure at time
-\(t^n\), and by \(\mathbf{f}^n(\mathbf{x})\) the IBM force density (force per unit volume).
-
-\paragraph{Discrete unknowns and staggering.}
-We use a finite-volume discretization on a Cartesian grid (with possible
-adaptive refinement). Cell-centered fields are
-\[
-    \mathbf{u}^n,\quad p^n,\quad \rho^n,\quad \mathbf{f}^n,
-\]
-while face-centered fields are
-\[
-    \mathbf{u}_f,\quad \alpha_f,\quad \mu_f,
-\]
-where \(\alpha_f \approx 1/\rho\) is the face-centered specific volume used
-  by the projection step. (In Basilisk, metric factors \(cm\) and \(fm\) may
-  multiply cell/face quantities; on a uniform full-fluid grid these are unity.)
-
-\paragraph{Basilisk operators.}
-To describe the time integrator compactly we introduce the following discrete
-operators.
-\begin{itemize}
-    \item \(\mathcal{I}_f[\mathbf{v}]\) : interpolation from cell centers to faces, producing a face field.
-    \item \(\mathcal{P}_{\Delta t}(\mathbf{u}_f;\alpha_f)\) : projection operator acting on a face velocity,
-          defined by the Poisson solve
-          \[
-              \nabla_h\!\cdot(\alpha_f \nabla_h \phi) = \frac{1}{\Delta t}\nabla_h\!\cdot \mathbf{u}_f,
-          \]
-          and the correction \(\mathbf{u}_f \leftarrow \mathbf{u}_f - \Delta
-          t\,\alpha_f \nabla_h \phi\). (In the implementation \(\phi\) is
-          stored in a pressure-like scalar; for the full-step projection it is
-          written into \(p^{n+1}\).)
-    \item \(\mathcal{A}_{\Delta t}(\mathbf{u};\mathbf{u}_f,\mathbf{g})\) : explicit advection update of a
-          cell-centered velocity field using the Bell--Collela--Glaz scheme (Basilisk
-          \texttt{bcg.h}), with advecting face velocity \(\mathbf{u}_f\) and optional cell-centered source
-          \(\mathbf{g}\).
-    \item \(\mathcal{D}_{\tau}(\mathbf{u};\mu_f,\rho)\) : implicit diffusion update over an effective
-          time \(\tau\), as implemented by Basilisk \texttt{viscosity.h}. Conceptually it applies
-          \[
-              \rho\,\frac{\mathbf{u}^{+}-\mathbf{u}}{\tau} = \nabla_h\cdot\!\left(2\mu_f \mathbf{D}_h(\mathbf{u}^{+})\right).
-          \]
-\end{itemize}
-
-\paragraph{Time step.}
-Given \((\mathbf{u}^n,p^n)\) and an IBM force density \(\mathbf{f}^n\), we
-compute \((\mathbf{u}^{n+1},p^{n+1})\) using the following split scheme,
-controlled by parameters \(\alpha_s,\beta_s \in [0,1]\).
-
-\begin{enumerate}
-    \item \textbf{Advecting face velocity.}
-          Build a face velocity from the current cell-centered velocity,
-          \[
-              \mathbf{u}_f \leftarrow \mathcal{I}_f[\mathbf{u}^n].
-          \]
-          Optionally (and in our implementation) we compute a divergence-free
-          advecting velocity at the half-step by projection:
-          \[
-              \mathbf{u}_f^{n+1/2} \leftarrow \mathcal{P}_{\Delta t/2}(\mathbf{u}_f;\alpha_f).
-          \]
-
-    \item \textbf{Predictor: explicit advection.}
-          Compute the advected intermediate velocity \(\mathbf{u}^*\) by
-          \[
-              \mathbf{u}^* \leftarrow \mathcal{A}_{\Delta t}(\mathbf{u}^n;\mathbf{u}_f^{n+1/2},\mathbf{g}^n),
-          \]
-          where \(\mathbf{g}^n\) denotes any explicit cell-centered source used
-          inside the advection step (e.g. the centered
-          pressure-gradient/acceleration field when mimicking Basilisk's
-          \texttt{centered.h} bookkeeping).
-
-    \item \textbf{Predictor: implicit diffusion (optional).}
-          If \(\alpha_s>0\), apply an implicit viscous update over \(\tau=\alpha_s\Delta t\):
-          \[
-              \mathbf{u}^* \leftarrow \mathcal{D}_{\alpha_s \Delta t}(\mathbf{u}^*;\mu_f,\rho).
-          \]
-
-    \item \textbf{IBM forcing (explicit kick).}
-          Form a pre-projection corrected velocity by adding the IBM force explicitly:
-          \[
-              \mathbf{u}^{**} \leftarrow \mathbf{u}^* + \Delta t\,\frac{\mathbf{f}^n}{\rho}.
-          \]
-
-    \item \textbf{Corrector: implicit diffusion (optional).}
-          If \(\beta_s>0\), apply an additional implicit viscous update over \(\tau=\beta_s\Delta t\):
-          \[
-              \mathbf{u}^{**} \leftarrow \mathcal{D}_{\beta_s \Delta t}(\mathbf{u}^{**};\mu_f,\rho).
-          \]
-
-    \item \textbf{Projection to enforce incompressibility.}
-          Interpolate \(\mathbf{u}^{**}\) to faces and project to obtain \(p^{n+1}\) and a divergence-free
-          face velocity:
-          \[
-              \mathbf{u}_f^{**} \leftarrow \mathcal{I}_f[\mathbf{u}^{**}],\qquad
-              \mathbf{u}_f^{n+1} \leftarrow \mathcal{P}_{\Delta t}(\mathbf{u}_f^{**};\alpha_f),
-          \]
-          where the associated Poisson solve updates the pressure field
-          \(p^{n+1}\). Finally, recover the cell-centered velocity using a
-          discrete pressure gradient:
-          \[
-              \mathbf{u}^{n+1} \leftarrow \mathbf{u}^{**} - \Delta t\,\frac{1}{\rho}\,\nabla_h p^{n+1}.
-          \]
-\end{enumerate}
-
-\printbibliography
+\appendix
+\include{appendix/immersed_boundary_methods}
 
 \end{document}

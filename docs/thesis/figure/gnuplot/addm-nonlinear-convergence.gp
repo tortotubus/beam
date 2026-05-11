@@ -8,7 +8,7 @@ set output plot_output
 set xlabel "$\\log{(1/\\Delta t)}$"
 set ylabel "$\\log{\\lVert \\vec x(T) - \\vec x_h(T)\\rVert}$"
 set grid
-set key outside right 
+set key inside right 
 plot \
 	csv_file every ::1 using ($2 == 1e-07 ? $4 : 1/0):5 with linespoints title "$\\epsilon = 1e-07$", \
 	csv_file every ::1 using ($2 == 1e-08 ? $4 : 1/0):5 with linespoints title "$\\epsilon = 1e-08$", \

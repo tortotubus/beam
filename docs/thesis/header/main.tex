@@ -1,14 +1,16 @@
 % Colors
-\usepackage[usenames,dvipsnames]{xcolor}
+\usepackage[dvipsnames]{xcolor}
 
 % Import for inkscape
 \usepackage{import}
 \usepackage{graphicx}
 \usepackage{float}
+\usepackage{afterpage}
 
-% Sections formatting
-\usepackage{etoolbox}
-% \pretocmd{\section}{\clearpage}{}{} \pretocmd{\subsection}{\clearpage}{}{}
+% Sections formatting 
+
+% \usepackage{etoolbox} \pretocmd{\section}{\clearpage}{}{}
+% \pretocmd{\subsection}{\clearpage}{}{}
 
 % Frames
 \input{header/mdframed}
@@ -16,11 +18,15 @@
 % Lists
 \usepackage{enumitem}
 
-% Geometry
-\usepackage[margin=1in]{geometry}
+% Geometry \makeatletter
+% \@ifpackageloaded{geometry}{}{\usepackage[margin=1in]{geometry}} \makeatother
 
 % Links
-\usepackage{hyperref}
+\usepackage[unicode=true,
+    linktocpage,
+    linkbordercolor={0.5 0.5 1},
+    citebordercolor={0.5 1 0.5},
+    linkcolor=blue]{hyperref}
 
 % Bibliography
 \input{header/bibliography.tex}
@@ -30,6 +36,7 @@
 
 % Tables
 \usepackage{tabularx}
+\usepackage{longtable}
 
 % Algorithms
 \usepackage[boxed, ruled, vlined]{algorithm2e}

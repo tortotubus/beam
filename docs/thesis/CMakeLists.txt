@@ -6,7 +6,10 @@ add_subdirectory(figure)
 file(GLOB_RECURSE THESIS_SOURCES
   CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/*.tex"
+  "${CMAKE_CURRENT_SOURCE_DIR}/admin/*.tex"
   "${CMAKE_CURRENT_SOURCE_DIR}/header/*.tex"
+  "${CMAKE_CURRENT_SOURCE_DIR}/body/*.tex"
+  "${CMAKE_CURRENT_SOURCE_DIR}/appendix/*.tex"
   "${CMAKE_CURRENT_SOURCE_DIR}/*.bib"
   "${CMAKE_CURRENT_SOURCE_DIR}/figure/*.pdf"
   "${CMAKE_CURRENT_SOURCE_DIR}/figure/*.pdf_tex"
