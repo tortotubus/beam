@@ -1,5 +1,6 @@
 #include "elff/c/models/beam/IBEulerBeamPenalty.h"
 
+#include "elff/c/models/beam/IBEulerBeamBCs.hpp"
 #include "elff/config/config.hpp"
 #include "elff/models/beam/IBEulerBeamPenalty.hpp"
 
@@ -9,16 +10,6 @@ using namespace ELFF::Models;
 using namespace ELFF;
 
 namespace {
-EulerBeam::EulerBeamBCs
-make_beam_bcs(int bc_type_1, int bc_type_2)
-{
-  return {
-    .end = { EulerBeam::left, EulerBeam::right },
-    .type = { static_cast<EulerBeam::EulerBeamBCType>(bc_type_1),
-              static_cast<EulerBeam::EulerBeamBCType>(bc_type_2) }
-  };
-}
-
 EulerBeamMesh
 make_offset_initial_mesh(vertex_t s0, int nodes, double length)
 {
@@ -74,8 +65,7 @@ extern "C"
 
 ib_euler_beam_penalty_t
 ib_euler_beam_penalty_new(vertex_t s0,
-                          int      bc_type_1,
-                          int      bc_type_2,
+                          ib_euler_beam_bcs_t bcs,
                           double   length,
                           double   EI,
                           double   mu,
@@ -83,13 +73,13 @@ ib_euler_beam_penalty_new(vertex_t s0,
                           double   r_penalty)
 {
   EulerBeamMesh ic_mesh = make_offset_initial_mesh(s0, nodes, length);
-  EulerBeam::EulerBeamBCs bcs = make_beam_bcs(bc_type_1, bc_type_2);
+  EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
 
   auto* beam = new IBEulerBeamPenalty(static_cast<real_t>(length),
                                       static_cast<real_t>(EI),
                                       static_cast<real_t>(mu),
                                       static_cast<size_t>(nodes),
-                                      bcs,
+                                      boundary_conditions,
                                       static_cast<real_t>(r_penalty));
 
   beam->apply_initial_condition(ic_mesh);
@@ -98,8 +88,7 @@ ib_euler_beam_penalty_new(vertex_t s0,
 
 ib_euler_beam_penalty_t
 ib_euler_beam_penalty_new_theta(vertex_t s0,
-                                int      bc_type_1,
-                                int      bc_type_2,
+                                ib_euler_beam_bcs_t bcs,
                                 double   length,
                                 double   EI,
                                 double   mu,
@@ -107,19 +96,8 @@ ib_euler_beam_penalty_new_theta(vertex_t s0,
                                 double   r_penalty,
                                 double   theta)
 {
-  static_cast<void>(bc_type_1);
-  static_cast<void>(bc_type_2);
-
   EulerBeamMesh ic_mesh = make_theta_initial_mesh(s0, nodes, length, theta);
-  const real_t x0 = s0.x;
-  const real_t y0 = s0.y;
-  const real_t z0 = s0.z;
-
-  EulerBeam::EulerBeamBCs boundary_conditions = {
-    .end = { EulerBeam::left, EulerBeam::right },
-    .type = { EulerBeam::free_bc, EulerBeam::simple_bc },
-    .vals = { { .position = {} }, { .position = { x0, y0, z0 } } }
-  };
+  EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
 
   auto* beam = new IBEulerBeamPenalty(static_cast<real_t>(length),
                                       static_cast<real_t>(EI),

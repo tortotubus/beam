@@ -8,8 +8,11 @@
 
 #include <fstream>
 #include <gtest/gtest.h>
+#include <iomanip>
+#include <limits>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "EulerBeamDynamicInextensibleReferences.hpp"
 #include "EulerBeamStaticInextensibleReferences.hpp"
@@ -411,12 +414,21 @@ plot)gnuplot";
 }
 
 TEST(EulerBeamInextensibleADDMTest, BisshoppAndDrucker) {
-  real_t length = 1., EI = 1., area = 1., r_pentalty = 1e2;
-  size_t nodes = 40;
-  (void)area;
+  std::string csv_filename = "addm-static-convergence.csv";
+  std::string gp_filename = "addm-static-convergence.gp";
+  std::string tex_filename = "addm-static-convergence.tex";
 
-  real_t tip_force_y = -1;
-  double comparison_tol = 5e-7;
+  std::ofstream gp(gp_filename);
+  std::ofstream csv(csv_filename);
+
+  ASSERT_TRUE(gp.is_open());
+  ASSERT_TRUE(csv.is_open());
+
+  const real_t length = 1.;
+  const real_t EI = 1.;
+  const real_t r_penalty = 1e2;
+  const real_t tip_force_y = -1.;
+  const double finest_mesh_tol = 5e-7;
 
   EulerBeam::EulerBeamBCs boundary_conditions = {
       .end = {EulerBeam::left, EulerBeam::right},
@@ -424,20 +436,57 @@ TEST(EulerBeamInextensibleADDMTest, BisshoppAndDrucker) {
       .vals = {{.position = {0, 0, 0}, .slope = {1, 0, 0}},
                {.force = {0, tip_force_y, 0}}}};
 
-  EulerBeamInextensibleADDM beam(length, EI, nodes, boundary_conditions,
-                                 r_pentalty);
-  beam.solve();
-  beam.get_mesh().plot_gnuplot("Bisshopp and Drucker ADDM");
-
-  EulerBeamMesh &mesh = beam.get_mesh();
-  auto centerline = mesh.get_centerline();
-  std::array<real_t, 3> tip = centerline[nodes - 1];
-
   BisshoppAndDrucker1945Result res =
       BisshoppAndDrucker1945(length, EI, -tip_force_y);
 
-  EXPECT_NEAR(std::abs(length - tip[0]), res.A, comparison_tol);
-  EXPECT_NEAR(std::abs(tip[1]), res.delta, comparison_tol);
+  gp << "if (!exists(\"csv_file\")) csv_file = \"" << csv_filename << "\"\n";
+  gp << "if (!exists(\"plot_output\")) plot_output = \"../vector/"
+     << tex_filename << "\"\n";
+
+  gp << R"gnuplot(
+set datafile separator comma
+set terminal cairolatex pdf size 4.8in,3.2in color colortext font ",10"
+set output plot_output
+
+set xlabel "$\\log{(1/\\Delta s)}$"
+set ylabel "$\\log{\\norm{\\vec {\\epsilon}_{\\rm tip}}}$"
+set grid
+set key off
+plot \
+  csv_file every ::1 using 6:7 with linespoints title "ADDM"
+)gnuplot";
+
+  csv << std::setprecision(16);
+  csv << "nodes,ds,x_error,y_error,tip_error,log_inv_ds,log_error\n";
+
+  const std::vector<size_t> node_counts = {11, 22, 44, 88, 172};
+  real_t finest_tip_error = std::numeric_limits<real_t>::infinity();
+  real_t previous_tip_error = std::numeric_limits<real_t>::infinity();
+
+  for (const size_t nodes : node_counts) {
+    EulerBeamInextensibleADDM beam(length, EI, nodes, boundary_conditions,
+                                   r_penalty);
+    beam.solve();
+
+    EulerBeamMesh &mesh = beam.get_mesh();
+    const auto &centerline = mesh.get_centerline();
+    const std::array<real_t, 3> &tip = centerline[nodes - 1];
+
+    const real_t x_error = std::abs(length - tip[0]) - res.A;
+    const real_t y_error = std::abs(tip[1]) - res.delta;
+    const real_t tip_error = std::sqrt(x_error * x_error + y_error * y_error);
+    const real_t ds = mesh.get_ds();
+
+    csv << nodes << "," << ds << "," << x_error << "," << y_error << ","
+        << tip_error << "," << std::log10(1.0 / ds) << ","
+        << std::log10(tip_error) << "\n";
+
+    EXPECT_LT(tip_error, previous_tip_error);
+    previous_tip_error = tip_error;
+    finest_tip_error = tip_error;
+  }
+
+  EXPECT_LT(finest_tip_error, finest_mesh_tol);
 }
 
 TEST(EulerBeamInextensibleADDMTest, Glowinski) {

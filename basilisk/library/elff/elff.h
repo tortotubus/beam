@@ -10,6 +10,33 @@
 #include "library/ibm/IBMeshModel.h"
 #include "library/elff/runtime.h"
 
+static inline ib_euler_beam_bcs_t elff_euler_beam_bcs_types (int left_type,
+                                                             int right_type) {
+  ib_euler_beam_bcs_t bcs = {0};
+  bcs.end[0] = IB_EULER_BEAM_BC_LEFT;
+  bcs.end[1] = IB_EULER_BEAM_BC_RIGHT;
+  bcs.type[0] = left_type;
+  bcs.type[1] = right_type;
+  return bcs;
+}
+
+static inline ib_euler_beam_bcs_t elff_euler_beam_bcs_default () {
+  ib_euler_beam_bcs_t bcs = {0};
+  bcs.end[0] = IB_EULER_BEAM_BC_LEFT;
+  bcs.end[1] = IB_EULER_BEAM_BC_RIGHT;
+  bcs.type[0] = IB_EULER_BEAM_BC_FREE;
+  bcs.type[1] = IB_EULER_BEAM_BC_SIMPLE;
+  return bcs;
+}
+
+static inline ib_euler_beam_bcs_t elff_euler_beam_bcs_theta_pin (coord s0) {
+  ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default ();
+  bcs.vals[1].position.x = s0.x;
+  bcs.vals[1].position.y = s0.y;
+  bcs.vals[1].position.z = s0.z;
+  return bcs;
+}
+
 // ============================================================================
 // ELFF Force-Coupled Operations
 // ============================================================================
@@ -100,9 +127,8 @@ IBMeshModel elff_euler_beam_new (double length,
                                  double mu,
                                  int nodes,
                                  double r_penalty,
+                                 ib_euler_beam_bcs_t bcs,
                                  coord s0,
-                                 int bc_type_1,
-                                 int bc_type_2,
                                  int pid);
 
 IBMeshModel elff_euler_beam_new_theta (double length,
@@ -111,9 +137,8 @@ IBMeshModel elff_euler_beam_new_theta (double length,
                                        int nodes,
                                        double r_penalty,
                                        double theta,
+                                       ib_euler_beam_bcs_t bcs,
                                        coord s0,
-                                       int bc_type_1,
-                                       int bc_type_2,
                                        int pid);
 
 void elff_euler_beam_destroy (void* ctx);
@@ -123,9 +148,8 @@ IBMeshModel elff_euler_beam_penalty_new (double length,
                                          double mu,
                                          int nodes,
                                          double r_penalty,
+                                         ib_euler_beam_bcs_t bcs,
                                          coord s0,
-                                         int bc_type_1,
-                                         int bc_type_2,
                                          int pid);
 IBMeshModel elff_euler_beam_penalty_new_theta (double length,
                                                double EI,
@@ -133,9 +157,8 @@ IBMeshModel elff_euler_beam_penalty_new_theta (double length,
                                                int nodes,
                                                double r_penalty,
                                                double theta,
+                                               ib_euler_beam_bcs_t bcs,
                                                coord s0,
-                                               int bc_type_1,
-                                               int bc_type_2,
                                                int pid);
 void elff_euler_beam_penalty_destroy (void* ctx);
 IBMeshModel elff_euler_beam_ggl_new (double length,
@@ -143,9 +166,8 @@ IBMeshModel elff_euler_beam_ggl_new (double length,
                                      double mu,
                                      int nodes,
                                      double r_penalty,
+                                     ib_euler_beam_bcs_t bcs,
                                      coord s0,
-                                     int bc_type_1,
-                                     int bc_type_2,
                                      int pid);
 IBMeshModel elff_euler_beam_ggl_new_theta (double length,
                                            double EI,
@@ -153,9 +175,8 @@ IBMeshModel elff_euler_beam_ggl_new_theta (double length,
                                            int nodes,
                                            double r_penalty,
                                            double theta,
+                                           ib_euler_beam_bcs_t bcs,
                                            coord s0,
-                                           int bc_type_1,
-                                           int bc_type_2,
                                            int pid);
 void elff_euler_beam_ggl_destroy (void* ctx);
 IBMeshModel elff_euler_beam_addm_new (double length,
@@ -163,9 +184,8 @@ IBMeshModel elff_euler_beam_addm_new (double length,
                                       double mu,
                                       int nodes,
                                       double r_penalty,
+                                      ib_euler_beam_bcs_t bcs,
                                       coord s0,
-                                      int bc_type_1,
-                                      int bc_type_2,
                                       int pid);
 IBMeshModel elff_euler_beam_addm_new_theta (double length,
                                             double EI,
@@ -173,27 +193,24 @@ IBMeshModel elff_euler_beam_addm_new_theta (double length,
                                             int nodes,
                                             double r_penalty,
                                             double theta,
+                                            ib_euler_beam_bcs_t bcs,
                                             coord s0,
-                                            int bc_type_1,
-                                            int bc_type_2,
                                             int pid);
 void elff_euler_beam_addm_destroy (void* ctx);
 IBMeshModel elff_euler_beam_huang_new (double length,
                                        double EI,
                                        double mu,
                                        int nodes,
+                                       ib_euler_beam_bcs_t bcs,
                                        coord s0,
-                                       int bc_type_1,
-                                       int bc_type_2,
                                        int pid);
 IBMeshModel elff_euler_beam_huang_new_theta (double length,
                                              double EI,
                                              double mu,
                                              int nodes,
                                              double theta,
+                                             ib_euler_beam_bcs_t bcs,
                                              coord s0,
-                                             int bc_type_1,
-                                             int bc_type_2,
                                              int pid);
 void elff_euler_beam_huang_destroy (void* ctx);
 
@@ -243,13 +260,12 @@ IBMeshModel elff_euler_beam_new (double length,
                                  double mu,
                                  int nodes,
                                  double r_penalty,
+                                 ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                  coord s0 = {0},
-                                 int bc_type_1 = 0,
-                                 int bc_type_2 = 0,
                                  int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_t beam_ptr =
-    ib_euler_beam_new (v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty);
+    ib_euler_beam_new (v0, bcs, length, EI, mu, nodes, r_penalty);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -273,13 +289,12 @@ IBMeshModel elff_euler_beam_new_theta (double length,
                                        int nodes,
                                        double r_penalty,
                                        double theta,
+                                       ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                        coord s0 = {0},
-                                       int bc_type_1 = 0,
-                                       int bc_type_2 = 0,
                                        int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_t beam_ptr = ib_euler_beam_new_theta (
-    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty, theta);
+    v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -310,13 +325,12 @@ IBMeshModel elff_euler_beam_penalty_new (double length,
                                          double mu,
                                          int nodes,
                                          double r_penalty,
+                                         ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                          coord s0 = {0},
-                                         int bc_type_1 = 0,
-                                         int bc_type_2 = 0,
                                          int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new (
-    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty);
+    v0, bcs, length, EI, mu, nodes, r_penalty);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -340,13 +354,12 @@ IBMeshModel elff_euler_beam_penalty_new_theta (double length,
                                                int nodes,
                                                double r_penalty,
                                                double theta,
+                                               ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                                coord s0 = {0},
-                                               int bc_type_1 = 0,
-                                               int bc_type_2 = 0,
                                                int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new_theta (
-    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty, theta);
+    v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -377,13 +390,12 @@ IBMeshModel elff_euler_beam_ggl_new (double length,
                                      double mu,
                                      int nodes,
                                      double r_penalty,
+                                     ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                      coord s0 = {0},
-                                     int bc_type_1 = 0,
-                                     int bc_type_2 = 0,
                                      int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_ggl_t beam_ptr =
-    ib_euler_beam_ggl_new (v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty);
+    ib_euler_beam_ggl_new (v0, bcs, length, EI, mu, nodes, r_penalty);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -407,13 +419,12 @@ IBMeshModel elff_euler_beam_ggl_new_theta (double length,
                                            int nodes,
                                            double r_penalty,
                                            double theta,
+                                           ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                            coord s0 = {0},
-                                           int bc_type_1 = 0,
-                                           int bc_type_2 = 0,
                                            int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_ggl_t beam_ptr = ib_euler_beam_ggl_new_theta (
-    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty, theta);
+    v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -441,13 +452,12 @@ IBMeshModel elff_euler_beam_addm_new (double length,
                                       double mu,
                                       int nodes,
                                       double r_penalty,
+                                      ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                       coord s0 = {0},
-                                      int bc_type_1 = 0,
-                                      int bc_type_2 = 0,
                                       int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_addm_t beam_ptr = ib_euler_beam_addm_new (
-    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty);
+    v0, bcs, length, EI, mu, nodes, r_penalty);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -471,13 +481,12 @@ IBMeshModel elff_euler_beam_addm_new_theta (double length,
                                             int nodes,
                                             double r_penalty,
                                             double theta,
+                                            ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                             coord s0 = {0},
-                                            int bc_type_1 = 0,
-                                            int bc_type_2 = 0,
                                             int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_addm_t beam_ptr = ib_euler_beam_addm_new_theta (
-    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, r_penalty, theta);
+    v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -507,13 +516,12 @@ IBMeshModel elff_euler_beam_huang_new (double length,
                                        double EI,
                                        double mu,
                                        int nodes,
+                                       ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                        coord s0 = {0},
-                                       int bc_type_1 = 0,
-                                       int bc_type_2 = 0,
                                        int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_huang_t beam_ptr =
-    ib_euler_beam_huang_new (v0, bc_type_1, bc_type_2, length, EI, mu, nodes);
+    ib_euler_beam_huang_new (v0, bcs, length, EI, mu, nodes);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
@@ -536,13 +544,12 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
                                              double mu,
                                              int nodes,
                                              double theta,
+                                             ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
                                              coord s0 = {0},
-                                             int bc_type_1 = 0,
-                                             int bc_type_2 = 0,
                                              int pid = 0) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_theta (
-    v0, bc_type_1, bc_type_2, length, EI, mu, nodes, theta);
+    v0, bcs, length, EI, mu, nodes, theta);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 

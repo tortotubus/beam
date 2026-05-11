@@ -99,8 +99,9 @@ event
 init(i = 0)
 {
   int m_id = ibmeshmanager_add_mesh();
-  // IBMeshModel beam_model = elff_euler_beam_huang_new_theta(b_length, b_EI, b_mu, b_nodes, b_theta);
-  IBMeshModel beam_model = elff_euler_beam_addm_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta);
+  ib_euler_beam_bcs_t b_bcs = elff_euler_beam_bcs_theta_pin((coord){0});
+  // IBMeshModel beam_model = elff_euler_beam_huang_new_theta(b_length, b_EI, b_mu, b_nodes, b_theta, b_bcs);
+  IBMeshModel beam_model = elff_euler_beam_addm_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta, b_bcs);
   ibmeshmanager_set_model(m_id, beam_model);
 
   foreach_ibnode_per_ibmesh()

@@ -10,3 +10,6 @@
 [submodule "third_party/gtest/gtest_submodule"]
 	path = third_party/gtest/gtest_submodule
 	url = https://github.com/google/googletest.git
+[submodule "third_party/ubcthesis/ubcthesis_submodule"]
+	path = third_party/ubcthesis/ubcthesis_submodule
+	url = https://gitlab.math.ubc.ca/colive/ubcthesis.git
