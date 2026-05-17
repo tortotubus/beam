@@ -114,6 +114,10 @@ init(i = 0)
   if (!restore_handler(base_path)) {
     foreach ()
       u.x[] = U0;
+
+#if TREE
+    adapt_wavelet_ibm(NULL, NULL, 0, 1, all, true);
+#endif
   } else {
   }
 }

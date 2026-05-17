@@ -28,9 +28,11 @@ double banaei_r = 0.1;
 double banaei_Ga = 40.;
 
 double b_length = 1.;
+coord b_s0 = {-1./2.,0.,0.};
 int b_nodes = 65;
-double b_penalty = 1e4;
+double b_penalty = 1e3;
 double b_theta = 0.00;
+int b_pid = 0;
 
 /* Diagnostic experiment controls */
 double experiment_ib_force_relaxation = 0.4;
@@ -155,7 +157,7 @@ event init(i = 0) {
   int m_id = ibmeshmanager_add_mesh();
 
   IBMeshModel beam_model = elff_euler_beam_addm_new_theta(
-      b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs);
+      b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs, b_s0, b_pid);
 
   ibmeshmanager_set_model(m_id, beam_model);
 
@@ -169,7 +171,12 @@ event init(i = 0) {
   if (!restore_handler(base_path)) {
     foreach ()
       foreach_dimension() u.x[] = 0.;
-  } else {
+
+    #if TREE 
+      adapt_wavelet_ibm(NULL,NULL,0,1,all,true);
+    #endif
+
+  } else {    
   }
 }
 
