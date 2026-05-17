@@ -24,19 +24,19 @@ int minlevel = 6;
 double Reynolds = 100.;
 double U0 = 1.;
 double L_fluid = 8;
-double dt_fluid = 0.001;
+double dt_fluid = 0.0005;
 double t_end = 60.;
 
 int ibmlevel = 10;
 double R_cylinder = 0.15;
+double alpha_cylinder = 1.0;
 coord c_cylinder = {0.};
 
 /* Derived parameters */
 
 #define h_fluid (L_fluid / (1 << ibmlevel))
-#define N_cylinder ((1.5 * pi * R_cylinder) / h_fluid)
-#define ds_cylinder ((2 * pi * R_cylinder) / N_cylinder)
-#define dV_cylinder (L_fluid / (1 << ibmlevel) * ds_cylinder)
+#define N_cylinder ((int)ceil(1.45 * pi * R_cylinder / (alpha_cylinder * h_fluid)))
+#define ds_cylinder ((2. * pi * R_cylinder) / (double)N_cylinder)
 
 /* Additional fields */
 
@@ -55,14 +55,6 @@ u.n[right] = neumann(0.);
 p[right] = dirichlet(0.);
 pf[right] = dirichlet(0.);
 
-coord circle(int n, int N, coord centre, double radius) {
-  double rad = 2. * pi * ((double)n / (double)N);
-  coord c = centre;
-  c.x += radius * cos(rad);
-  c.y += radius * sin(rad);
-  return c;
-}
-
 int main(int argc, char **argv) {
   /* Here we register runtime options for the simulation */
   input_file_register_option("basilisk.fluid", L_fluid, PARAM_VALUE_DOUBLE);
@@ -76,6 +68,7 @@ int main(int argc, char **argv) {
   input_file_register_option("cylinder", c_cylinder.x, PARAM_VALUE_DOUBLE);
   input_file_register_option("cylinder", c_cylinder.y, PARAM_VALUE_DOUBLE);
   input_file_register_option("cylinder", ibmlevel, PARAM_VALUE_INT);
+  input_file_register_option("cylinder", alpha_cylinder, PARAM_VALUE_DOUBLE);
 
   /* Here we parse the options given through the command-line */
   int input_file_parse_result = input_file_parse_cli(argc, argv);
@@ -89,9 +82,17 @@ int main(int argc, char **argv) {
   /* Setting relevant parameters for basilisk */
   L0 = L_fluid;
   origin(-1.85, -L0 / 2.);
+#if TREE
+  N = 1 << minlevel;
+#else 
   N = 1 << ibmlevel;
+#endif 
   DT = dt_fluid;
   mu = muv;
+
+  ib_force_relaxation = 0.3;
+  ib_richardson_iters = 4;
+
   display_control(Reynolds, 10, 1000);
 
   run();
@@ -102,27 +103,64 @@ event properties(i++) {
 }
 
 event init(i = 0) {
-  int new_id = ibmeshmanager_add_mesh();
-  ibmeshmanager_add_nodes(new_id, N_cylinder);
+  int m_id = ibmeshmanager_add_mesh();
+
+  IBMeshModel cylinder_model = elff_pinned_rigid_body_circle_new(
+      R_cylinder, N_cylinder, 1., c_cylinder, 0., 0);
+  ibmeshmanager_set_model(m_id, cylinder_model);
+
   foreach_ibnode_per_ibmesh() {
     node->depth = ibmlevel;
     mesh->depth = ibmlevel;
-    ibval(nweight) = ds_cylinder;
   }
 
   if (!restore_handler(base_path)) {
     foreach ()
       u.x[] = U0;
-    foreach_ibnode_per_ibmesh() {
-      coord cpos = circle(node_id, N_cylinder, c_cylinder, R_cylinder);
-      foreach_dimension() { ibval(npos.x) = cpos.x; }
-    }
   } else {
   }
 }
 
 event logfile(i++) {
   fprintf(stderr, "%d %g %d %d %d\n", i, t, mgp.i, mgu_a.i, mgu_b.i);
+}
+
+int write_gp_file(const char * base_path) {
+  if (pid() == 0) {
+    if (!base_path) {
+      fprintf(stderr, "warning: base_path is NULL; skipping gp output\n");
+      return 0;
+    }
+
+    if (create_path(base_path) != 0) {
+      fprintf(stderr, "warning: failed to create output path %s; skipping gp output\n", base_path);
+      return 0;
+    }
+
+    char fname[4096];
+    snprintf(fname, sizeof(fname), "%s/static-cylinder-drag.gp", base_path);
+
+    FILE *fp = NULL;
+
+    fp = fopen(fname, "w");
+
+    const char *gp_str = 
+      "if (!exists(\"csv_file\")) csv_file = \"cylinderstats.csv\"\n"
+      "if (!exists(\"plot_output\")) plot_output = \"static-cylinder-drag.tex\"\n"
+      "set datafile separator comma\n"
+      "set terminal cairolatex pdf size 4.8in,3.2in color colortex font \",10\"\n"
+      "set output plot_output\n"
+      "set xlabel \"$t$\"\n"
+      "set ylabel \"\"\n"
+      "set grid\n"
+      "set key off\n"
+      "plot \\\n"
+      "\tcsv_file every ::1 using 1:5 with linespoints title \"$C_l$\"\\\n";
+
+    fclose(fp);
+  }
+
+  return 0;
 }
 
 event statsfile(i++) {
@@ -165,7 +203,7 @@ event statsfile(i++) {
   }
 }
 
-event output(i += 1; t <= t_end)
+event output(i += 200; t <= t_end)
 // output(i += 1; i <= 5.)
 {
   scalar omega[];
