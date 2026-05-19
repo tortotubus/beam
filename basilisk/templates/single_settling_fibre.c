@@ -5,6 +5,9 @@
 #include "library/io/output-vtk.h"
 #include "library/io/params/params-cli.h"
 
+#include "lambda2.h"
+
+
 /* Default simulations parameters */
 
 double dt_fluid = 0.0005;
@@ -22,19 +25,20 @@ int ibmlevel = 11;
  *   r     = Delta rho/rho_0
  *   Ga    = sqrt(r g L^3)/nu
  */
+
 double banaei_rp = 30.;
 double banaei_gamma = 0.1;
 double banaei_r = 0.1;
 double banaei_Ga = 40.;
 
 double b_length = 1.;
-coord b_s0 = {-1./2.,0.,0.};
+coord b_s0 = {-1. / 2., 0., 0.};
 int b_nodes = 65;
 double b_penalty = 1e3;
 double b_theta = 0.00;
 int b_pid = 0;
 
-/* Diagnostic experiment controls */
+/* Nonphysical experiment controls */
 double experiment_ib_force_relaxation = 0.4;
 int experiment_ib_richardson_iters = 3;
 int experiment_stats_interval = 1;
@@ -53,13 +57,13 @@ char *base_path = "single_settling_fibre_output";
 #define b_mu ((1. + banaei_r) * b_rho_0 * b_area)
 #define b_submerged_weight_per_length (b_linear_density_difference * b_g)
 #define b_EI                                                                   \
-  (banaei_gamma * banaei_r * b_submerged_weight_per_length * b_length *         \
+  (banaei_gamma * banaei_r * b_submerged_weight_per_length * b_length *        \
    b_length * b_length)
 #define b_gravity -(b_submerged_weight_per_length)
 
-#define fluid_nu                                                               \
-  (sqrt(banaei_r * b_g * b_length * b_length * b_length) / banaei_Ga)
+#define fluid_nu (sqrt(banaei_r * b_g * b_length * b_length * b_length) / banaei_Ga)
 #define fluid_dynamic_viscosity (b_rho_0 * fluid_nu)
+#define fluid_velocity_scale (sqrt(banaei_r * b_g * b_length))
 
 /* Additional fields */
 
@@ -144,6 +148,11 @@ int main(int argc, char **argv) {
   run();
 }
 
+event logfile(i++) {
+  if (pid() == 0)
+    fprintf(stderr, "%d %g\n", i, t);
+}
+
 /* Reynolds control */
 event properties(i++) {
   foreach_face() muv.x[] = fm.x[] * fluid_dynamic_viscosity;
@@ -152,8 +161,7 @@ event properties(i++) {
 /* Beam setup */
 event init(i = 0) {
   ib_euler_beam_bcs_t b_bcs =
-      elff_euler_beam_bcs_types(IB_EULER_BEAM_BC_FREE,
-                                IB_EULER_BEAM_BC_FREE);
+      elff_euler_beam_bcs_types(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
   int m_id = ibmeshmanager_add_mesh();
 
   IBMeshModel beam_model = elff_euler_beam_addm_new_theta(
@@ -171,90 +179,95 @@ event init(i = 0) {
   if (!restore_handler(base_path)) {
     foreach ()
       foreach_dimension() u.x[] = 0.;
-
-    #if TREE 
-      adapt_wavelet_ibm(NULL,NULL,0,1,all,true);
-    #endif
-
-  } else {    
+#if TREE
+    adapt_wavelet_ibm(NULL, NULL, 0, 1, all, true);
+#endif
+  } else {
+    // if restored
   }
 }
 
+event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
 
-event logfile(i++) {
-  if (pid() == 0)
-    fprintf(stderr, "%d %g\n", i, t);
-}
+  coord pos_first;
+  coord pos_last;
+  coord pos_middle;
+  coord pos_min_vert = {0., Y0 + L0, 0.};
 
-event statsfile(i += experiment_stats_interval; t <= experiment_t_end) {
-  double x_first = 0.;
-  double y_first = 0.;
-  double x_last = 0.;
-  double y_last = 0.;
-  double x_com = 0.;
-  double y_com = 0.;
-  double w_sum = 0.;
-  int node_count = 0;
+  double delta_first;
+  double delta_last;
 
   foreach_ibnode() {
-    const double w = ibval(nweight);
-    if (node_count == 0) {
-      x_first = ibval(npos.x);
-      y_first = ibval(npos.y);
+    if (node_id == 0) {
+      foreach_dimension() { pos_first.x = ibval(npos.x); }
+    } else if (node_id == ibmm.pool.active.size - 1) {
+      foreach_dimension() { pos_last.x = ibval(npos.x); }
+    } else if (node_id == b_nodes / 2) {
+      foreach_dimension() { pos_middle.x = ibval(npos.x); }
     }
-
-    x_last = ibval(npos.x);
-    y_last = ibval(npos.y);
-    x_com += w * ibval(npos.x);
-    y_com += w * ibval(npos.y);
-    w_sum += w;
-    node_count++;
+    if (pos_min_vert.y > ibval(npos.y)) {
+      foreach_dimension() { pos_min_vert.x = ibval(npos.x); }
+    }
   }
 
-  if (w_sum > 0.) {
-    x_com /= w_sum;
-    y_com /= w_sum;
-  }
-
-  const double end_to_end = sqrt(sq(x_last - x_first) + sq(y_last - y_first));
+  delta_first = (pos_first.y - pos_min_vert.y) / (0.5 * b_length);
+  delta_last = (pos_last.y - pos_min_vert.y) / (0.5 * b_length);
 
   if (pid() == 0) {
+    fprintf(stderr, "%d %g %g %g %g\n", i, t, pos_min_vert.y, delta_first,
+            delta_last);
+
     FILE *fp = NULL;
+
     if (!base_path) {
       fprintf(stderr, "warning: base_path is NULL; skipping tip output\n");
       return 0;
     }
+
     create_path(base_path);
     char fname[4096];
-    snprintf(fname, sizeof(fname), "%s/tip.txt", base_path);
+    snprintf(fname, sizeof(fname), "%s/banaei-marchetti-validation.csv",
+             base_path);
+
     fp = fopen(fname, i == 0 ? "w" : "a");
+
     if (!fp) {
       fprintf(stderr, "warning: failed to open %s for append\n", fname);
       return 0;
     }
-    if (i == 0)
-      fprintf(fp,
-              "# i t x_first y_first x_last y_last x_com y_com end_to_end\n");
-    fprintf(fp, "%d %g %g %g %g %g %g %g %g\n", i, t, x_first, y_first, x_last,
-            y_last, x_com, y_com, end_to_end);
+
+    if (i == 0) {
+      fprintf(fp, "i,t,banaei_Ga,banaei_gamma,banaei_r,banaei_rp,B,x0,xm,xmy,xf,"
+                  "y0,ym,ymy,yf,z0,zm,zmy,zf,delta_0,delta_f\n");
+    }
+
+    fprintf(fp, "%d,%g,%g,%g,%g,%g%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+            i, t, banaei_Ga, banaei_gamma, banaei_r, banaei_rp, (1./(banaei_gamma * banaei_r)), pos_first.x,
+            pos_middle.x, pos_min_vert.x, pos_last.x, pos_first.y, pos_middle.y,
+            pos_min_vert.y, pos_last.y, pos_first.z, pos_middle.z,
+            pos_min_vert.z, pos_last.z, delta_first, delta_last);
     fclose(fp);
   }
 }
 
-event output(i += 500; t <= experiment_t_end) {
-  scalar omega[];
-  vorticity(u, omega);
+event output(t += experiment_output_interval; t <= experiment_t_end) {
+  scalar l2[], omega_z[];
+  lambda2(u, l2);
+  vorticity(u, omega_z);
+
 #if TREE
-  output_hdf_htg({omega, p}, {u, ibmf}, base_path);
+  output_hdf_htg({l2, omega_z, p}, {u, ibmf}, base_path);
 #else
-  output_hdf_imagedata({omega, p}, {u, ibmf}, base_path);
+  output_hdf_imagedata({l2, omega_z, p}, {u, ibmf}, base_path);
 #endif
   output_hdf_pd(NULL, (IBvector[]){eulvel, nforce, nvel, {{-1}}}, base_path);
 }
 
 #if TREE
 event adapt(i++) {
-  adapt_wavelet_ibm({u}, (double[]){3e-3, 3e-3, 3e-3}, maxlevel, minlevel);
+  double adapt_rel_u_tol = 1e-4;
+  double val = adapt_rel_u_tol * fluid_velocity_scale;
+  adapt_wavelet_ibm({u}, (double[]){val, val, val}, maxlevel, minlevel);
 }
 #endif
 

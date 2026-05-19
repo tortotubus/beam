@@ -54,7 +54,7 @@ static inline ib_runtime_t elff_runtime_get () {
   }
 
   assert (elff_runtime);
-  elff_set_out_prefix("[info] ");
+  // elff_set_out_prefix("[info] ");
   return elff_runtime;
 }
 

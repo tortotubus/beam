@@ -1,21 +1,40 @@
 #include "library/io/params/params-txt.h"
 
+/* Type definitions */
+
 typedef struct InputFileCLIOptions {
   const char* program_name;
   const char* input_path;
   int show_help;
+  int show_template;
   int had_error;
 } InputFileCLIOptions;
 
+/* Function declarations */
+
+static inline void input_file_cli_options_init (InputFileCLIOptions* opts);
+static inline void input_file_print_help (const char* program_name, FILE* out);
+static inline int input_file_parse_cli_args (int argc, char** argv, InputFileCLIOptions* opts);
+static inline int input_file_parse_cli (int argc, char** argv);
+
+/* Function definitions */
+
+/**
+ * @brief Initialize @ref InputFileCLIOptions
+ */
 static inline void input_file_cli_options_init (InputFileCLIOptions* opts) {
   if (!opts)
     return;
   opts->program_name = "program";
   opts->input_path = NULL;
   opts->show_help = 0;
+  opts->show_template = 0;
   opts->had_error = 0;
 }
 
+/**
+ * @brief Print help
+ */
 static inline void input_file_print_help (const char* program_name, FILE* out) {
   if (!out)
     return;
@@ -23,14 +42,14 @@ static inline void input_file_print_help (const char* program_name, FILE* out) {
     program_name = "program";
 
   if (pid () == 0) {
-    fprintf (out, "Usage: %s [--help|-h] [input-file]\n", program_name);
+    fprintf (out, "Usage: %s [--help|-h] [--template] [input-file]\n", program_name);
     fprintf (out, "\n");
     fprintf (out, "Arguments:\n");
-    fprintf (out,
-             "  input-file    Optional params file in [group] key = value format.\n");
+    fprintf (out, "  input-file    Optional params file in [group] key = value format.\n");
     fprintf (out, "\n");
     fprintf (out, "Options:\n");
     fprintf (out, "  -h, --help    Show this help and exit.\n");
+    fprintf (out, "  -t. --template    Print default params file template and exit.\n");
     fprintf (out, "\n");
     fprintf (out, "Info:\n");
     fprintf (out, "  %s\n", GRIDNAME);
@@ -47,6 +66,7 @@ static inline void input_file_print_help (const char* program_name, FILE* out) {
  *
  * Recognized options:
  * - `-h`, `--help`
+ * - `--template`
  *
  * Positional handling:
  * - The first positional argument is treated as the params input file.
@@ -85,6 +105,16 @@ input_file_parse_cli_args (int argc, char** argv, InputFileCLIOptions* opts) {
       continue;
     }
 
+    if (strcmp (arg, "--template") == 0) {
+      opts->show_template = 1;
+      continue;
+    }
+
+    if (strcmp (arg, "-t") == 0) {
+      opts->show_template = 1;
+      continue;
+    }
+
     if (arg[0] == '-') {
       fprintf (stderr, "%s: unrecognized option '%s'\n", opts->program_name, arg);
       opts->had_error = 1;
@@ -110,7 +140,7 @@ input_file_parse_cli_args (int argc, char** argv, InputFileCLIOptions* opts) {
  * @brief Convenience wrapper:
  *        parse CLI, handle --help, and parse params file if provided.
  *
- * @return 0 on success/no-op, 1 if help printed, -1 on error.
+ * @return 0 on success/no-op, 1 if help/template printed, -1 on error.
  */
 static inline int input_file_parse_cli (int argc, char** argv) {
   InputFileCLIOptions opts;
@@ -119,6 +149,11 @@ static inline int input_file_parse_cli (int argc, char** argv) {
 
   if (opts.show_help) {
     input_file_print_help (opts.program_name, stdout);
+    return 1;
+  }
+
+  if (opts.show_template) {
+    input_file_print_template (stdout);
     return 1;
   }
 

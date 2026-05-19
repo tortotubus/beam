@@ -71,6 +71,7 @@ void _input_file_register_option (const char* group_name,
                                   ParamValueType option_value_type);
 int input_file_apply_option (const char* group_name, const char* option_name);
 int input_file_apply_options ();
+void input_file_print_template (FILE* out);
 void input_file_print_options ();
 static int _input_file_find_group (const char* group_name);
 static int _input_group_find_option (const InputGroup* group, const char* option_name);
@@ -291,6 +292,52 @@ static int _input_group_find_option (const InputGroup* group, const char* option
       return oi;
   }
   return -1;
+}
+
+/**
+ * @brief Prints registered options as a reusable params input file.
+ */
+void input_file_print_template (FILE* out) {
+  if (!out || pid () != 0)
+    return;
+
+  for (int gi = 0; gi < input_file.input_group_count; gi++) {
+    InputGroup* g = &input_file.input_groups[gi];
+    fprintf (out, "[%s]\n", g->group_name ? g->group_name : "");
+
+    for (int oi = 0; oi < g->option_count; oi++) {
+      const char* option_name = g->option_names[oi] ? g->option_names[oi] : "";
+      ParamValue* v = &g->option_values[oi];
+
+      fprintf (out, "%s = ", option_name);
+      if (!v->ptr) {
+        fprintf (out, "\n");
+        continue;
+      }
+
+      switch (v->type) {
+      case 0:
+        fprintf (out, "%d\n", *((int*) v->ptr));
+        break;
+      case 1:
+        fprintf (out, "%.17g\n", *((double*) v->ptr));
+        break;
+      case 2:
+        fprintf (out, "%s\n", *((bool*) v->ptr) ? "true" : "false");
+        break;
+      case 3: {
+        char* s = *((char**) v->ptr);
+        fprintf (out, "\"%s\"\n", s ? s : "");
+        break;
+      }
+      default:
+        fprintf (out, "\n");
+        break;
+      }
+    }
+
+    fprintf (out, "\n");
+  }
 }
 
 /**
