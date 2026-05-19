@@ -1,1 +1,42 @@
 \chapter{Navier-Stokes}
+
+\section{Adaptive Grids}
+
+Many systems exhibit a multi-scale nature, where phenomenon occur at a
+hierarchy of different physical and temporal scales. This observation,
+particularly in physical space, has been the motivation behind the development
+of various \emph{adaptive mesh refinement} (AMR) schemes. The general idea
+across different forms of AMR is to capture small-scale phenomenon with fine
+meshes \emph{locally} and to keep solution meshes coarse where phenomenon occur
+on a larger scale. Ideally, these adaptive meshes are then able to dynamically
+adapt the grid (through refinement or coarsening) throughout the course of the
+simulation as according to user-defined and problem-specific refinement
+criteria.
+
+For Cartesian grids, the oldest and arguably still most popular type of
+approaches are broadly called \emph{block-structured} AMR. This body of methods
+originates from a series of papers \cite{berger_adaptive_1984} and still
+remains popular and the family of schemes is still widely used in modern
+libraries (e.g. \href{https://amrex-codes.github.io/amrex/}{AMReX}). In this
+approach, a coarse Cartesian grid is created with size \(h\), where regions
+requiring refinement have finer rectangular grids \(h/2\) nested within the
+coarse grid.
+
+A second broad category of method applicable to cartesian grids is
+\emph{tree-structured} AMR. These methods represent a Cartesian mesh based on a
+tree data structure, where all possible cells or nodes of a mesh are
+represented as the \emph{leaves} of a tree. The main functional difference of
+these methods is the creation of locally-refined regions through a
+``point-wise'' refinement the size of a single mesh cell, rather than through
+defining larger rectangular regions as is required using block-structured AMR.
+In theory, this allows more flexible and local refinement in regions of
+interest with more arbitrary geometry, in comparison to defining regions of
+interest only though blocks. The trade off is an arguably more complex
+implementation and less inherent cache-locality. In addition, special treatment
+is needed for the \emph{restriction} and \emph{prolongation} operators such
+that schemes using the tree-structured mesh retain desired order near
+refinement boundaries.
+
+\section{Tree-structured Adaptive Mesh Refinment}
+
+\section{}
