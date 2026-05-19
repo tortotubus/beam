@@ -34,7 +34,6 @@ char * base_path = "huang_output";
 #define b_mu huang_rho
 
 /* Additional fields */
-
 face vector muv[]; 
 
 /* Boundary conditions */
@@ -79,7 +78,11 @@ main(int argc, char ** argv)
   /* Setting relevant parameters for basilisk */
   L0 = L_fluid;
   origin(-2., -L0 / 2.);
+#if TREE
+  N = 1 << minlevel;
+#else 
   N = 1 << ibmlevel;
+#endif   
   DT = dt_fluid;
   mu = muv;
   display_control(huang_Re, 10, 1000);
