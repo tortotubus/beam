@@ -128,7 +128,7 @@ init(i = 0)
 event
 logfile(i++) {
   if (pid() == 0)
-    fprintf(stderr, "[info] %d %g\n", i, t);
+    fprintf(stderr, "%d %g\n", i, t);
 }
 
 event
@@ -150,13 +150,16 @@ statsfile(i++)
     }
     create_path(base_path);
     char fname[4096];
-    snprintf(fname, sizeof(fname), "%s/tip.txt", base_path);
+    snprintf(fname, sizeof(fname), "%s/tip.csv", base_path);
     fp = fopen(fname, "a");
     if (!fp) {
       fprintf(stderr, "warning: failed to open %s for append\n", fname);
       return 0;
     }
-    fprintf(fp, "%d %g %g %g\n", i, t, x_tip, y_tip);
+    if (i==0) {
+      fprintf(fp, "i,t,x_tip,y_tip\n");
+    }
+    fprintf(fp, "%d,%g,%g,%g\n", i, t, x_tip, y_tip);
     fclose(fp);
   }
 }
@@ -179,7 +182,7 @@ output(t += 0.05; t <= 50)
 event
 adapt(i++)
 {
-  adapt_wavelet_ibm({ u }, (double[]){ 3e-3, 3e-3 }, maxlevel, minlevel);
+  adapt_wavelet_ibm({ u }, (double[]){ 5e-3, 5e-3 }, maxlevel, minlevel);
 }
 #endif
 

@@ -4,12 +4,65 @@
 % after finished.
 \def\arraystretch{1.5}
 % The longtable environment allows the table to span multiple pages
-\begin{longtable}[l]{l l}
-    $c$               & speed of light               \\
-    $\hbar$           & reduced Planck constant      \\
-    $\mu_{0}$         & vacuum permeability constant \\
-    $\varepsilon_{0}$ & vacuum permittivity constant \\
-    $\Delta$          & Laplace operator             \\
+\begin{longtable}[l]{p{0.22\textwidth} p{0.68\textwidth}}
+    \multicolumn{2}{l}{\textbf{Geometry and Beam Kinematics}}                                        \\
+    $\Omega$               & fluid domain                                                            \\
+    $\Gamma_h$             & discrete immersed boundary or Lagrangian marker set                     \\
+    $s$                    & arclength coordinate along the beam centerline                          \\
+    $L$                    & beam length                                                             \\
+    $\vec x$               & Eulerian spatial coordinate                                             \\
+    $\vec r(s,t)$          & beam centerline position                                                \\
+    $\vec v(s,t)$          & beam centerline velocity, $\partial_t\vec r$                            \\
+    $\vec t,\vec n,\vec b$ & tangent, normal, and binormal directors                                 \\
+    $\kappa_n,\kappa_b$    & curvature components in the normal and binormal directions              \\
+    $\lambda$              & local axial stretch ratio in the Euler--Bernoulli derivation            \\
+    $A$                    & beam cross-sectional area                                               \\
+    $I$, $I_{\eta\eta}$, $I_{\beta\beta}$
+                           & second moments of area of the beam cross section                        \\
+    $\Delta s$             & beam mesh spacing                                                       \\
+    \multicolumn{2}{l}{\textbf{Fluid Variables and Parameters}}                                      \\
+    $\vec u(\vec x,t)$     & Eulerian fluid velocity                                                 \\
+    $\vec u_f$             & face-centered fluid velocity                                            \\
+    $p$                    & fluid pressure                                                          \\
+    $\rho_f$               & fluid density                                                           \\
+    $\rho_i$               & fluid density in cell $i$                                               \\
+    $\mu_f$                & fluid dynamic viscosity                                                 \\
+    $\alpha_f$             & reciprocal fluid density, $1/\rho_f$                                    \\
+    $\vec g$               & body acceleration, such as gravity                                      \\
+    $\vec a_f$             & face-centered acceleration or source field in the fluid solver          \\
+    $\vec G$               & cell-centered pressure-gradient and acceleration correction field        \\
+    $\Delta x$             & fluid grid spacing                                                      \\
+    $\Delta V_i$           & volume of fluid cell $i$                                                \\
+    \multicolumn{2}{l}{\textbf{Beam Mechanics}}                                                      \\
+    $\rho_b$               & beam mass per unit length                                               \\
+    $E$                    & Young's modulus                                                         \\
+    $EI$                   & flexural rigidity                                                       \\
+    $T$                    & beam tension; Lagrange multiplier enforcing inextensibility             \\
+    $\vec f_b$             & non-hydrodynamic beam force density                                     \\
+    $\vec f$               & generic force density                                                   \\
+    $\vec F$               & generic total or resultant force                                        \\
+    \multicolumn{2}{l}{\textbf{Immersed-Boundary Coupling}}                                          \\
+    $\vec X_a$             & position of Lagrangian marker $a$                                       \\
+    $\vec U_a$             & prescribed or computed velocity of marker $a$                           \\
+    $q_a$                  & quadrature weight associated with marker $a$                            \\
+    $\rho_a$               & local fluid density associated with marker $a$                          \\
+    $\Delta V_a$           & local cell volume associated with marker $a$                            \\
+    $\delta_h$             & regularized immersed-boundary delta kernel                              \\
+    $J$                    & interpolation operator from the fluid grid to markers                   \\
+    $S$                    & spreading operator from markers to the fluid grid                       \\
+    $\bm\Lambda$           & Lagrangian hydrodynamic force density exerted by the fluid on the beam  \\
+    $\vec F_h$             & total hydrodynamic force on an immersed body                            \\
+    \multicolumn{2}{l}{\textbf{Time Integration and Discrete Systems}}                               \\
+    $t$                    & time                                                                    \\
+    $\Delta t$             & time-step size                                                          \\
+    $n$                    & time-step index                                                         \\
+    $\beta,\gamma$         & Newmark time-integration parameters                                     \\
+    $\vec q$               & discrete beam position or generalized coordinate vector                 \\
+    $\bm\phi$              & discrete inextensibility constraint vector in the GGL formulation       \\
+    $\mat M$               & mass matrix                                                             \\
+    $\mat C$               & constraint Jacobian or constraint-gradient matrix, depending on context \\
+    $\mat J_\phi$          & Jacobian of the discrete inextensibility constraint                     \\
+    $\zeta$                & velocity-level Lagrange multiplier used in the GGL formulation          \\
 \end{longtable}
 % Reset spacing to default
 \def\arraystretch{1}

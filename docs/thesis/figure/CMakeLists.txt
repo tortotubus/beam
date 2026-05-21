@@ -1,20 +1,30 @@
 set(THESIS_SOURCE_VECTOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vector")
 set(THESIS_BINARY_VECTOR_DIR "${CMAKE_CURRENT_BINARY_DIR}/vector")
+set(THESIS_SOURCE_RASTER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/raster")
+set(THESIS_BINARY_RASTER_DIR "${CMAKE_CURRENT_BINARY_DIR}/raster")
 
 add_subdirectory(gnuplot)
 add_subdirectory(inkscape)
+add_subdirectory(paraview)
 
 set(THESIS_GENERATED_FIGURES
   ${THESIS_GNUPLOT_GENERATED_FIGURES}
   ${THESIS_INKSCAPE_GENERATED_FIGURES}
+  ${THESIS_PARAVIEW_GENERATED_FIGURES}
 )
 set(THESIS_FIGURE_INPUTS
   ${THESIS_GNUPLOT_INPUTS}
   ${THESIS_INKSCAPE_INPUTS}
+  ${THESIS_PARAVIEW_INPUTS}
 )
 
 add_custom_target(thesis_figures)
-add_dependencies(thesis_figures thesis_gnuplot_figures thesis_inkscape_figures)
+add_dependencies(
+  thesis_figures
+  thesis_gnuplot_figures
+  thesis_inkscape_figures
+  thesis_paraview_figures
+)
 
 set(THESIS_GENERATED_FIGURES
   ${THESIS_GENERATED_FIGURES}

@@ -1,6 +1,7 @@
  
 *.aux
 *.bbl
+*.bbl-SAVE-ERROR
 *.bcf
 *.fdb_latexmk
 *.fls

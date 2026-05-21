@@ -1,15 +1,7 @@
 \documentclass[masc,oneside]{ubcthesis}
 
 % Some packages that are necessary and that may be useful. Be careful about removing any as it may cause some formatting errors.
-
-
 \usepackage{afterpage}
-% \usepackage{float}
-% \usepackage{pdflscape}
-% \usepackage[numbers,sort&compress]{natbib}
-% \usepackage{psfrag}
-% \usepackage{parskip} 
-% \usepackage{lipsum}
 
 \input{header/main}
 
@@ -47,9 +39,9 @@
 \renewcommand\thesubparagraph {\theparagraph.\arabic{subparagraph}}
 
 \setcounter{tocdepth}{2}
-\setcounter{secnumdepth}{2}
+\setcounter{secnumdepth}{2} 
 
-\floatstyle{ruled}
+\floatstyle{ruled}  
 \newfloat{Program}{htbp}{lop}[chapter] 
 
 \begin{document}
@@ -88,10 +80,13 @@
 
 \mainmatter
 
+\include{body/introduction}
 \include{body/euler_bernoulli}
 \include{body/addm}
+\include{body/ggl}
 \include{body/navier_stokes}
 \include{body/immersed_boundary_methods}
+\include{body/coupled}
 
 % =============================================================================
 % Appendix
@@ -99,5 +94,8 @@
 
 \appendix
 \include{appendix/immersed_boundary_methods}
+
+\backmatter
+\printbibliography[heading=bibintoc,title={Bibliography}]
 
 \end{document}

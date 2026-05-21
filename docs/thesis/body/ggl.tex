@@ -1,5 +1,6 @@
+\chapter{Gear-Gupta-Leimkuhler}
 
-\subsection{Constrained Mechanics}
+\section{Constrained Mechanics}
 
 Differential-algebraic equations (DAEs) are systems of equations involving both
 differential and algebraic relations. In contrast to ordinary differential
@@ -66,3 +67,177 @@ configuration level,
     g(q)=0.
 \end{equation*}
 Differentiating once gives the velocity-level compatibility condition, and differentiating a second time yields an acceleration-level relation involving \(\ddot q\). Since the equations of motion also involve accelerations, it is only at this stage that the constraint can be combined directly with the dynamics to determine the Lagrange multipliers and admissible accelerations. For this reason, the standard redundant-coordinate formulation of constrained mechanical systems is typically classified as an index-3 DAE.
+
+\section{Time-Dependent GGL Beam Formulation}
+
+The Gear--Gupta--Leimkuhler formulation used in this work is posed directly as
+a time-dependent constrained system. It is not obtained by first solving a
+static constrained beam problem and then adding a correction for inertia. The
+unknown centerline is
+\begin{equation*}
+    \vec r(s,t) = (x(s,t),y(s,t),z(s,t)),
+    \qquad s\in[0,L],
+\end{equation*}
+where \(s\) is the reference arclength coordinate, and the velocity is
+\begin{equation*}
+    \vec v(s,t) = \pdv{\vec r}{t}(s,t).
+\end{equation*}
+Inextensibility is imposed at the configuration level by
+\begin{equation}\label{eq:ggl-inextensibility}
+    g(\vec r) = \norm{\vec r'}^2 - 1 = 0.
+\end{equation}
+Differentiating this constraint in time gives the velocity compatibility
+condition
+\begin{equation}\label{eq:ggl-velocity-constraint}
+    c(\vec r,\vec v) = \vec r'\cdot \vec v' = 0.
+\end{equation}
+The factor of two from differentiating \(\norm{\vec r'}^2\) has been omitted,
+since it does not change the constraint manifold.
+
+The purpose of the GGL reformulation is to make both constraints visible to the
+time-step solve. Instead of solving only for \(\vec r\) and a position
+multiplier, the method treats the position, velocity, and two multiplier fields
+as simultaneous unknowns:
+\begin{equation*}
+    (\vec r,\vec v,T,\zeta).
+\end{equation*}
+The tension \(T\) enforces the configuration-level constraint, while
+\(\zeta\) enforces the velocity-level constraint. This avoids a separate
+projection step in which the position or velocity is corrected after the time
+integrator has advanced the beam.
+
+One part of the coupled system is the weak momentum balance at the new time
+level: find \((\vec r,T)\) such that, for all admissible virtual
+displacements \(\vec \eta\),
+\begin{equation}\label{eq:ggl-position-weak}
+    \int_0^L \rho_b \pdv[2]{\vec r}{t} \cdot \vec \eta \odif{s}
+    +
+    \int_0^L EI \vec r'' \cdot \vec \eta'' \odif{s}
+    -
+    2\int_0^L T \vec r' \cdot \vec \eta' \odif{s}
+    -
+    \int_0^L \vec f \cdot \vec \eta \odif{s}
+    = 0,
+\end{equation}
+where \(\rho_b\) is the beam mass per unit length. The factor \(2\) appears
+because the variation of \(\norm{\vec r'}^2-1\) is
+\(2\vec r'\cdot\vec \eta'\). Different normalizations of the constraint move
+this constant into the multiplier; the implementation convention is the one
+shown in \eqref{eq:ggl-position-weak}.
+
+For the spatial discretization, the centerline and velocity are approximated
+componentwise with the same \(C^1\) cubic Hermite beam space. Each node
+therefore carries a position and a slope degree of freedom for each Cartesian
+component. The multipliers \(T\) and \(\zeta\) are approximated with
+continuous piecewise-linear functions on the same one-dimensional mesh. The
+integrals defining the mass, bending, load, and constraint terms are evaluated
+elementwise by Gaussian quadrature.
+
+Let \(\vec q\) and \(\vec v\) denote the discrete position and velocity
+coefficient vectors at the new time level. The implementation uses the
+average-acceleration Newmark choice
+\begin{equation*}
+    \gamma = \frac12,
+    \qquad
+    \beta = \frac14.
+\end{equation*}
+Given the previous state \((\vec q_n,\vec v_n,\vec a_n)\), define
+\begin{align}
+    \tilde{\vec q}
+     & =
+    \vec q_n
+    + \Delta t \vec v_n
+    + \Delta t^2\left(\frac12-\beta\right)\vec a_n, \\
+    \tilde{\vec v}
+     & =
+    \vec v_n
+    + \Delta t(1-\gamma)\vec a_n.
+\end{align}
+For any position iterate \(\vec q\), Newmark gives
+\begin{align}
+    \vec a(\vec q)
+     & =
+    \frac{1}{\beta\Delta t^2}
+    \left(\vec q-\tilde{\vec q}\right), \\
+    \vec v_N(\vec q)
+     & =
+    \tilde{\vec v}
+    +
+    \frac{\gamma}{\beta\Delta t}
+    \left(\vec q-\tilde{\vec q}\right).
+\end{align}
+The vector \(\vec v_N(\vec q)\) is the velocity implied by the displacement
+update, but in the GGL system the actual velocity \(\vec v\) remains an
+independent unknown.
+
+Let \(\mat M\) be the consistent Hermite mass matrix, let \(\vec k_b(\vec q)\)
+be the bending residual, and let \(\vec f\) be the assembled external load.
+Define the discrete constraint vector
+\begin{equation}\label{eq:ggl-discrete-position-constraint}
+    \phi_i(\vec q)
+    =
+    \int_0^L N_i(s)
+    \left(\norm{\vec r_h'(s)}^2-1\right)
+    \odif{s},
+\end{equation}
+where \(N_i\) is a multiplier test function. The velocity constraint operator
+\(\mat C(\vec q)\) is defined by
+\begin{equation}\label{eq:ggl-discrete-velocity-operator}
+    \left[\mat C(\vec q)\vec w\right]_i
+    =
+    \int_0^L
+    N_i(s)\vec r_h'(s)\cdot\vec w_h'(s)
+    \odif{s}.
+\end{equation}
+Since \(\mat J_\phi(\vec q)=D\bm\phi(\vec q)\), one has
+\(\mat J_\phi(\vec q)\vec w = 2\mat C(\vec q)\vec w\). At each time step,
+Newton's method is applied to the coupled residual
+\begin{align}
+    \vec R_q
+     & =
+    \mat M\vec a(\vec q)
+    +
+    \vec k_b(\vec q)
+    -
+    \vec f
+    -
+    \mat J_\phi(\vec q)^\transp\vec T
+    =
+    \vec 0,
+    \label{eq:ggl-residual-q}      \\
+    \vec R_v
+     & =
+    \mat M\left(\vec v-\vec v_N(\vec q)\right)
+    -
+    \mat C(\vec q)^\transp\bm\zeta
+    =
+    \vec 0,
+    \label{eq:ggl-residual-v}      \\
+    \vec R_T
+     & =
+    \bm\phi(\vec q)
+    =
+    \vec 0,
+    \label{eq:ggl-residual-t}      \\
+    \vec R_\zeta
+     & =
+    \mat C(\vec q)\vec v
+    =
+    \vec 0.
+    \label{eq:ggl-residual-zeta}
+\end{align}
+The four blocks correspond respectively to momentum balance, the mass-weighted
+kinematic relation between position and velocity, the configuration constraint,
+and the velocity constraint. Thus the nonlinear solve acts on the full stacked
+vector
+\begin{equation*}
+    \left[
+        \vec q,\;
+        \vec v,\;
+        \vec T,\;
+        \bm\zeta
+        \right]^\transp .
+\end{equation*}
+This is the essential distinction from schemes that enforce inextensibility
+only through a post-step correction: the admissible position and velocity
+constraints are part of the same algebraic system as the time update.

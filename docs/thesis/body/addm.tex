@@ -1,4 +1,5 @@
 \chapter{Alternating Direction Method of Multipliers}
+\label{chap:addm}
 
 \section{Introduction}
 
@@ -30,7 +31,7 @@ problem may be written as the constrained local minimization problem
     \right\},
 \end{equation}
 where \(EI>0\) is the flexural stiffness. For example, a planar gravity load can
-be recovered by taking \(\vec f = -\rho g \vec e_y\), up to the sign convention
+be recovered by taking \(\vec f = -\rho_b g \vec e_y\), up to the sign convention
 used for the vertical coordinate.
 
 The admissible set is
@@ -56,13 +57,13 @@ numerical enforcement of inextensibility, we use those analytical results as
 motivation for the constrained variational formulation rather than reproducing
 the full bifurcation analysis.
 
-Introducing a Lagrange multiplier \(\lambda(s)\) for
+Introducing the beam tension \(T(s)\), equivalently the Lagrange multiplier for
 \eqref{eq:addm-static-inextensibility} gives the formal Euler--Lagrange
 equation
 \begin{equation}\label{eq:addm-static-strong-form}
     EI \pdv[4]{\vec r}{s}
     -
-    \pdv*{\left(\lambda \pdv{\vec r}{s}\right)}{s}
+    \pdv*{\left(T \pdv{\vec r}{s}\right)}{s}
     =
     \vec f,
     \qquad
@@ -92,13 +93,13 @@ therefore be applied to this linear constraint:
         \int_0^L \norm{\pdv[2]{\vec r}{s}}^2 \odif{s}
         -
         \int_0^L \vec f \cdot \vec r \odif{s}
-        \\                                & \qquad +
-                                         \int_0^L \vec \eta \cdot
-                                         \left(\vec p-\pdv{\vec r}{s}\right)\odif{s}
+        \\                                     & \qquad +
+                                              \int_0^L \vec \eta \cdot
+                                              \left(\vec p-\pdv{\vec r}{s}\right)\odif{s}
         +
-                                         \frac{r}{2}
+                                              \frac{r}{2}
         \int_0^L
-                                         \norm{\vec p-\pdv{\vec r}{s}}^2 \odif{s},
+                                              \norm{\vec p-\pdv{\vec r}{s}}^2 \odif{s},
     \end{split}
 \end{equation}
 where \(r>0\) is the penalty parameter and
@@ -372,31 +373,31 @@ alternating-direction iterations.
 
 For a general second-order in time dynamical system
 \begin{equation*}
-    \mat M \ddot{\vec u} + \mat C \dot{\vec u} + f^{\rm int}(\vec u) = f^{\rm ext}
+    \mat M \ddot{\vec q} + \mat C \dot{\vec q} + f^{\rm int}(\vec q) = f^{\rm ext}
 \end{equation*}
 where \(\mat M\) is a mass matrix, and \(\mat C\) is a damping matrix. Newmark-\(\beta\) scheme provides for the update
 \begin{align*}
-    \vec u_{n+1}        & = \vec u_n + \Delta t \dot{\vec u}_n + \frac12 \Delta t^2 \ddot {\vec u}_\beta \\
-    \dot {\vec u}_{n+1} & = \dot{\vec u}_n + \Delta t \dot{\vec u}_\gamma
+    \vec q_{n+1}        & = \vec q_n + \Delta t \dot{\vec q}_n + \frac12 \Delta t^2 \ddot {\vec q}_\beta \\
+    \dot {\vec q}_{n+1} & = \dot{\vec q}_n + \Delta t \dot{\vec q}_\gamma
 \end{align*}
-where the acceleration vector \(\ddot{\vec u}_\beta\) and the velocity vector \(\ddot{\vec u}_\gamma\) are defined as
+where the acceleration vector \(\ddot{\vec q}_\beta\) and the velocity vector \(\dot{\vec q}_\gamma\) are defined as
 \begin{align*}
-    \ddot{\vec u}_\beta   & = (1-2\beta) \ddot{\vec u}_n + 2\beta\ddot{\vec u}_{n+1}  \\
-    \dot{\vec u}_{\gamma} & = (1- \gamma)\ddot{\vec u}_n + \gamma \ddot{\vec u}_{n+1}
+    \ddot{\vec q}_\beta   & = (1-2\beta) \ddot{\vec q}_n + 2\beta\ddot{\vec q}_{n+1}  \\
+    \dot{\vec q}_{\gamma} & = (1- \gamma)\ddot{\vec q}_n + \gamma \ddot{\vec q}_{n+1}
 \end{align*}
 Substituted into the updates we have
 \begin{align*}
-    \vec u_{n+1}        & = \vec u_n + \Delta t \dot{\vec u}_n + \frac12 \Delta t^2  \left[(1-2\beta) \ddot{\vec u}_n + 2\beta \ddot{\vec u}_{n+1}\right] \\
-    \dot {\vec u}_{n+1} & = \dot{\vec u}_n + \Delta t \left[(1- \gamma)\ddot{\vec u}_n + \gamma \ddot{\vec u}_{n+1}\right]
+    \vec q_{n+1}        & = \vec q_n + \Delta t \dot{\vec q}_n + \frac12 \Delta t^2  \left[(1-2\beta) \ddot{\vec q}_n + 2\beta \ddot{\vec q}_{n+1}\right] \\
+    \dot {\vec q}_{n+1} & = \dot{\vec q}_n + \Delta t \left[(1- \gamma)\ddot{\vec q}_n + \gamma \ddot{\vec q}_{n+1}\right]
 \end{align*}
-which gives us a stencils for \(\ddot{\vec u}_{n+1}\) and \(\dot{\vec u}_{n+1}\) which are
+which gives stencils for \(\ddot{\vec q}_{n+1}\) and \(\dot{\vec q}_{n+1}\):
 \begin{align*}
-    \ddot{\vec u}_{n+1} & = \frac{1}{\beta \Delta t^2}(\vec u_{n+1} - \vec{u}_n - \Delta t \dot{\vec u}_n) - \frac{1-2\beta}{2\beta}\ddot{\vec u}_n \\
-    \dot{\vec u}_{n+1}  & = \dot{\vec u}_n + \Delta t[(1-\gamma)\ddot{\vec u}_n + \gamma \ddot{\vec u}_{n+1}]
+    \ddot{\vec q}_{n+1} & = \frac{1}{\beta \Delta t^2}(\vec q_{n+1} - \vec{q}_n - \Delta t \dot{\vec q}_n) - \frac{1-2\beta}{2\beta}\ddot{\vec q}_n \\
+    \dot{\vec q}_{n+1}  & = \dot{\vec q}_n + \Delta t[(1-\gamma)\ddot{\vec q}_n + \gamma \ddot{\vec q}_{n+1}]
 \end{align*}
 In our time dependent E-B problem we have
 \begin{equation*}
-    \mu \ddot{\vec r}(s) + \underbrace{EI \vec{r}^{(4)}(s) - (\lambda(s) \vec r'(s))'}_{\vec f^{\rm int}} =  \underbrace{\vec F(s,t)}_{\vec f^{\rm ext}}
+    \rho_b \ddot{\vec r}(s) + \underbrace{EI \vec{r}^{(4)}(s) - (T(s) \vec r'(s))'}_{\vec f^{\rm int}} =  \underbrace{\vec f(s,t)}_{\vec f^{\rm ext}}
 \end{equation*}
 which has no damping. Therefore, we only need to discretize \(\ddot{\vec r}^{n+1}\):
 \begin{equation*}
@@ -404,7 +405,7 @@ which has no damping. Therefore, we only need to discretize \(\ddot{\vec r}^{n+1
 
 \section{Validation}
 
-\subsection{Elliptic Integral Solution}
+\subsection{Elliptic Integral Solution to the Static Problem}
 
 We use a static equilibrium solution for the tip of a cantilevered inextensible
 beam given by Bisshopp and Drucker \cite{bisshopp_large_1945}. The solution
@@ -454,7 +455,7 @@ For \(P=0\), the limiting values are \(k=1/\sqrt{2}\), \(\delta=0\), and
 \begin{figure}[H]
     \centering
     \import{figure/vector}{bisshopp-drucker.tex}
-    \caption{Non-dimensional tip deflection \(y_{\rm tip}/L\) and tip retreat \(x_{\rm tip}/L\) with respect to non-dimensional tip load \(PL^2/B\).}
+    \caption{Non-dimensional tip deflection \(y_{\rm tip}/L\) and tip retreat \(x_{\rm tip}/L\) with respect to non-dimensional tip load \(PL^2/B\), reproduced from \textcite{bisshopp_large_1945}}
     \label{fig:bisshopp-drucker-reference}
 \end{figure}
 
@@ -489,7 +490,7 @@ tip quantity.
     \label{fig:bisshopp-drucker-convergence}
 \end{figure}
 
-\subsection{Pinned Manufactured Solution}
+\subsection{Pinned Manufactured Solution to the Dynamic Problem}
 
 To test the temporal convergence of the Newmark integrator using the method of
 manufactured solutions. The manufactured motion is chosen to satisfy the
@@ -591,13 +592,13 @@ basis.
 
 For the linear dynamic Euler--Bernoulli equation
 \begin{equation*}
-    \rho \ddot{\vec r} + EI \vec r^{(4)} = \vec f
+    \rho_b \ddot{\vec r} + EI \vec r^{(4)} = \vec f
 \end{equation*}
 the corresponding manufactured load is
 \begin{equation*}
     \vec f_{\rm linear}
     =
-    \rho\left[
+    \rho_b\left[
         \left(\frac1\phi - s^2\phi\right)\vec e_r
         - \frac1\phi \vec e_x
         - s\vec e_\theta
@@ -608,9 +609,9 @@ Equivalently, this can be written as
 \begin{equation*}
     \vec f_{\rm linear}
     =
-    \left[\rho\left(\frac1\phi - s^2\phi\right)+EI\phi^3\right]\vec e_r
-    - \frac{\rho}{\phi}\vec e_x
-    - \rho s\vec e_\theta.
+    \left[\rho_b\left(\frac1\phi - s^2\phi\right)+EI\phi^3\right]\vec e_r
+    - \frac{\rho_b}{\phi}\vec e_x
+    - \rho_b s\vec e_\theta.
 \end{equation*}
 
 For the nonlinear inextensible benchmark, the load convention used in the
@@ -618,17 +619,17 @@ reference implementation is
 \begin{equation*}
     \vec f_{\rm nonlinear}
     =
-    \rho\ddot{\vec r}_{\rm ex}
+    \rho_b\ddot{\vec r}_{\rm ex}
     + EI\vec r_{\rm ex}^{(4)}
-    + \pdv*{\left(\lambda \pdv{\vec r_{\rm ex}}{s}\right)}{s}.
+    + \pdv*{\left(T \pdv{\vec r_{\rm ex}}{s}\right)}{s}.
 \end{equation*}
 The multiplier contribution is
 \begin{equation*}
-    \pdv*{\left(\lambda \pdv{\vec r_{\rm ex}}{s}\right)}{s}
+    \pdv*{\left(T \pdv{\vec r_{\rm ex}}{s}\right)}{s}
     =
-    \pdv{\lambda}{s}\vec e_\theta - \lambda\phi\vec e_r.
+    \pdv{T}{s}\vec e_\theta - T\phi\vec e_r.
 \end{equation*}
-With the manufactured choice \(\lambda=1\), this contribution is
+With the manufactured choice \(T=1\), this contribution is
 \(-\phi\vec e_r\), and hence
 \begin{equation*}
     \vec f_{\rm nonlinear}
@@ -639,9 +640,9 @@ or equivalently
 \begin{equation*}
     \vec f_{\rm nonlinear}
     =
-    \left[\rho\left(\frac1\phi - s^2\phi\right)+EI\phi^3-\phi\right]\vec e_r
-    - \frac{\rho}{\phi}\vec e_x
-    - \rho s\vec e_\theta.
+    \left[\rho_b\left(\frac1\phi - s^2\phi\right)+EI\phi^3-\phi\right]\vec e_r
+    - \frac{\rho_b}{\phi}\vec e_x
+    - \rho_b s\vec e_\theta.
 \end{equation*}
 
 \subsection{Linear Convergence Study}
@@ -669,14 +670,7 @@ primarily reflects temporal error.
 \end{figure}
 
 Figure~\ref{fig:newmark-addm-linear-convergence} shows the expected monotone
-decrease in error as the time step is refined. On the logarithmic axes, the
-points should lie close to a straight line if the asymptotic temporal regime
-has been reached. For the average-acceleration Newmark method and a smooth
-manufactured load, the expected temporal order is second order. The final
-discussion should compare the fitted slope against this expected value and
-identify whether the coarsest or finest time steps should be excluded from the
-fit.
-
+decrease in error as the time step is refined.
 % TODO: Insert the fitted linear-study slope and the exact data range used for
 % the regression. TODO: Check whether the finest time step is affected by the
 % fixed spatial resolution or roundoff before reporting the final observed
@@ -687,8 +681,8 @@ fit.
 In the nonlinear study, the same manufactured trajectory is used, but the
 multiplier field is solved simultaneously with the beam position. The external
 forcing is set to \(\vec f_{\rm nonlinear}\), corresponding to the manufactured
-choice \(\lambda=1\). This test exercises both the Newmark discretization and
-the nonlinear ADDM iteration used to enforce inextensibility.
+choice \(T=1\). This test exercises both the Newmark discretization and the
+nonlinear ADDM iteration used to enforce inextensibility.
 
 The time-step sequence and final-time error measurement are the same as in the
 linear study. The nonlinear tolerances used are \(\epsilon =

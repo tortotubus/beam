@@ -1,4 +1,5 @@
 \chapter{Navier-Stokes}
+\label{chap:navier-stokes}
 
 \section{Adaptive Grids}
 
@@ -37,6 +38,313 @@ is needed for the \emph{restriction} and \emph{prolongation} operators such
 that schemes using the tree-structured mesh retain desired order near
 refinement boundaries.
 
-\section{Tree-structured Adaptive Mesh Refinment}
+\section{Tree-structured Adaptive Meshes}
 
-\section{}
+Tree-structured adaptive meshes may be understood as hierarchical data
+structures for representing a computational domain by recursively subdividing
+cells. In a single-tree grid, the \emph{root} cell typically coincides with the
+entire physical domain. Refinement proceeds by replacing a cell with \(2^d\)
+children, where \(d\) is the spatial dimension. Thus, in two dimensions the
+resulting structure is a \emph{quadtree}, while in three dimensions it is an
+\emph{octree}. Cells without children are called the \emph{leaves} of the tree
+and form the active mesh on which the discrete equations are usually defined.
+As with other abstract data structures, different implementations may realize
+the same logical tree in different ways, with corresponding trade-offs in
+memory layout, traversal efficiency, parallel scalability, and ease of neighbor
+lookup.
+
+Before tree-adaptive meshes became common in scientific computing, they were
+studied first as general-purpose spatial data structures starting around the
+late 1970s. Their recursive refinement makes them a compact representation of
+spatially localized detail: uniform regions can be stored coarsely, while
+geometric features, interfaces, or occupied regions can be represented at
+higher resolution. Consequently, early applications appeared in computer
+graphics, image and volume representation, solid modeling, spatial indexing,
+neighbor queries, visibility algorithms, and ray-tracing acceleration. In these
+settings, the leaves of the tree represented regions of space for storage,
+search, or geometric reasoning, rather than finite-volume or finite-element
+cells for solving partial differential equations. Practical application of the
+data structure would only be realized in the early 2000s, such as in RAMSES and
+Gerris.
+
+\subsection{Data Structures for Adaptive-Tree Meshes}
+
+One naive implementation of the quad- or octree datastructure is through a
+struct or class representing each node of the tree, where each vertex contains
+\(2^d\) pointers in memory to each child. This pointer then in effect
+represents the directed edge to the children.
+
+\paragraph{Fully Threaded Tree}
+An extension of the naive implmentation is the \emph{full-threaded tree}
+described by \textcite{khokhlov_fully_1998}. In addition to the struct or class
+holding a pointer to the \(2^d\) children, we may also have each node contain
+pointers to the parent, as well as each neighbor cell connected by a face or
+edge. The obvious benefit of to a computational mesh can be seen if
+implementing a finite-difference stencil, where frequent neighbor traversal is
+needed, which does not come for free from simple pointer-arithmetic such as
+when traversing a simple array.
+
+Unless special care is taken, one of the potential downsides of these types of
+trees is the memory requirement of storing pointers, as well as the
+non-inherent memory locality between cells. Although the \(2^d\) children may
+be heap-allocated and be adjacent in memory, leaves without common parents are
+in no way guarenteed to be nearby in memory. This is in contrast to simple
+arrays, where, since the entire grid is allocated at once on the heap, spatial
+neighbors are local in memory also, and allow modern computers and compilers to
+take advantage of CPU cache and vetorization.
+
+\paragraph{Linear Trees}
+Another approach to representing trees is the \emph{linear tree}. Rather than
+representing the tree as simple structs or classes connected by pointers, we
+may store each leaf of the tree in a linear array, where each element of the
+array stores a spatial index encoded in a single binary integer. The entire
+abstract tree, including neighbor queries, then may be recovered purely through
+bit operations and array indicies.
+
+These representations of trees have several benefits: One is a reduction in the
+memory storage requirements, due to the fact that the edges and threads can be
+recovered from a single integer. Second, is that when sorted by the Morton or
+Z-order code, computations performed on the vertices (e.g. with a stencil),
+provide some guarantee that cells close together in space will also be close
+together in memory, which is good for avoiding {cache misses} and allow
+efficient vectorization of operations. Another benefit of using this encoding,
+is that it allows a straightforward method for domain-decomposition: Simply
+divide the spatial domain by splitting the sorted array into \(n\) sub-arrays.
+The current state-of-the-art in this regard may be found in
+\textcite{burstedde_p4est_2011}.
+
+The primary and still very acceptable disadvantages are two: The maximum depth
+of your domain is now limited by the size of the integer used to represent the
+spatial code. Second, and perhaps more importantly, insertion (refinement),
+deletion (coarsening) and neighbour look-ups now become
+\(\mathcal{O}(\log{(n)})\) operations (where \(n\) is the number of leaf
+vertices): This is due to the fact one now must perform a binary search through
+the sorted array of leaf vertices, where in pure pointer-based trees, these
+operations are principally \(\mathcal{O}(1)\).
+
+An example of such a scheme is illustrated in Figure \ref{fig:linear-quadtree}
+where a sample 6-digit binary string is used to encode a representation of a
+simple quadtree mesh.
+
+\begin{figure}[H]
+    \centering
+    \def\svgwidth{\textwidth}
+    \import{figure/vector}{linear-quadtree.pdf_tex}
+    \caption{An example of a linear quadtree implementation where cells positions are given an \((i,j)\) index in an coordinate system with origin defined similarly to matrix row-column indexing. Once a \((i,j)\) coordinate is assigned to each leaf cell of the tree (visible in the mesh on the left), the coordinate, together with the level, is used to compute a Morton-order code, shown in hexadecimal format in the mesh and tree, and in binary in the sorted array. This code is formed by interleaving the \(j\) and \(i\) coordinate in binary as shown in the diagram on the right. Once a code is generated for each leaf, the array on the right is sorted by this code, which corresponds to the dotted line in red.}
+    \label{fig:linear-quadtree}
+\end{figure}
+
+\paragraph{Basilisk's Data Structures}
+
+Unlike linear quadtree implementations such as \textcite{burstedde_p4est_2011},
+which focuses strongly on meshing and domain decomposion concerns, Basilisk
+presents itself as complete solver-development framework, providing facilities
+for both adaptive meshing as well as tooling to support the discrete numerical
+schemes on these adaptive Cartesian meshes as well. Since these concerns are
+more tightly coupled in Basilisk, design of the data structures in Basilisk
+routines favor a more monolothic design that manages to address both mesh
+topology and solver concerns together. As a result, the scheme is closer in
+shape to the FTT of \textcite{khokhlov_fully_1998} rather than the linear
+quadtree of \textcite{burstedde_p4est_2011}.
+
+In Basilisk, rather than using the default memory allocator, where memory is
+given at random addresses as provided by the operating system, an
+\emph{mempool} allocator\footnote{\url{https://basilisk.fr/src/grid/mempool.h}}
+is used to allocate raw memory at each level. The mempool requests large chunks
+of memory at a time, up to \(2^{20}\) bytes at a time. When a cell is refined,
+the \texttt{refine} function asks the mempool for an address to the first free
+and sufficiently large segment of memory availible in the pool. Then, the new
+cells are written into the free block of memory in that pool. Similarly, when
+\texttt{coarsen} is called, it informs the mempool that the block is no longer
+used and may be reused at a later time. Actual information written into the raw
+memory block include a small \texttt{Cell} struct containing the Cartesian
+index \((i,j,k)\) followed by a given number of \texttt{double} variables
+needed to store all Eulerian fields required by any particular solver. The
+advantage of this is that although the non-sibling neghbors of cells are not
+arranged or sorted in memory by means of a space-filling curve, they are
+nontheless likely to be found within the same block of memory and therefore not
+frequently cause cache misses.
+
+However, since they are not arranged by spatial ordering, a separate means of
+neighbor finding is needed. Basilisk does this through a memory
+index\footnote{\url{https://basilisk.fr/src/grid/memindex/virtual.h}}. At each
+refinement level, Basilisk stores a \texttt{Layer} containing both the
+\texttt{Mempool} which owns the cell data and a \texttt{Memindex} which maps
+logical Cartesian indices to addresses in that pool. The \texttt{Memindex} is
+therefore not a space-filling ordering of the cells, but a sparse
+multidimensional array of pointers keyed by the integer coordinates \((i,j,k)\)
+of the level. When children are created, Basilisk obtains a contiguous block
+from the level's mempool and assigns each child coordinate to the corresponding
+address in the index; when children are coarsened, these entries are cleared.
+Neighbor access can then be implemented by adding an offset to the current
+point's integer coordinates and dereferencing the corresponding entry, rather
+than by searching a sorted Morton array, making the operation overall
+\(\mathcal{O}(1)\). The virtual-memory implementation uses \texttt{mmap} to
+allocate the pointer tables lazily and \texttt{madvise} to release pages when
+they become empty, so the code can expose the full Cartesian index space of a
+level, including ghost cells, without storing a dense array of cell data.
+
+\subsection{Tree Grading and Interpolation Schemes}
+
+In all adaptive mesh schemes, special treatement is needed at refinement
+boundaries. Though it is factually true that both block-structured AMR and
+tree-structured AMR can represent the exact same topologies, the primary
+limitation that practically restricts either to a subset of ungraded meshes is
+the interpolation schemes used at refinement boundaries. Typically, the
+block-structured AMR methods impose minimum patch sizes because they allow for
+much simpler interpolation schemes at the cost of stronger restrictions on the
+types of mesh topologies allowed. Similarly, in tree-structured AMR, it is
+typically imposed that cells differ at most 1 level across a shared face, edge,
+or vertex. Typically, this is stated as a "2:1" grading. This is entirely done,
+as in the patch-based AMR, to ensure that ghost cells may be interpolated at
+refinement boundaries, usually in a way that preserves local or global order
+for a given scheme. A good summary of this particular issue in adaptive meshing
+may be found in \textcite{batty_cell-centred_2017} and the particular
+interpolation scheme still used by Basilisk may be found in
+\textcite{popinet_gerris_2003}.
+
+\subsection{Domain Decomposition}
+
+\section{Centered Projection Solver}
+\label{sec:centered-projection-solver}
+
+The centered Navier--Stokes module in Basilisk is a finite-volume projection
+method for the variable-density Navier--Stokes
+equations.\footnote{\url{https://basilisk.fr/src/navier-stokes/centered.h}} The
+primary unknowns are the cell-centered velocity \(\vec u\) and pressure \(p\).
+The solver also maintains a face-centered velocity \(\vec u_f\), used for
+fluxes and for the pressure projection, and a cell-centered vector \(\vec G\)
+which stores the combined pressure-gradient and acceleration contribution. In
+continuum form, the equations approximated by the solver are
+\begin{align}
+    \pdv{\vec u}{t}
+    + \nabla \cdot \left(\vec u \otimes \vec u\right)
+                        & =
+    \frac{1}{\rho_f}
+    \left[-\nabla p + \nabla \cdot \left(2\mu_f \mat D\right)\right]
+    + \vec a_f,
+    \label{eq:basilisk-centered-momentum} \\
+    \nabla \cdot \vec u & = 0,
+    \label{eq:basilisk-centered-incompressibility}
+\end{align}
+where
+\begin{equation}
+    \mat D = \frac{1}{2}\left[\nabla \vec u
+        + \left(\nabla \vec u\right)^\transp\right]
+\end{equation}
+is the rate-of-strain tensor. In the discrete solver, the specific volume
+\(\alpha_f = 1/\rho_f\), dynamic viscosity \(\mu_f\), and acceleration \(\vec a_f\)
+are stored on cell faces. If the user does not provide these fields, the
+default state is a unit-density inviscid flow with zero acceleration. The
+implementation follows the projection-method structure used in Gerris
+\cite{popinet_gerris_2003} and Basilisk's adaptive finite-volume solvers
+\cite{popinet_quadtree-adaptive_2015}.
+
+The pressure and acceleration terms are discretized consistently on faces. On a
+regular Cartesian grid, the face value of the combined source in the
+\(x\)-direction is
+\begin{equation}
+    \left(G_f\right)^x_{i+1/2}
+    =
+    a^x_{i+1/2}
+    - \alpha^x_{i+1/2}\frac{p_{i+1}-p_i}{\Delta x}.
+    \label{eq:basilisk-face-gradient}
+\end{equation}
+The cell-centered field used to update \(\vec u\) is then obtained by
+averaging the adjacent face values,
+\begin{equation}
+    G^x_i =
+    \frac{1}{2}
+    \left[\left(G_f\right)^x_{i-1/2}
+    + \left(G_f\right)^x_{i+1/2}\right],
+    \label{eq:basilisk-centered-gradient}
+\end{equation}
+with analogous expressions in the other coordinate directions. This
+face-based construction is part of Basilisk's source-term interface: modules
+for surface tension, reduced gravity, buoyancy, and user-defined body forces
+typically add their contributions through the face acceleration field
+\(\vec a_f\). Combining \(\vec a_f\) with the pressure gradient on the same face
+stencil allows discrete equilibria, such as Laplace-pressure balance or
+hydrostatic balance, to be represented without introducing a spurious velocity
+field. At solid or symmetry boundaries, the default pressure condition is
+therefore a Neumann condition chosen so that the normal pressure gradient
+balances the normal acceleration.
+
+The projection operator acts on a provisional face velocity \(\vec w_f^\star\).
+For a projection over a time interval \(\Delta \tau\), the pressure-like scalar
+\(\phi\) satisfies
+\begin{equation}
+    \nabla_h \cdot \left(\alpha_f \nabla_h \phi\right)
+    =
+    \frac{1}{\Delta \tau}\nabla_h \cdot \vec w_f^\star,
+    \label{eq:basilisk-projection-poisson}
+\end{equation}
+and the projected face velocity is
+\begin{equation}
+    \vec w_f
+    =
+    \vec w_f^\star
+    - \Delta \tau\,\alpha_f\nabla_h\phi .
+    \label{eq:basilisk-projection-update}
+\end{equation}
+This enforces \(\nabla_h\cdot\vec w_f=0\) up to the tolerance of the
+multigrid Poisson solve. The method is therefore an approximate projection:
+the face velocity is projected directly, while the cell-centered velocity is
+corrected using the averaged field \(\vec G\) from
+\eqref{eq:basilisk-centered-gradient}.
+
+The half-step projection in the advection stage supplies a divergence-free
+advecting velocity for the Bell--Colella--Glaz fluxes. The final projection
+then computes the pressure at \(t^{n+1}\), updates the face velocity used by
+the next time step, and applies the corresponding centered pressure and
+acceleration correction to \(\vec u\). When the \texttt{stokes} flag is set,
+the explicit advection stage is skipped and the method reduces to the viscous,
+pressure, and acceleration updates. On tree-adaptive grids, Basilisk uses
+restriction and prolongation operators chosen to preserve the solenoidal
+character of the face velocity across refinement boundaries.
+
+In Algorithm~\ref{alg:basilisk-centered-solver}, \(\mathcal P_{\Delta\tau}\)
+denotes the projection defined by
+\eqref{eq:basilisk-projection-poisson}--\eqref{eq:basilisk-projection-update},
+\(\mathcal V_{\Delta t}\) denotes the implicit viscous solve, \(I_f\) is the
+cell-to-face interpolation of the centered velocity, and \(\mathcal G(p,\vec
+a_f)\) is the centered pressure/acceleration operator in
+\eqref{eq:basilisk-face-gradient}--\eqref{eq:basilisk-centered-gradient}.
+
+\begin{algorithm}[H]
+    \caption{Pseudocode for one centered Navier--Stokes time step}
+    \label{alg:basilisk-centered-solver}
+    \DontPrintSemicolon
+    \KwIn{\(\vec u^n\), \(p^n\), \(\vec G^n\), \(\vec u_f^n\), and
+        material/source fields \(\alpha_f\), \(\rho_f\), \(\mu_f\), \(\vec a_f\).}
+    \KwOut{\(\vec u^{n+1}\), \(p^{n+1}\), \(\vec G^{n+1}\), and
+    \(\vec u_f^{n+1}\) with \(\nabla_h\cdot\vec u_f^{n+1}=0\).}
+    \(\Delta t \leftarrow \textsc{CFL}(\vec u_f^n)\)\;
+    \(\textsc{AdvanceTracers}(\Delta t/2)\)\;
+    \((\alpha_f,\rho_f,\mu_f) \leftarrow \textsc{Properties}()\)\;
+    \(\vec u^\star \leftarrow \vec u^n\)\;
+    \If{\(\texttt{stokes}=\texttt{false}\)}{
+    \(\widehat{\vec u}_f^{\,n+1/2}
+    \leftarrow \textsc{BCGPredict}(\vec u^n,\vec G^n,\Delta t)\)\;
+    \((\vec u_f^{\,n+1/2},p_f)
+    \leftarrow
+    \mathcal P_{\Delta t/2}(\widehat{\vec u}_f^{\,n+1/2};\alpha_f)\)\;
+    \(\vec u^\star
+    \leftarrow
+    \textsc{BCGAdvect}(\vec u^n,\vec u_f^{\,n+1/2},\vec G^n,\Delta t)\)\;
+    }
+    \If{\(\mu_f \ne 0\)}{
+        \(\vec u^\star
+        \leftarrow
+        \mathcal V_{\Delta t}(\vec u^\star+\Delta t\,\vec G^n;\rho_f,\mu_f)
+        -\Delta t\,\vec G^n\)\;
+    }
+    \(\vec a_f \leftarrow \textsc{AccelerationSources}()\)\;
+    \(\widehat{\vec u}_f^{\,n+1}
+    \leftarrow I_f(\vec u^\star)+\Delta t\,\vec a_f\)\;
+    \((\vec u_f^{\,n+1},p^{n+1})
+    \leftarrow
+    \mathcal P_{\Delta t}(\widehat{\vec u}_f^{\,n+1};\alpha_f)\)\;
+    \(\vec G^{n+1} \leftarrow \mathcal G(p^{n+1},\vec a_f)\)\;
+    \(\vec u^{n+1} \leftarrow \vec u^\star+\Delta t\,\vec G^{n+1}\)\;
+\end{algorithm}
