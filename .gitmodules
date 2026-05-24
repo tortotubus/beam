@@ -13,3 +13,6 @@
 [submodule "third_party/ubcthesis/ubcthesis_submodule"]
 	path = third_party/ubcthesis/ubcthesis_submodule
 	url = https://gitlab.math.ubc.ca/colive/ubcthesis.git
+[submodule "third_party/ubcbeamer/ubcbeamer"]
+	path = third_party/ubcbeamer/ubcbeamer_submodule
+	url = https://gitlab.math.ubc.ca/colive/ubcbeamer.git
