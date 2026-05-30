@@ -1,0 +1,375 @@
+\documentclass[10pt,english]{beamer}
+
+\input{header}
+
+\title[Flexible Fibres on Adaptive Octree Grids]{Simulation of Flexible Filaments in Inertial Flow on Adaptive Octree Grids}
+\subtitle{}
+\author{Conor Olive\inst{1} \and Anthony Wachs\inst{1,2} \and Mona Rahmani\inst{2}}
+\institute{\inst{1} University of British Columbia, Mathematics \and \inst{2} University of British Columbia, Chemical and Biological Engineering}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{frame}{Motivation}
+    \begin{itemize}
+        \item Flexible fibres occur in various natural and anthropogenic
+              contexts
+        \item Samples of wastewater/effluent (especially near large North
+              American urban centres) indicate that plastic fibres make up the
+              largest share of microplastic type
+              \cite{sutton_microplastic_2016}
+        \item Resolved numerical studies of many-fibre aggregate dynamics in
+              inertial regimes are sparse \cite{du_roure_dynamics_2019}
+    \end{itemize}
+    \vfill
+    \begin{alertblock}{Problem Statement}
+        How can we build a reasonably resolved numerical model to study
+        \textbf{many-fibre}, potentially very \textbf{dilute} suspentions in
+        various \textbf{inertial} flow regimes?
+    \end{alertblock}
+\end{frame}
+
+\begin{frame}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\textheight]{microplastic-types.png}
+        \caption{Different categories of microplastics: (A) fragment, (B) film, (C) foam, (D) fibre, (E) line, and (F) pellet. Reproduced from \textcite{browne_accumulation_2011}.}
+        \label{fig:microplastic-types}
+    \end{figure}
+\end{frame}
+
+\begin{frame}{Continuous Model}
+    \small
+    \begin{columns}[T,onlytextwidth]
+        % \begin{itemize} \item We choose to model the microplastic fibres as
+        % large-angle Euler--Bernoulli (EB) beams and fluid with Navier--Stokes
+        % equations \item Spectial treatement of the discretization and
+        % fluid-structure coupling is required to make large problems
+        % computationally tractable \end{itemize} \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{Incompressible Navier-Stokes}
+                \begin{minipage}[t][2.25cm][t]{\linewidth}
+                    \begin{align*}
+                        \rho_f \left(\pdv{\vec u}{t} + \vec u \cdot \nabla \vec u\right) & =
+                        - \nabla p + \mu_f \nabla^2 \vec u
+                        + \rho_f \vec g + \IBMforceeul                                         \\
+                        \nabla \cdot \vec u                                              & = 0
+                    \end{align*}
+                \end{minipage}
+            \end{block}
+        \end{column}
+        \begin{column}{0.475\textwidth}
+            \begin{block}{Large Angle Euler-Bernoulli Beam}
+                \begin{minipage}[t][2.25cm][t]{\linewidth}
+                    \begin{align*}
+                        \EBlindens \pdv[2]{\EBpos}{t}
+                        + \EBflex \pdv[4]{\EBpos}{s}
+                        - \pdv{}{s} \left(\EBlagmult \pdv{\EBpos}{s}\right) & =
+                        \IBMforcelag + \EBlindens\vec g                           \\
+                        \norm{\pdv{\EBpos}{s}}^2                            & = 1
+                    \end{align*}
+                \end{minipage}
+            \end{block}
+        \end{column}
+    \end{columns}
+    \vspace{0.6em}
+    \begin{block}{Immersed Boundary}
+        \begin{equation*}
+            \begin{aligned}
+                \pdv{\EBpos}{t}(s,t)
+                 & = \vec u(\EBpos(s,t),t),
+                \qquad
+                \IBMforcelag(s,t)=-\IBMforcedens(s,t), \\
+                \IBMforceeul(\vec x,t)
+                 & = \int_0^L \IBMforcedens(s,t)\,
+                \delta(\vec x-\EBpos(s,t))\,\odif{s} .
+            \end{aligned}
+        \end{equation*}
+    \end{block}
+\end{frame}
+
+\begin{frame}{Discretization}
+    \begin{itemize}
+        \item An explicit direct-forcing immersed-boundary method is chosen to
+              model the fluid-structure interaction in a partitioned manner,
+              where the force density is obtained from a kinematic no-slip
+              constraint
+        \item The open source Basilisk \cite{popinet_quadtree-adaptive_2015}
+              solver is chosen to advance the fluid equations, which provides
+              tree-structured adaptive mesh refinement and an off-the-shelf
+              fractional-step N-S solver
+        \item The fibre is discretized using an augmented Lagrangian method
+              first described by \textcite{glowinski_large_nodate}, needed to
+              treat the inextensibility constraint
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \begin{figure}
+        \includegraphics[width=0.9\textwidth]{octree.png}
+    \end{figure}
+\end{frame}
+
+\begin{frame}{Augmented-Lagrangian Beam Solve}
+    \begin{itemize}
+        \item Alternating minimization with respect to \(\vec p\) and
+              \(\EBpos\), followed by a multiplier update, yields an
+              alternating direction method enforcing inextensibility
+        \item The \(\vec p\)-subproblem remains local in \(s\) while the
+              \(\EBpos\) subproblem is a linear fourth-order beam solve using
+              the current multiplier and tangent field fixed
+        \item The linear system resulting from finite-element discretization is
+              sparse, symmetric, and positive definite, and remains constant
+              for fixed augmentation parameters and appropriate B.C.s
+        \item A single factorization can be reused for all components and all
+              alternating-direction iterations
+        \item A average-acceleration Newmark method is used to discretize the
+              time derivative, where the static subproblem is solved at each
+              time step
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \pdfpcnote{
+        Here p is an auxiliary tangent field.
+        It approximates the first spatial derivative dX/ds.
+        The constraint p = dX/ds is enforced by the multiplier update.
+    }
+    Given \(\EBpos_h^0\), \(\EBlagmult_h^0\), penalty \(\EBaug>0\), repeat:
+    \begin{enumerate}
+        \item Project the tangent field:
+              \[
+                  \vec p_h^{k+1}
+                  =
+                  \frac{
+                      \EBaug\,\partial_s \EBpos_h^k - \EBlagmult_h^k
+                  }{
+                      \norm{\EBaug\,\partial_s \EBpos_h^k - \EBlagmult_h^k}
+                  }.
+              \]
+
+        \item Solve the linear beam problem for \(\EBpos_h^{k+1}\):
+              \[
+                  (EI\,K_b+\EBaug K_s)\EBpos_h^{k+1}
+                  =
+                  \vec F(\vec p_h^{k+1},\EBlagmult_h^k).
+              \]
+
+        \item Update the multiplier:
+              \[
+                  \EBlagmult_h^{k+1}
+                  =
+                  \EBlagmult_h^k
+                  +
+                  \alpha
+                  \left(
+                  \vec p_h^{k+1}
+                  -
+                  \partial_s\EBpos_h^{k+1}
+                  \right).
+              \]
+
+        \item Stop when
+              \[
+                  \norm{\vec p_h^{k+1}-\partial_s\EBpos_h^{k+1}} < \epsilon
+              \]
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}{Beam Validation}
+    \begin{columns}[T,onlytextwidth]
+        \begin{column}{0.49\textwidth}
+            \centering
+            \input{figure/vector/addm-static-convergence.tex}
+
+            {\small Static Bisshopp--Drucker cantilever
+                \parencite{bisshopp_large_1945}}
+        \end{column}
+        \begin{column}{0.49\textwidth}
+            \centering
+            \input{figure/vector/addm-nonlinear-convergence.tex}
+
+            {\small Nonlinear inextensible manufactured solution }
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Direct-Forcing Immersed Boundary Method}
+    % Given predicted fluid velocity \(\vec u^*\) and fibre state, for each time
+    % step:
+    \begin{enumerate}
+        \item Interpolate fluid velocity to Lagrangian fibre markers:
+              \[
+                  \vec U_a^* = J\vec u^* .
+              \]
+
+        \item Compute the target marker velocity from the beam update:
+              \[
+                  \vec U_a^{\,\mathrm{target}}
+                  =
+                  \dot{\vec X}_a^{\,n+1}.
+              \]
+
+        \item Choose the Lagrangian force density \(\IBMforcedens \in
+              \mathbb{R}^d\) from the slip residual:
+              \[
+                  \IBMforcedens
+                  =
+                  \frac{\rho_f}{\Delta t}
+                  \left(
+                  \vec U_a^{\,\mathrm{target}}
+                  -
+                  \vec U_a^*
+                  \right).
+              \]
+
+        \item Spread the marker force back to the Eulerian grid, and use this
+              to correct fluid momentum
+              \[
+                  \IBMforceeul = S\IBMforcedens, \qquad
+                  \vec u^{**}
+                  =
+                  \vec u^*
+                  + \frac{\Delta t}{\rho_f} \IBMforceeul .
+              \]
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}{Direct-Forcing Immersed Boundary Method Validation}
+    \begin{columns}[T,onlytextwidth]
+        \begin{column}{0.5\textwidth}
+            \input{figure/vector/static-sphere-Re-sweep.tex}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{Schiller-Naumann}
+                \[
+                    C_D(\Rep)
+                    =
+                    \frac{24}{\Rep}
+                    \left(1+0.15\Rep^{0.687}\right)
+                \]
+            \end{block}
+
+            \begin{itemize}
+                \item Uniform flow past a fixed sphere.
+                \item IBM force is integrated as drag.
+                \item Tested over \(\Rep=10\)--\(250\).
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Fully Coupled Validation}
+    \begin{columns}
+        \centering
+        \begin{column}{0.85\textwidth}
+            \centering
+            \href{run:figure/raster/single-fibre-Re-200-KB-10e-3_surface_edges.mp4?autostart}{
+                \includegraphics[width=\textwidth]{single-fibre-Re-200-KB-10e-3_surface_edges_0001.png}
+            }
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{}
+    \begin{center}
+        \centering
+        \begin{tabular}{@{}cccc@{}}
+            \includegraphics[height=0.85\textheight]{single-fibre-Re-200-KB-10e-3_early_t9p2.png}  &
+            \includegraphics[height=0.85\textheight]{single-fibre-Re-200-KB-10e-3_early_t10.png}   &
+            \includegraphics[height=0.85\textheight]{single-fibre-Re-200-KB-10e-3_early_t10p8.png} &
+            \includegraphics[height=0.85\textheight]{single-fibre-Re-200-KB-10e-3_early_t11p6.png}   \\
+            {\scriptsize \(t=9.2\)}                                                                &
+            {\scriptsize \(t=10.0\)}                                                               &
+            {\scriptsize \(t=10.8\)}                                                               &
+            {\scriptsize \(t=11.6\)}
+        \end{tabular}
+        \par\vspace{0.4em}
+        {\scriptsize \(\Reynolds=200\), \(\KB=10^{-3}\). Black curves show
+        vorticity contours; red markers show Lagrangian fibre points.}
+    \end{center}
+\end{frame}
+
+\begin{frame}
+    \begin{columns}
+        \begin{column}{5in}
+            \small
+            \centering
+            \input{figure/vector/huang-tip-Re-200-KB-10e-3.tex}
+            \setlength{\tabcolsep}{3pt}
+            \begin{tabular}[t]{@{}lc@{}}
+                \toprule
+                Parameter     & Value       \\
+                \midrule
+                \(\Reynolds\) & \(200\)     \\
+                \(q\)         & \(1.5\)     \\
+                \(\KB\)       & \(10^{-3}\) \\
+                \(\Fr\)       & \(0.5\)     \\
+                \bottomrule
+            \end{tabular}
+            \hspace{0.25in}
+            \begin{tabular}[t]{@{}lcc@{}}
+                \toprule
+                                                          & Amplitude             & \(\St\)           \\
+                \midrule
+                Huang et al. \cite{huang_simulation_2007} & \(\pm 0.35\)          & \(0.30\)          \\
+                Wang \cite{wang_strongly_2015}            & \(\pm 0.35\)          & \(0.31\)          \\
+                Lee \cite{lee_discrete-forcing_2015}      & \(\pm 0.38\)          & \(0.31\)          \\
+                Goza \cite{goza_strongly-coupled_2016}    & \(\pm 0.38\)          & \(0.32\)          \\
+                \textbf{Present}                          & \(\mathbf{\pm 0.36}\) & \(\mathbf{0.31}\) \\
+                \bottomrule
+            \end{tabular}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Conclusion}
+    \begin{columns}[T,onlytextwidth]
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Current Status}
+                \begin{minipage}[t][0.38\textheight][t]{\linewidth}
+                    \begin{itemize}
+                        \item Individual partitioned models show good
+                              validation
+                        \item Fully coupled fibre motion agrees with published
+                              results
+                    \end{itemize}
+                \end{minipage}
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{Future Work}
+                \begin{minipage}[t][0.38\textheight][t]{\linewidth}
+                    \begin{itemize}
+                        \item Complete additional validation cases in the short
+                              term
+                        \item Extend the model with additional physical
+                              mechanisms
+                        \item Add contact model(s) to extend model for dense
+                              fibre packings
+                    \end{itemize}
+                \end{minipage}
+            \end{block}
+        \end{column}
+    \end{columns}
+
+    \vfill
+    Contact me: \href{mailto:colive@math.ubc.ca}{colive@math.ubc.ca}
+\end{frame}
+
+\begin{frame}[plain,noframenumbering]
+    \centering
+    \vfill
+    {\usebeamerfont{section title}\usebeamercolor[fg]{section title}
+        Questions?
+    }
+    \vfill
+\end{frame}
+
+\begin{frame}[allowframebreaks]{References}
+    \printbibliography[heading=none]
+\end{frame}
+
+\end{document}

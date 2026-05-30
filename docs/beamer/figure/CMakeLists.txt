@@ -1,0 +1,32 @@
+set(BEAMER_SOURCE_VECTOR_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vector")
+set(BEAMER_BINARY_VECTOR_DIR "${CMAKE_CURRENT_BINARY_DIR}/vector")
+set(BEAMER_SOURCE_RASTER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/raster")
+set(BEAMER_BINARY_RASTER_DIR "${CMAKE_CURRENT_BINARY_DIR}/raster")
+
+add_subdirectory(gnuplot)
+add_subdirectory(paraview)
+
+set(BEAMER_GENERATED_FIGURES
+  ${BEAMER_GNUPLOT_GENERATED_FIGURES}
+  ${BEAMER_PARAVIEW_GENERATED_FIGURES}
+)
+set(BEAMER_FIGURE_INPUTS
+  ${BEAMER_GNUPLOT_INPUTS}
+  ${BEAMER_PARAVIEW_INPUTS}
+)
+
+add_custom_target(beamer_figures)
+add_dependencies(
+  beamer_figures
+  beamer_gnuplot_figures
+  beamer_paraview_figures
+)
+
+set(BEAMER_GENERATED_FIGURES
+  ${BEAMER_GENERATED_FIGURES}
+  PARENT_SCOPE
+)
+set(BEAMER_FIGURE_INPUTS
+  ${BEAMER_FIGURE_INPUTS}
+  PARENT_SCOPE
+)

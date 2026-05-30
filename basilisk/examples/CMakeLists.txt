@@ -15,5 +15,8 @@ elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/static_cylinder_mp
 elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/static_sphere.c")
 elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/static_sphere_mpi.c")
 
+elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/static_fibre.c")
+elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/static_fibre_mpi.c")
+
 elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fibre.c")
 elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fibre_mpi.c")

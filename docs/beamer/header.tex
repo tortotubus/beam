@@ -1,0 +1,65 @@
+
+\usetheme[math]{UBC}
+
+\setbeamertemplate{caption}[numbered]
+
+% Tables
+\usepackage{booktabs}
+
+% Figures & Media 
+\usepackage{graphicx}
+\usepackage{tikz}
+
+% Metadata
+\usepackage{pdfpc}
+\usepackage{pdfpc-movie}
+
+% Bibliography
+\usepackage[
+    backend=biber,
+    style=numeric,
+    sorting=none,
+    maxbibnames=3,
+    giveninits=true,
+    doi=true,
+    url=false,
+    isbn=false,
+]{biblatex}
+
+\graphicspath{
+    {figure/vector/}
+        {figure/raster/}
+}
+
+% Math 
+\usepackage{amsmath}
+\usepackage{bm}
+\usepackage{derivative}
+
+\newcommand{\Reynolds}{\mathrm{Re}}
+\newcommand{\Rep}{\mathrm{Re}_p}
+\newcommand{\Fr}{\mathrm{Fr}}
+\newcommand{\St}{\mathrm{St}}
+\newcommand{\KB}{K_B}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\transp}{\mathsf{T}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\let\vec\undefined
+\newcommand{\vec}[1]{\bm{#1}}
+\let\epsilon\undefined
+\newcommand{\epsilon}{\varepsilon}
+
+\newcommand{\EBpos}{\vec X}
+\newcommand{\EBaug}{r}
+\newcommand{\EBlagmult}{\vec T}
+\newcommand{\EBflex}{EI}
+\newcommand{\EBlindens}{\rho_b}
+
+\newcommand{\IBMforcedens}{\vec\Lambda}
+\newcommand{\IBMforcelag}{\vec F}
+\newcommand{\IBMforceeul}{\vec f}
+
+\addbibresource{references.bib}
+\renewcommand*{\bibfont}{\small}
+\renewcommand*{\mkbibacro}[1]{#1}
+\setbeamertemplate{bibliography item}{\insertbiblabel}

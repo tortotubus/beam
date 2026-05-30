@@ -1,0 +1,5 @@
+raster/*.png
+vector/*.pdf
+vector/*.tex
+raster/*.mp4
+*.stamp

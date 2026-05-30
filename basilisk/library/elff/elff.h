@@ -224,6 +224,18 @@ IBMeshModel elff_rigid_body_circle_new (double radius,
                                         int pid);
 void elff_rigid_body_circle_destroy (void* ctx);
 
+IBMeshModel elff_rigid_body_fibre_new (double length,
+                                       double diameter,
+                                       int nodes,
+                                       double linear_density,
+                                       coord center,
+                                       coord velocity,
+                                       double q_w,
+                                       coord q_xyz,
+                                       coord angular_velocity_body,
+                                       int pid);
+void elff_rigid_body_fibre_destroy (void* ctx);
+
 IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
                                                int point_count,
                                                double density,
@@ -231,6 +243,16 @@ IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
                                                double angle,
                                                int pid);
 void elff_pinned_rigid_body_circle_destroy (void* ctx);
+
+IBMeshModel elff_pinned_rigid_body_fibre_new (double length,
+                                              double diameter,
+                                              int nodes,
+                                              double linear_density,
+                                              coord center,
+                                              double q_w,
+                                              coord q_xyz,
+                                              int pid);
+void elff_pinned_rigid_body_fibre_destroy (void* ctx);
 
 IBMeshModel elff_rigid_body_sphere_new (double radius,
                                         int point_count,
@@ -612,6 +634,50 @@ void elff_rigid_body_circle_destroy (void* ctx) {
 /**
  * @brief
  */
+IBMeshModel elff_rigid_body_fibre_new (double length,
+                                       double diameter,
+                                       int nodes,
+                                       double linear_density,
+                                       coord center = {0},
+                                       coord velocity = {0},
+                                       double q_w = 1.,
+                                       coord q_xyz = {0},
+                                       coord angular_velocity_body = {0},
+                                       int pid = 0) {
+  vertex_t x = {center.x, center.y, center.z};
+  vertex_t v = {velocity.x, velocity.y, velocity.z};
+  quaternion_t q = {q_w, q_xyz.x, q_xyz.y, q_xyz.z};
+  vertex_t omega = {angular_velocity_body.x,
+                    angular_velocity_body.y,
+                    angular_velocity_body.z};
+
+  ib_rigid_body_fibre_t body_ptr = ib_rigid_body_fibre_new (
+    length, diameter, nodes, linear_density, x, v, q, omega);
+
+  elff_runtime_register ((ib_model_t) body_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = body_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_rigid_body_fibre_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+void elff_rigid_body_fibre_destroy (void* ctx) {
+  ib_rigid_body_fibre_t handle = (ib_rigid_body_fibre_t) ctx;
+  ib_rigid_body_fibre_destroy (handle);
+}
+
+/**
+ * @brief
+ */
 IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
                                                int point_count,
                                                double density,
@@ -641,6 +707,44 @@ IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
 void elff_pinned_rigid_body_circle_destroy (void* ctx) {
   ib_pinned_rigid_body_circle_t handle = (ib_pinned_rigid_body_circle_t) ctx;
   ib_pinned_rigid_body_circle_destroy (handle);
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_pinned_rigid_body_fibre_new (double length,
+                                              double diameter,
+                                              int nodes,
+                                              double linear_density,
+                                              coord center = {0},
+                                              double q_w = 1.,
+                                              coord q_xyz = {0},
+                                              int pid = 0) {
+  vertex_t x = {center.x, center.y, center.z};
+  quaternion_t q = {q_w, q_xyz.x, q_xyz.y, q_xyz.z};
+
+  ib_pinned_rigid_body_fibre_t body_ptr = ib_pinned_rigid_body_fibre_new (
+    length, diameter, nodes, linear_density, x, q);
+
+  elff_runtime_register ((ib_model_t) body_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = body_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_pinned_rigid_body_fibre_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+void elff_pinned_rigid_body_fibre_destroy (void* ctx) {
+  ib_pinned_rigid_body_fibre_t handle = (ib_pinned_rigid_body_fibre_t) ctx;
+  ib_pinned_rigid_body_fibre_destroy (handle);
 }
 
 /**

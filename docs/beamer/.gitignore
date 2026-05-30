@@ -1,0 +1,17 @@
+*.aux
+*.bbl
+*.bbl-SAVE-ERROR
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.pdf
+*.pdfpc
+*.run.xml
+*.snm
+*.synctex.gz
+*.synctex(busy)
+*.toc

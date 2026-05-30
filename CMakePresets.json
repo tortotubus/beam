@@ -42,12 +42,12 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/sockeye_release",
-	"CMAKE_SKIP_INSTALL_RPATH": "FALSE",
-	"CMAKE_INSTALL_RPATH": "${sourceDir}/install/sockeye_release/lib64",
-	"CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
+      	"CMAKE_SKIP_INSTALL_RPATH": "FALSE",
+	      "CMAKE_INSTALL_RPATH": "${sourceDir}/install/sockeye_release/lib64",
+        "CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
         "ELFF_USE_SUBMODULES": "ON",
         "ELFF_BUILD_THIRD_PARTY_BASILISK": "ON",
-	"ELFF_BUILD_DOC": "OFF",
+	      "ELFF_BUILD_DOC": "OFF",
         "ELFF_BUILD_TESTS": "OFF"
       }
     },

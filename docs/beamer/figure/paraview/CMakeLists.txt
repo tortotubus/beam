@@ -1,0 +1,106 @@
+find_program(PVPYTHON_EXECUTABLE NAMES pvpython REQUIRED)
+
+set(BEAMER_PARAVIEW_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+
+file(GLOB BEAMER_PARAVIEW_SCRIPTS
+  CONFIGURE_DEPENDS
+  "${BEAMER_PARAVIEW_SOURCE_DIR}/*/generate.py"
+)
+
+set(BEAMER_PARAVIEW_GENERATED_FIGURES "")
+set(BEAMER_PARAVIEW_INPUTS "")
+
+foreach(PARAVIEW_SCRIPT IN LISTS BEAMER_PARAVIEW_SCRIPTS)
+  get_filename_component(FIGURE_DIR "${PARAVIEW_SCRIPT}" DIRECTORY)
+  get_filename_component(FIGURE_NAME "${FIGURE_DIR}" NAME)
+  set(PARAVIEW_SURFACE_SCRIPT "${FIGURE_DIR}/generate_2.py")
+
+  set(BINARY_STAMP "${CMAKE_CURRENT_BINARY_DIR}/${FIGURE_NAME}.stamp")
+  set(SOURCE_STAMP "${BEAMER_SOURCE_RASTER_DIR}/${FIGURE_NAME}.stamp")
+  set(PARAVIEW_OUTPUTS
+    "${BINARY_STAMP}"
+    "${SOURCE_STAMP}"
+  )
+
+  file(GLOB_RECURSE PARAVIEW_CASE_INPUTS
+    CONFIGURE_DEPENDS
+    "${FIGURE_DIR}/case/*"
+  )
+  set(PARAVIEW_INPUTS
+    "${PARAVIEW_SCRIPT}"
+    ${PARAVIEW_CASE_INPUTS}
+  )
+  if(EXISTS "${PARAVIEW_SURFACE_SCRIPT}")
+    list(APPEND PARAVIEW_INPUTS "${PARAVIEW_SURFACE_SCRIPT}")
+  endif()
+
+  if(EXISTS "${PARAVIEW_SURFACE_SCRIPT}")
+    add_custom_command(
+      OUTPUT ${PARAVIEW_OUTPUTS}
+      COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "${BEAMER_BINARY_RASTER_DIR}"
+        "${BEAMER_SOURCE_RASTER_DIR}"
+      COMMAND "${PVPYTHON_EXECUTABLE}"
+        "${PARAVIEW_SCRIPT}"
+        "--output-dir=${BEAMER_BINARY_RASTER_DIR}"
+        "--output-prefix=${FIGURE_NAME}"
+      COMMAND "${PVPYTHON_EXECUTABLE}"
+        "${PARAVIEW_SCRIPT}"
+        "--output-dir=${BEAMER_SOURCE_RASTER_DIR}"
+        "--output-prefix=${FIGURE_NAME}"
+      COMMAND "${PVPYTHON_EXECUTABLE}"
+        "${PARAVIEW_SURFACE_SCRIPT}"
+        "--output-dir=${BEAMER_BINARY_RASTER_DIR}"
+      COMMAND "${PVPYTHON_EXECUTABLE}"
+        "${PARAVIEW_SURFACE_SCRIPT}"
+        "--output-dir=${BEAMER_SOURCE_RASTER_DIR}"
+      COMMAND "${CMAKE_COMMAND}" -E touch
+        "${BINARY_STAMP}"
+        "${SOURCE_STAMP}"
+      DEPENDS ${PARAVIEW_INPUTS}
+      COMMENT "Generating ParaView figure ${FIGURE_NAME}"
+      VERBATIM
+    )
+  else()
+    add_custom_command(
+      OUTPUT ${PARAVIEW_OUTPUTS}
+      COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "${BEAMER_BINARY_RASTER_DIR}"
+        "${BEAMER_SOURCE_RASTER_DIR}"
+      COMMAND "${PVPYTHON_EXECUTABLE}"
+        "${PARAVIEW_SCRIPT}"
+        "--output-dir=${BEAMER_BINARY_RASTER_DIR}"
+        "--output-prefix=${FIGURE_NAME}"
+      COMMAND "${PVPYTHON_EXECUTABLE}"
+        "${PARAVIEW_SCRIPT}"
+        "--output-dir=${BEAMER_SOURCE_RASTER_DIR}"
+        "--output-prefix=${FIGURE_NAME}"
+      COMMAND "${CMAKE_COMMAND}" -E touch
+        "${BINARY_STAMP}"
+        "${SOURCE_STAMP}"
+      DEPENDS ${PARAVIEW_INPUTS}
+      COMMENT "Generating ParaView figure ${FIGURE_NAME}"
+      VERBATIM
+    )
+  endif()
+
+  list(APPEND BEAMER_PARAVIEW_INPUTS
+    ${PARAVIEW_INPUTS}
+  )
+  list(APPEND BEAMER_PARAVIEW_GENERATED_FIGURES
+    ${PARAVIEW_OUTPUTS}
+  )
+endforeach()
+
+add_custom_target(beamer_paraview_figures
+  DEPENDS ${BEAMER_PARAVIEW_GENERATED_FIGURES}
+)
+
+set(BEAMER_PARAVIEW_GENERATED_FIGURES
+  ${BEAMER_PARAVIEW_GENERATED_FIGURES}
+  PARENT_SCOPE
+)
+set(BEAMER_PARAVIEW_INPUTS
+  ${BEAMER_PARAVIEW_INPUTS}
+  PARENT_SCOPE
+)
