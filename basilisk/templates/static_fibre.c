@@ -11,21 +11,22 @@
 
 char *base_path = "static_fibre_test";
 
-int maxlevel = 10;
+int maxlevel = 11;
 int minlevel = 5;
 double Reynolds = 0.05;
 double U0 = 1.;
 double L_fluid = 16.;
 double dt_fluid = 0.0005;
+double dt_output = 0.5;
 double t_end = 60.;
 
 int ibmlevel = 11;
 double L_fibre = 1.;
 double D_fibre = 1. / 30.;
-double alpha_fibre = 2.0;
-double theta_fibre = 1.57079632679489661923;
+double alpha_fibre = 1.5;
+double theta_fibre = .5 * pi;
 
-double experiment_ib_force_relaxation = 0.4;
+double experiment_ib_force_relaxation = 0.9;
 int experiment_ib_richardson_iters = 3;
 
 coord c_fibre = {0.};
@@ -66,6 +67,7 @@ int main(int argc, char **argv) {
   input_file_register_option("basilisk.fluid", maxlevel, PARAM_VALUE_INT);
   input_file_register_option("basilisk.fluid", Reynolds, PARAM_VALUE_DOUBLE);
   input_file_register_option("basilisk.output", base_path, PARAM_VALUE_STRING);
+  input_file_register_option("basilisk.output", dt_output, PARAM_VALUE_DOUBLE);
   input_file_register_option("fibre", L_fibre, PARAM_VALUE_DOUBLE);
   input_file_register_option("fibre", D_fibre, PARAM_VALUE_DOUBLE);
   input_file_register_option("fibre", c_fibre.x, PARAM_VALUE_DOUBLE);
@@ -135,6 +137,9 @@ event logfile(i++) {
 }
 
 event csvfile(i++) {
+  static int have_prev_Cd = 0;
+  static double prev_Cd = 0.;
+
   double Cd = 0., Cl = 0.;
   double fx = 0., fy = 0., fz = 0.;
   foreach (reduction(+ : fx) reduction(+ : fy) reduction(+ : fz)) {
@@ -147,6 +152,27 @@ event csvfile(i++) {
   Cd = fx / qA;
   Cl = sqrt(sq(fy) + sq(fz)) / qA;
   if (pid() == 0) {
+    double dCd_rel = have_prev_Cd && fabs(prev_Cd) > 0.
+                         ? fabs(Cd - prev_Cd) / fabs(prev_Cd)
+                         : 0.;
+    double Cl_over_Cd = fabs(Cd) > 0. ? Cl / fabs(Cd) : 0.;
+
+    fprintf(stderr,
+            "stats i=%d t=%g fx=%g Cd=%g Cd_target=%g Cd/Cd_target=%g "
+            "dCd_rel=%g Cl=%g Cl/Cd=%g\n",
+            i,
+            t,
+            fx,
+            Cd,
+            Cd_sbt_fibre,
+            Cd / Cd_sbt_fibre,
+            dCd_rel,
+            Cl,
+            Cl_over_Cd);
+    fflush(stderr);
+    prev_Cd = Cd;
+    have_prev_Cd = 1;
+
     if (!base_path) {
       fprintf(stderr, "warning: base_path is NULL; skipping fibre stats output\n");
       return 0;
@@ -191,7 +217,7 @@ event csvfile(i++) {
   }
 }
 
-event output(i += 10; t <= t_end) {
+event output(t += dt_output; t <= t_end) {
   scalar l2[];
   lambda2(u, l2);
 

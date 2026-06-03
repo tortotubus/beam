@@ -52,23 +52,24 @@
       }
     },
     {
-      "name": "r8k1",
-      "displayName": "r8k1",
-      "description": "Release build with system default generator.",
-      "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build/r8k1",
-      "environment": {
-        "CC": "/media/data/labdata/colive/.nix-profile/bin/gcc",
-        "CXX": "/media/data/labdata/colive/.nix-profile/bin/g++",
-        "MPICXX": "/media/data/labdata/colive/.nix-profile/bin/mpicxx",
-        "MPICC": "/media/data/labdata/colive/.nix-profile/bin/mpicc",
-        "PATH": "/media/data/labdata/colive/.nix-profile/bin:/usr/bin",
-        "LD_LIBRARY_PATH": "/media/data/labdata/colive/.nix-profile/lib"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/r8k1"
-      }
+      "name": "u-11666u1",
+      "displayName": "u-11666u1",
+      "description": "r8k1-new",
+	    "generator": "Unix Makefiles",
+	    "binaryDir": "${sourceDir}/build/u-11666u1",
+	    "cacheVariables": {
+		"CMAKE_BUILD_TYPE": "Release",
+		"CMAKE_INSTALL_PREFIX": "${sourceDir}/install/u-11666u1",
+		"CMAKE_SKIP_INSTALL_RPATH": "FALSE",
+		"CMAKE_INSTALL_RPATH": "${sourceDir}/install/u-11666u1/lib64",
+		"CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
+		"ELFF_BUILD_TESTS": "OFF",
+		"ELFF_USE_SUBMODULES": "OFF",
+		"ELFF_BUILD_THIRD_PARTY_EIGEN3": "FALSE",
+		"ELFF_BUILD_THIRD_PARTY_BASILISK": "TRUE",
+		"ELFF_BUILD_THIRD_PARTY_GTEST": "FALSE",
+		"ELFF_BUILD_THIRD_PARTY_HDF5": "FALSE"
+	    }
     }
   ],
   "buildPresets": [
@@ -91,10 +92,9 @@
       "jobs": 8
     },
     {
-      "name": "r8k1",
-      "configurePreset": "r8k1",
-      "description": "Build on r8k1",
-      "jobs": 8
+      "name": "u-11666u1",
+      "configurePreset": "u-11666u1",
+      "description": "Build on u-11666u1"
     }
   ],
   "testPresets": [
