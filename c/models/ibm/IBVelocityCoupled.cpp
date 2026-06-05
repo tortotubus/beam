@@ -31,6 +31,7 @@ extern "C"
     IBMesh& mesh = model->GetCurrent();
 
     std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
+    std::vector<IBMesh::IBVertex>& velocity = mesh.GetVelocity();
     std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
     const auto& measures = mesh.GetMeasures();
     int nm = mesh.GetNumberOfPoints();
@@ -48,6 +49,9 @@ extern "C"
       mesh_str.position[i].x = position[i].x;
       mesh_str.position[i].y = position[i].y;
       mesh_str.position[i].z = position[i].z;
+      mesh_str.velocity[i].x = velocity[i].x;
+      mesh_str.velocity[i].y = velocity[i].y;
+      mesh_str.velocity[i].z = velocity[i].z;
       mesh_str.forces[i].x = forces[i].x;
       mesh_str.forces[i].y = forces[i].y;
       mesh_str.forces[i].z = forces[i].z;
@@ -83,6 +87,7 @@ extern "C"
     // Call GetMidpoint() and receive a reference to the proteced member
     IBMesh& mesh = model->GetMidpoint(velocity_arr, dt);
     std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
+    std::vector<IBMesh::IBVertex>& mesh_velocity = mesh.GetVelocity();
     std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
     const auto& measures = mesh.GetMeasures();
     int nn = mesh.GetNumberOfPoints();
@@ -101,6 +106,9 @@ extern "C"
       mesh_str.position[i].x = position[i].x;
       mesh_str.position[i].y = position[i].y;
       mesh_str.position[i].z = position[i].z;
+      mesh_str.velocity[i].x = mesh_velocity[i].x;
+      mesh_str.velocity[i].y = mesh_velocity[i].y;
+      mesh_str.velocity[i].z = mesh_velocity[i].z;
       mesh_str.forces[i].x = forces[i].x;
       mesh_str.forces[i].y = forces[i].y;
       mesh_str.forces[i].z = forces[i].z;
@@ -135,6 +143,7 @@ extern "C"
     // Call GetMidpoint() and receive a reference to the proteced member
     IBMesh& mesh = model->GetNext(velocity_arr, dt);
     std::vector<IBMesh::IBVertex>& position = mesh.GetPoints();
+    std::vector<IBMesh::IBVertex>& mesh_velocity = mesh.GetVelocity();
     std::vector<IBMesh::IBVertex>& forces = mesh.GetForces();
     const auto& measures = mesh.GetMeasures();
     int nm = mesh.GetNumberOfPoints();
@@ -153,6 +162,9 @@ extern "C"
       mesh_str.position[i].x = position[i].x;
       mesh_str.position[i].y = position[i].y;
       mesh_str.position[i].z = position[i].z;
+      mesh_str.velocity[i].x = mesh_velocity[i].x;
+      mesh_str.velocity[i].y = mesh_velocity[i].y;
+      mesh_str.velocity[i].z = mesh_velocity[i].z;
       mesh_str.forces[i].x = forces[i].x;
       mesh_str.forces[i].y = forces[i].y;
       mesh_str.forces[i].z = forces[i].z;

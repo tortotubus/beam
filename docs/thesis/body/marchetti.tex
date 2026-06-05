@@ -1,0 +1,130 @@
+\section{Rigid Fibre Drag Test Based on Marchetti}
+\label{sec:marchetti-rigid-fibre-drag}
+
+The settling-fibre comparison in Chapter~\ref{chap:coupled-validation} uses
+the deformation data of \textcite{marchetti_deformation_2018} as a reference
+for the coupled flexible-fibre model. The same paper also provides a useful,
+more restricted, reference for a static rigid-fibre immersed-boundary test. The
+purpose of such a test is not to reproduce the full flexible settling problem.
+Instead, it isolates the hydrodynamic force computed by the immersed-boundary
+scheme on a centerline representation of a slender body in a uniform flow.
+
+The appropriate comparison is the weak-deformation limit discussed by
+\textcite{marchetti_deformation_2018}. In that regime the fibre remains nearly
+straight and horizontal while settling perpendicular to its long axis. The
+hydrodynamic force is then approximated by the Stokes drag on a rigid slender
+filament. Marchetti \emph{et al.} write the fibre length as \(2\ell\), the
+radius as \(a\), and the aspect ratio as \(\kappa^{-1}=\ell/a\). With the
+notation used here, \(L=2\ell\), \(D=2a\), and therefore
+\(r_p=L/D=\ell/a=\kappa^{-1}\). The broadside rigid-fibre drag is
+\begin{equation}
+    F_{\perp}
+    =
+    C_{\perp}\mu U L,
+    \qquad
+    C_{\perp}
+    =
+    \frac{4\pi}{\log(4r_p)-1/2},
+    \label{eq:marchetti-broadside-drag}
+\end{equation}
+up to the usual \(O(1/\log^2 r_p)\) slender-body correction. At leading order,
+this reduces to \(C_{\perp}\simeq 4\pi/\log r_p\). Balancing
+\eqref{eq:marchetti-broadside-drag} with the submerged weight gives the rigid
+broadside settling speed \(U_{\perp}\) used by Marchetti \emph{et al.} to
+nondimensionalize their measured velocities.
+
+For the static-fibre test, the imposed flow speed is known rather than obtained
+from a weight balance. The total force computed from the immersed-boundary
+tractions can therefore be compared directly to
+\eqref{eq:marchetti-broadside-drag}. If the drag coefficient is reported using
+the projected area \(LD\),
+\begin{equation}
+    C_D
+    =
+    \frac{F_x}{\frac{1}{2}\rho U^2 LD},
+    \qquad
+    \Reynolds_D
+    =
+    \frac{\rho U D}{\mu},
+\end{equation}
+then the expected broadside target is
+\begin{equation}
+    C_{D,\perp}^{\rm SBT}
+    =
+    \frac{2C_{\perp}}{\Reynolds_D}
+    =
+    \frac{8\pi}
+         {\Reynolds_D\left[\log(4r_p)-1/2\right]}.
+    \label{eq:marchetti-broadside-cd-target}
+\end{equation}
+For the settling-fibre geometry used in this work, \(r_p=30\), giving
+\(C_{\perp}=2.93\) and
+\begin{equation}
+    C_{D,\perp}^{\rm SBT}
+    \simeq
+    \frac{5.86}{\Reynolds_D}.
+\end{equation}
+This value is nearly identical to the finite-aspect-ratio perpendicular drag
+formula used in the static-fibre template,
+\begin{equation}
+    C_{D,\perp}^{\rm TGT}
+    =
+    \frac{8\pi}
+         {\Reynolds_D\left[\log(r_p)+\delta_{\perp}(r_p)\right]},
+    \qquad
+    \delta_{\perp}
+    =
+    0.839+\frac{0.185}{r_p}+\frac{0.233}{r_p^2},
+\end{equation}
+which gives \(C_D\simeq 5.92/\Reynolds_D\) for \(r_p=30\). The difference is
+about one percent and is smaller than the expected discretization error for a
+centerline immersed-boundary calculation.
+
+This comparison should be made at a diameter Reynolds number small enough that
+the Stokes drag law is the dominant physics. A practical sweep is therefore to
+fix the same geometry and immersed-boundary spacing conventions as the settling
+case,
+\[
+    r_p=30,
+    \qquad
+    \alpha_{\rm fibre}=\Delta s/h=2,
+\]
+and vary the finest immersed-boundary grid level. At each resolution, the
+measured quantity is the time-averaged total hydrodynamic force on the pinned
+rigid fibre after the uniform-flow solution has reached a statistically steady
+state. The primary target is
+\[
+    \frac{C_D}{C_{D,\perp}^{\rm SBT}}\to 1
+\]
+as the fibre support width and marker spacing become small relative to the
+diameter and length. Secondary diagnostics are the lift force, which should
+remain small by symmetry, and the sensitivity of the drag to \(\Delta s/D\)
+and the regularized-kernel support width relative to \(D\).
+
+The figures and data in \textcite{marchetti_deformation_2018} provide context
+for this test but not a direct immersed-boundary force distribution. Figure~2
+shows the observed deformation regimes and identifies the small-\(B\) limit in
+which the fibre remains close to a straight broadside filament. Figure~8 plots
+the normalized maximum deflection against \(B\) and the elasto-viscous number
+\(V\), and is the basis for the deformation data already digitized in
+Figure~\ref{fig:marchetti-banaei-settling}. Figure~9 plots the measured and
+bead-spring settling velocities as \(U/U_{\perp}\), giving the velocity target
+\(U/U_{\perp}\simeq 1\) in the weak-deformation rigid limit. Figure~10 plots
+the dimensionless drag relation between \(B\) and \(V\), showing a
+weak-deformation branch where \(B\simeq C_{\perp}V\), an intermediate
+reconfiguration branch where the drag is shape dependent, and a saturated
+branch approaching the drag of two nearly vertical filament arms. These figures
+justify the broadside rigid limit as a force target, but they do not provide
+local hydrodynamic tractions or a finite-Reynolds-number drag law for a
+centerline fibre.
+
+The static test should therefore be interpreted as a low-Reynolds-number
+hydrodynamic-force verification of the fibre immersed-boundary representation.
+It is complementary to the full settling validation at
+\(\mathrm{Ga}=40\). With the Banaei nondimensionalization used for the settling
+case and \(r_p=30\), the velocity scale corresponds to a diameter Reynolds
+number of approximately \(\Reynolds_D=\mathrm{Ga}/r_p\simeq 1.33\). That value
+is low, but it is not asymptotically Stokesian. A static run at
+\(\Reynolds_D\simeq 1.33\) can be useful as a Ga-comparable sensitivity check,
+whereas the strict Marchetti slender-body target should be assessed using
+\(\Reynolds_D\ll1\), for example \(\Reynolds_D=0.05\) or \(0.1\).

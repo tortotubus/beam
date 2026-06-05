@@ -57,9 +57,13 @@ public:
     , measures(other.measures) {};
 
   size_t GetNumberOfPoints() { return NumberOfPoints; }
+  size_t GetNumberOfPoints() const { return NumberOfPoints; }
   std::vector<IBVertex>& GetPoints() { return points; }
+  const std::vector<IBVertex>& GetPoints() const { return points; }
   std::vector<IBVertex>& GetVelocity() { return velocity; }
+  const std::vector<IBVertex>& GetVelocity() const { return velocity; }
   std::vector<IBVertex>& GetForces() { return forces; }
+  const std::vector<IBVertex>& GetForces() const { return forces; }
   std::vector<real_t>& GetMeasures() { return measures; }
   const std::vector<real_t>& GetMeasures() const { return measures; }
 };

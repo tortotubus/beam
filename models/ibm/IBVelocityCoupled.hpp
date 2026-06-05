@@ -6,6 +6,8 @@
 #include "elff/models/ibm/IBMesh.hpp"
 #include "elff/models/ibm/IBModel.hpp"
 
+#include <algorithm>
+#include <cstdint>
 #include <vector>
 
 namespace ELFF {
@@ -39,12 +41,23 @@ namespace Models {
  * as
  *  \f[\vec X^{n+1}_i = \vec X^n_i + \Delta t \vec{U}^{n+1}_i.\f]
  */
-class IBVelocityCoupled
+class IBVelocityCoupled :
+  public IBModel
 {
 protected:
   IBMesh mesh, mesh_next;
 
   void CopyCurrentToNext() { mesh_next = mesh; }
+
+  void SetNodalMeasures(const std::vector<real_t>& nodal_measures)
+  {
+    ELFF_ASSERT(nodal_measures.size() == mesh.GetNumberOfPoints(),
+                "Nodal measure length must match number of points.\n");
+    std::copy(nodal_measures.begin(), nodal_measures.end(), mesh.GetMeasures().begin());
+    std::copy(nodal_measures.begin(),
+              nodal_measures.end(),
+              mesh_next.GetMeasures().begin());
+  }
 
   virtual void ComputeMidpointForces() = 0;
 
@@ -82,6 +95,45 @@ public:
   IBVelocityCoupled(size_t NumberOfPoints)
     : mesh(NumberOfPoints)
     , mesh_next(NumberOfPoints) {};
+
+  void pack_state(IBModelState& s) const override
+  {
+    static constexpr int64_t state_version = 1;
+
+    s.ints.clear();
+    s.reals.clear();
+    s.bytes.clear();
+
+    const size_t n = mesh.GetNumberOfPoints();
+    s.ints.push_back(state_version);
+    s.ints.push_back(static_cast<int64_t>(n));
+
+    s.reals.reserve(20 * n);
+    pack_mesh_state(s, mesh);
+    pack_mesh_state(s, mesh_next);
+  }
+
+  void unpack_state(const IBModelState& s) override
+  {
+    static constexpr int64_t state_version = 1;
+
+    ELFF_VERIFY(s.ints.size() == 2,
+                "IBVelocityCoupled::unpack_state(): invalid integer metadata.\n");
+    ELFF_VERIFY(s.ints[0] == state_version,
+                "IBVelocityCoupled::unpack_state(): unsupported state version.\n");
+
+    const size_t n = mesh.GetNumberOfPoints();
+    ELFF_VERIFY(static_cast<size_t>(s.ints[1]) == n,
+                "IBVelocityCoupled::unpack_state(): point count mismatch.\n");
+    ELFF_VERIFY(s.reals.size() == 20 * n,
+                "IBVelocityCoupled::unpack_state(): invalid real buffer size.\n");
+
+    size_t k = 0;
+    unpack_mesh_state(s, k, mesh);
+    unpack_mesh_state(s, k, mesh_next);
+    ELFF_VERIFY(k == s.reals.size(),
+                "IBVelocityCoupled::unpack_state(): trailing real data.\n");
+  }
 
   size_t GetNumberOfPoints() { return mesh.GetNumberOfPoints(); }
 
@@ -129,6 +181,61 @@ public:
     std::vector<IBMesh::IBVertex> velocity_wrapper(velocity,
                                                             velocity + n);
     return GetNext(velocity_wrapper, dt);
+  }
+
+private:
+  static void pack_vertex(IBModelState& s, const IBMesh::IBVertex& value)
+  {
+    s.reals.push_back(value.x);
+    s.reals.push_back(value.y);
+    s.reals.push_back(value.z);
+  }
+
+  static void unpack_vertex(const IBModelState& s,
+                            size_t& k,
+                            IBMesh::IBVertex& value)
+  {
+    value.x = s.reals[k++];
+    value.y = s.reals[k++];
+    value.z = s.reals[k++];
+  }
+
+  static void pack_mesh_state(IBModelState& s, const IBMesh& ib_mesh)
+  {
+    const size_t n = ib_mesh.GetNumberOfPoints();
+    const auto& points = ib_mesh.GetPoints();
+    const auto& velocity = ib_mesh.GetVelocity();
+    const auto& forces = ib_mesh.GetForces();
+    const auto& measures = ib_mesh.GetMeasures();
+
+    for (size_t i = 0; i < n; ++i)
+      pack_vertex(s, points[i]);
+    for (size_t i = 0; i < n; ++i)
+      pack_vertex(s, velocity[i]);
+    for (size_t i = 0; i < n; ++i)
+      pack_vertex(s, forces[i]);
+    for (size_t i = 0; i < n; ++i)
+      s.reals.push_back(measures[i]);
+  }
+
+  static void unpack_mesh_state(const IBModelState& s,
+                                size_t& k,
+                                IBMesh& ib_mesh)
+  {
+    const size_t n = ib_mesh.GetNumberOfPoints();
+    auto& points = ib_mesh.GetPoints();
+    auto& velocity = ib_mesh.GetVelocity();
+    auto& forces = ib_mesh.GetForces();
+    auto& measures = ib_mesh.GetMeasures();
+
+    for (size_t i = 0; i < n; ++i)
+      unpack_vertex(s, k, points[i]);
+    for (size_t i = 0; i < n; ++i)
+      unpack_vertex(s, k, velocity[i]);
+    for (size_t i = 0; i < n; ++i)
+      unpack_vertex(s, k, forces[i]);
+    for (size_t i = 0; i < n; ++i)
+      measures[i] = s.reals[k++];
   }
 };
 

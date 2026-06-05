@@ -4,7 +4,9 @@
 #include "elff/c/models/beam/IBEulerBeamGGL.h"
 #include "elff/c/models/beam/IBEulerBeamHuang.h"
 #include "elff/c/models/beam/IBEulerBeamPenalty.h"
+#include "elff/c/models/capsule/IBCapsule.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
+#include "elff/c/models/ibm/IBVelocityCoupled.h"
 #include "elff/c/models/rigidbody/IBRigidBody.h"
 
 #include "library/ibm/IBMeshModel.h"
@@ -35,6 +37,166 @@ static inline ib_euler_beam_bcs_t elff_euler_beam_bcs_theta_pin (coord s0) {
   bcs.vals[1].position.y = s0.y;
   bcs.vals[1].position.z = s0.z;
   return bcs;
+}
+
+// ============================================================================
+// ELFF Velocity-Coupled Operations
+// ============================================================================
+
+int elff_vc_node_count (void* ctx);
+int elff_vc_sync (void* ctx, void* mesh);
+int elff_vc_midpoint (void* ctx, void* mesh, double dt);
+int elff_vc_advance (void* ctx, void* mesh, double dt);
+void elff_capsule_destroy (void* ctx);
+
+static inline vertex_t elff_vertex_from_coord (coord value) {
+  vertex_t out = {0};
+  out.x = value.x;
+  out.y = value.y;
+  out.z = value.z;
+  return out;
+}
+
+static inline IBMeshModel elff_velocity_coupled_model (void* ctx,
+                                                       void (*destroy) (void*)) {
+  IBMeshModel ib_model = ibmeshmodel_velocity_coupled_init ();
+  ib_model.ctx = ctx;
+  ib_model.velocity_ops->node_count = elff_vc_node_count;
+  ib_model.velocity_ops->sync = elff_vc_sync;
+  ib_model.velocity_ops->midpoint = elff_vc_midpoint;
+  ib_model.velocity_ops->advance = elff_vc_advance;
+  ib_model.velocity_ops->destroy = destroy;
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+int elff_vc_node_count (void* ctx) {
+  ib_velocity_coupled_t vc_ptr = (ib_velocity_coupled_t) ctx;
+  return ib_velocity_coupled_get_number_of_nodes (vc_ptr);
+}
+
+/**
+ * @brief
+ */
+trace int elff_vc_sync (void* ctx, void* mesh) {
+  IBMesh* ib_mesh = (IBMesh*) mesh;
+  int ib_nodes_count = ib_mesh->nodes.size;
+  IBNode** ib_nodes = ib_mesh->nodes.ptrs;
+
+  ib_velocity_coupled_t vc_ptr = (ib_velocity_coupled_t) ctx;
+  ib_mesh_t elff_mesh = ib_velocity_coupled_get_current (vc_ptr);
+
+  if (elff_mesh.n != ib_nodes_count) {
+    ib_mesh_free (&elff_mesh);
+    return -1;
+  }
+
+  for (int ni = 0; ni < ib_nodes_count; ni++) {
+    IBNode* node = ib_nodes[ni];
+    const double nodal_measure =
+      elff_mesh.measure ? elff_mesh.measure[ni] : 1.0;
+    foreach_dimension () {
+      ibval (npos.x) = elff_mesh.position[ni].x;
+      ibval (nvel.x) = elff_mesh.velocity[ni].x;
+      ibval (nforce.x) = elff_mesh.forces ? elff_mesh.forces[ni].x : 0.;
+    }
+    ibval (nweight) = nodal_measure;
+  }
+
+  ib_mesh_free (&elff_mesh);
+  return 0;
+}
+
+/**
+ * @brief
+ */
+trace int elff_vc_midpoint (void* ctx, void* mesh, double dt) {
+  IBMesh* ib_mesh = (IBMesh*) mesh;
+  int ib_nodes_count = ib_mesh->nodes.size;
+  IBNode** ib_nodes = ib_mesh->nodes.ptrs;
+
+  vertex_t* velocity = calloc (ib_nodes_count, sizeof (vertex_t));
+  for (int ni = 0; ni < ib_nodes_count; ni++) {
+    IBNode* node = ib_nodes[ni];
+    foreach_dimension () {
+      velocity[ni].x = ibval (nvel.x);
+    }
+  }
+
+  ib_velocity_coupled_t vc_ptr = (ib_velocity_coupled_t) ctx;
+  ib_mesh_t elff_mesh =
+    ib_velocity_coupled_get_midpoint (vc_ptr, velocity, ib_nodes_count, dt);
+
+  free (velocity);
+
+  if (elff_mesh.n != ib_nodes_count) {
+    ib_mesh_free (&elff_mesh);
+    return -1;
+  }
+
+  for (int ni = 0; ni < ib_nodes_count; ni++) {
+    IBNode* node = ib_nodes[ni];
+    const double nodal_measure =
+      elff_mesh.measure ? elff_mesh.measure[ni] : 1.0;
+    foreach_dimension () {
+      ibval (npos.x) = elff_mesh.position[ni].x;
+      ibval (nvel.x) = elff_mesh.velocity[ni].x;
+      ibval (nforce.x) = elff_mesh.forces ? elff_mesh.forces[ni].x : 0.;
+    }
+    ibval (nweight) = nodal_measure;
+  }
+
+  ib_mesh_free (&elff_mesh);
+  return 0;
+}
+
+/**
+ * @brief
+ */
+trace int elff_vc_advance (void* ctx, void* mesh, double dt) {
+  IBMesh* ib_mesh = (IBMesh*) mesh;
+  int ib_nodes_count = ib_mesh->nodes.size;
+  IBNode** ib_nodes = ib_mesh->nodes.ptrs;
+
+  vertex_t* velocity = calloc (ib_nodes_count, sizeof (vertex_t));
+  for (int ni = 0; ni < ib_nodes_count; ni++) {
+    IBNode* node = ib_nodes[ni];
+    foreach_dimension () {
+      velocity[ni].x = ibval (nvel.x);
+    }
+  }
+
+  ib_velocity_coupled_t vc_ptr = (ib_velocity_coupled_t) ctx;
+  ib_mesh_t elff_mesh =
+    ib_velocity_coupled_get_next (vc_ptr, velocity, ib_nodes_count, dt);
+
+  free (velocity);
+
+  if (elff_mesh.n != ib_nodes_count) {
+    ib_mesh_free (&elff_mesh);
+    return -1;
+  }
+
+  for (int ni = 0; ni < ib_nodes_count; ni++) {
+    IBNode* node = ib_nodes[ni];
+    const double nodal_measure =
+      elff_mesh.measure ? elff_mesh.measure[ni] : 1.0;
+    foreach_dimension () {
+      ibval (npos.x) = elff_mesh.position[ni].x;
+      ibval (nvel.x) = elff_mesh.velocity[ni].x;
+      ibval (nforce.x) = elff_mesh.forces ? elff_mesh.forces[ni].x : 0.;
+    }
+    ibval (nweight) = nodal_measure;
+  }
+
+  ib_mesh_free (&elff_mesh);
+  return 0;
+}
+
+void elff_capsule_destroy (void* ctx) {
+  ib_capsule_destroy ((ib_capsule_t) ctx);
 }
 
 // ============================================================================
@@ -213,6 +375,24 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
                                              coord s0,
                                              int pid);
 void elff_euler_beam_huang_destroy (void* ctx);
+
+IBMeshModel elff_capsule_sphere_new (double radius,
+                                     coord center,
+                                     int refinements,
+                                     double elastic_modulus,
+                                     int pid);
+
+IBMeshModel elff_capsule_ellipsoid_new (coord radii,
+                                        coord center,
+                                        int refinements,
+                                        double elastic_modulus,
+                                        int pid);
+
+IBMeshModel elff_capsule_biconcave_new (double radius,
+                                        coord center,
+                                        int refinements,
+                                        double elastic_modulus,
+                                        int pid);
 
 IBMeshModel elff_rigid_body_circle_new (double radius,
                                         int point_count,
@@ -592,6 +772,57 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
 void elff_euler_beam_huang_destroy (void* ctx) {
   ib_euler_beam_huang_t handle = (ib_euler_beam_huang_t) ctx;
   ib_euler_beam_huang_destroy (handle);
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_capsule_sphere_new (double radius,
+                                     coord center = {0},
+                                     int refinements = 0,
+                                     double elastic_modulus = 1.,
+                                     int pid = 0) {
+  ib_capsule_t capsule_ptr = ib_capsule_sphere_new (
+    radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
+
+  elff_runtime_register ((ib_model_t) capsule_ptr, pid);
+
+  return elff_velocity_coupled_model (capsule_ptr, elff_capsule_destroy);
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_capsule_ellipsoid_new (coord radii,
+                                        coord center = {0},
+                                        int refinements = 0,
+                                        double elastic_modulus = 1.,
+                                        int pid = 0) {
+  ib_capsule_t capsule_ptr = ib_capsule_ellipsoid_new (
+    elff_vertex_from_coord (radii),
+    elff_vertex_from_coord (center),
+    refinements,
+    elastic_modulus);
+
+  elff_runtime_register ((ib_model_t) capsule_ptr, pid);
+
+  return elff_velocity_coupled_model (capsule_ptr, elff_capsule_destroy);
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_capsule_biconcave_new (double radius,
+                                        coord center = {0},
+                                        int refinements = 0,
+                                        double elastic_modulus = 1.,
+                                        int pid = 0) {
+  ib_capsule_t capsule_ptr = ib_capsule_biconcave_new (
+    radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
+
+  elff_runtime_register ((ib_model_t) capsule_ptr, pid);
+
+  return elff_velocity_coupled_model (capsule_ptr, elff_capsule_destroy);
 }
 
 /**

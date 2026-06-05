@@ -42,6 +42,7 @@ typedef struct {
 // ============================================================================
 
 IBMeshManager ibmm = {0};
+static bool ibmeshmanager_use_velocity_midpoint_op = false;
 
 // ============================================================================
 // Function declarations
@@ -54,6 +55,10 @@ void ibmeshmanager_delete_mesh (int mesh_id);
 void ibmeshmanager_add_nodes (int mesh_id, int count);
 void ibmeshmanager_delete_all_nodes (int mesh_id);
 void ibmeshmanager_set_model (int mesh_id, IBMeshModel model);
+void ibmeshmanager_advance_positions (double dt);
+void ibmeshmanager_advance_force_coupled_positions (double dt);
+void ibmeshmanager_evaluate_velocity_coupled_midpoints (double dt);
+void ibmeshmanager_advance_velocity_coupled_positions (double dt);
 
 #if _MPI
 int _ibmeshmanager_get_pid (Point p);
@@ -320,7 +325,7 @@ void ibmeshmanager_set_model (int mesh_id, IBMeshModel model) {
  * @brief
  * @relates IBMeshManager
  */
-trace void ibmeshmanager_advance_positions (double dt) {
+trace void ibmeshmanager_advance_positions_filtered (double dt, int model_type) {
 #if _MPI
   ibmeshmanager_update_pid ();
 #endif
@@ -334,10 +339,13 @@ trace void ibmeshmanager_advance_positions (double dt) {
     double* vel_global = calloc (n, sizeof (double));
 
     foreach_ibnode_per_ibmesh () {
+      if (model_type != IB_MODEL_INVALID && mesh->model.type != model_type)
+        continue;
       if (node->pid == pid ()) {
         int di = 0;
         foreach_dimension () {
           f_global[node_id * stride + di] = ibval (nforce.x);
+          vel_global[node_id * stride + di] = ibval (nvel.x);
           di++;
         }
       }
@@ -345,6 +353,8 @@ trace void ibmeshmanager_advance_positions (double dt) {
 
     MPI_Allreduce (
       MPI_IN_PLACE, f_global, n, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce (
+      MPI_IN_PLACE, vel_global, n, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     // if (pid () == 0) {
     //   printf ("[proc %d]: ", pid ());
@@ -355,11 +365,14 @@ trace void ibmeshmanager_advance_positions (double dt) {
     // }
 
     foreach_ibnode_per_ibmesh () {
+      if (model_type != IB_MODEL_INVALID && mesh->model.type != model_type)
+        continue;
       const int owner = mesh->pid >= 0 ? mesh->pid : 0;
       if (owner == pid ()) {
         int di = 0;
         foreach_dimension () {
           ibval (nforce.x) = f_global[node_id * stride + di];
+          ibval (nvel.x) = vel_global[node_id * stride + di];
           di++;
         }
       }
@@ -372,9 +385,19 @@ trace void ibmeshmanager_advance_positions (double dt) {
 
   // Call the models
   foreach_ibmesh () {
+    if (model_type != IB_MODEL_INVALID && mesh->model.type != model_type)
+      continue;
     switch (mesh->model.type) {
     case IB_MODEL_VELOCITY_COUPLED: {
-      // TODO
+      const int owner = mesh->pid >= 0 ? mesh->pid : 0;
+      if (owner == pid ()) {
+        IBVelocityCoupledModelOps* ops = mesh->model.velocity_ops;
+        void* ctx = mesh->model.ctx;
+        if (ibmeshmanager_use_velocity_midpoint_op && ops->midpoint)
+          ops->midpoint (ctx, mesh, dt);
+        else
+          ops->advance (ctx, mesh, dt);
+      }
       break;
     }
     case IB_MODEL_FORCE_COUPLED: {
@@ -394,8 +417,53 @@ trace void ibmeshmanager_advance_positions (double dt) {
 #if _MPI
   // Syncronize outputs
   foreach_ibmesh () {
+    if (model_type != IB_MODEL_INVALID && mesh->model.type != model_type)
+      continue;
     switch (mesh->model.type) {
     case IB_MODEL_VELOCITY_COUPLED: {
+      const int owner = mesh->pid >= 0 ? mesh->pid : 0;
+      const int nn = (int) mesh->nodes.size;
+      const int stride = 3 * dimension + 1;
+      double* buff = malloc ((size_t) nn * stride * sizeof (double));
+
+      if (owner == pid ()) {
+        for (int ni = 0; ni < nn; ni++) {
+          IBNode* node = mesh->nodes.ptrs[ni];
+          int k = ni * stride;
+
+          foreach_dimension () {
+            buff[k++] = ibval (npos.x);
+          }
+          foreach_dimension () {
+            buff[k++] = ibval (nvel.x);
+          }
+          foreach_dimension () {
+            buff[k++] = ibval (nforce.x);
+          }
+          buff[k++] = ibval (nweight);
+        }
+      }
+
+      MPI_Bcast (buff, nn * stride, MPI_DOUBLE, owner, MPI_COMM_WORLD);
+
+      if (owner != pid ()) {
+        for (int ni = 0; ni < nn; ni++) {
+          IBNode* node = mesh->nodes.ptrs[ni];
+          int k = ni * stride;
+          foreach_dimension () {
+            ibval (npos.x) = buff[k++];
+          }
+          foreach_dimension () {
+            ibval (nvel.x) = buff[k++];
+          }
+          foreach_dimension () {
+            ibval (nforce.x) = buff[k++];
+          }
+          ibval (nweight) = buff[k++];
+        }
+      }
+
+      free (buff);
       break;
     }
     case IB_MODEL_FORCE_COUPLED: {
@@ -451,6 +519,25 @@ trace void ibmeshmanager_advance_positions (double dt) {
   ibmm.dirty = true;
   ibmeshmanager_update_pid ();
 #endif
+}
+
+trace void ibmeshmanager_advance_positions (double dt) {
+  ibmeshmanager_advance_positions_filtered (dt, IB_MODEL_INVALID);
+}
+
+trace void ibmeshmanager_advance_force_coupled_positions (double dt) {
+  ibmeshmanager_advance_positions_filtered (dt, IB_MODEL_FORCE_COUPLED);
+}
+
+trace void ibmeshmanager_evaluate_velocity_coupled_midpoints (double dt) {
+  ibmeshmanager_use_velocity_midpoint_op = true;
+  ibmeshmanager_advance_positions_filtered (dt, IB_MODEL_VELOCITY_COUPLED);
+  ibmeshmanager_use_velocity_midpoint_op = false;
+}
+
+trace void ibmeshmanager_advance_velocity_coupled_positions (double dt) {
+  ibmeshmanager_use_velocity_midpoint_op = false;
+  ibmeshmanager_advance_positions_filtered (dt, IB_MODEL_VELOCITY_COUPLED);
 }
 
 #if _MPI
