@@ -194,6 +194,48 @@ vtkPolyData::to_c_struct() const
     }
   }
 
+  const size_t n_celldata = celldata_data.size();
+
+  char** celldata_names = static_cast<char**>(
+    std::calloc(n_celldata, sizeof(char*)));
+  size_t* celldata_ncomp = static_cast<size_t*>(
+    std::calloc(n_celldata, sizeof(size_t)));
+  double** celldata_data = static_cast<double**>(
+    std::calloc(n_celldata, sizeof(double*)));
+
+  if ((n_celldata > 0) &&
+      ((celldata_names == nullptr) || (celldata_ncomp == nullptr) ||
+       (celldata_data == nullptr))) {
+    ELFF_ABORT("malloc failure for celldata\n");
+  }
+
+  for (size_t i = 0; i < n_celldata; ++i) {
+    const std::string& field_name = this->celldata_names[i];
+    celldata_names[i] = static_cast<char*>(
+      std::malloc((field_name.size() + 1) * sizeof(char)));
+
+    if (!celldata_names[i]) {
+      ELFF_ABORT("malloc failure for celldata_names[i]\n");
+    }
+
+    std::memcpy(celldata_names[i], field_name.c_str(), field_name.size() + 1);
+    celldata_ncomp[i] = this->celldata_ncomp[i];
+
+    const size_t field_size = this->celldata_data[i].size();
+    celldata_data[i] = static_cast<double*>(
+      std::malloc(field_size * sizeof(double)));
+
+    if ((field_size > 0) && !celldata_data[i]) {
+      ELFF_ABORT("malloc failure for celldata_data[i]\n");
+    }
+
+    if (field_size > 0) {
+      std::memcpy(celldata_data[i],
+                  this->celldata_data[i].data(),
+                  field_size * sizeof(double));
+    }
+  }
+
   // Create the struct
   C::vtkPolyData c_str = { .points_state = C::SEALED,
                            .points = points,
@@ -230,11 +272,11 @@ vtkPolyData::to_c_struct() const
                            .pointdata_names = pointdata_names,
                            .pointdata_ncomp = pointdata_ncomp,
                            .pointdata_data = pointdata_data,
-                           .n_celldata = 0,
-                           .m_celldata = 0,
-                           .celldata_names = nullptr,
-                           .celldata_ncomp = nullptr,
-                           .celldata_data = nullptr };
+                           .n_celldata = n_celldata,
+                           .m_celldata = n_celldata,
+                           .celldata_names = celldata_names,
+                           .celldata_ncomp = celldata_ncomp,
+                           .celldata_data = celldata_data };
 
   return c_str;
 }
@@ -319,9 +361,22 @@ vtkPolyData::number_of_polygons() const
 }
 
 const size_t
+vtkPolyData::number_of_cells() const
+{
+  return number_of_vertices() + number_of_lines() + number_of_strips() +
+         number_of_polygons();
+}
+
+const size_t
 vtkPolyData::number_of_pointdata() const
 {
   return pointdata_data.size();
+}
+
+const size_t
+vtkPolyData::number_of_celldata() const
+{
+  return celldata_data.size();
 }
 
 void
@@ -427,6 +482,77 @@ vtkPolyData::set_pointdata_vector3(int64_t field,
   data[(point_id * 3) + 0] = value[0];
   data[(point_id * 3) + 1] = value[1];
   data[(point_id * 3) + 2] = value[2];
+}
+
+int64_t
+vtkPolyData::add_celldata_scalar(const std::string& name)
+{
+  return add_celldata_vector(name, 1);
+}
+
+int64_t
+vtkPolyData::add_celldata_vector(const std::string& name, size_t ncomp)
+{
+  on_add_field_data();
+
+  if (ncomp == 0) {
+    ELFF_ABORT("Cell-data vector must have at least one component.\n");
+  }
+
+  celldata_names.push_back(name);
+  celldata_ncomp.push_back(ncomp);
+  celldata_data.emplace_back(number_of_cells() * ncomp, 0.);
+
+  return static_cast<int64_t>(celldata_data.size() - 1);
+}
+
+std::vector<double>&
+vtkPolyData::get_celldata(int64_t field)
+{
+  const size_t id = static_cast<size_t>(field);
+
+  if (id >= celldata_data.size()) {
+    ELFF_ABORT("Cell-data field does not exist.\n");
+  }
+
+  return celldata_data[id];
+}
+
+const std::vector<double>&
+vtkPolyData::get_celldata(int64_t field) const
+{
+  const size_t id = static_cast<size_t>(field);
+
+  if (id >= celldata_data.size()) {
+    ELFF_ABORT("Cell-data field does not exist.\n");
+  }
+
+  return celldata_data[id];
+}
+
+void
+vtkPolyData::set_celldata_vector3(int64_t field,
+                                  size_t cell_id,
+                                  const std::array<double, 3>& value)
+{
+  const size_t id = static_cast<size_t>(field);
+
+  if (id >= celldata_data.size()) {
+    ELFF_ABORT("Cell-data field does not exist.\n");
+  }
+
+  if (celldata_ncomp[id] != 3) {
+    ELFF_ABORT("Cell-data field is not 3-component.\n");
+  }
+
+  if (cell_id >= number_of_cells()) {
+    ELFF_ABORT("Cell-data cell index out of range.\n");
+  }
+
+  auto& data = celldata_data[id];
+  data[(cell_id * 3) + 0] = value[0];
+  data[(cell_id * 3) + 1] = value[1];
+  data[(cell_id * 3) + 2] = value[2];
 }
 
 int64_t
@@ -548,6 +674,24 @@ vtkPolyData::append(const vtkPolyData& other)
     return;
   }
 
+  ELFF_ASSERT(pointdata_names.size() == other.pointdata_names.size(),
+              "vtkPolyData::append(): point-data field count mismatch.\n");
+  for (size_t i = 0; i < pointdata_names.size(); ++i) {
+    ELFF_ASSERT(pointdata_names[i] == other.pointdata_names[i],
+                "vtkPolyData::append(): point-data field name mismatch.\n");
+    ELFF_ASSERT(pointdata_ncomp[i] == other.pointdata_ncomp[i],
+                "vtkPolyData::append(): point-data component count mismatch.\n");
+  }
+
+  ELFF_ASSERT(celldata_names.size() == other.celldata_names.size(),
+              "vtkPolyData::append(): cell-data field count mismatch.\n");
+  for (size_t i = 0; i < celldata_names.size(); ++i) {
+    ELFF_ASSERT(celldata_names[i] == other.celldata_names[i],
+                "vtkPolyData::append(): cell-data field name mismatch.\n");
+    ELFF_ASSERT(celldata_ncomp[i] == other.celldata_ncomp[i],
+                "vtkPolyData::append(): cell-data component count mismatch.\n");
+  }
+
   C::vtkPolyData c_dst = this->to_c_struct();
   C::vtkPolyData c_src = other.to_c_struct();
 
@@ -589,6 +733,22 @@ vtkPolyData::append(const vtkPolyData& other)
     pointdata_data[i].assign(c_dst.pointdata_data[i],
                              c_dst.pointdata_data[i] +
                                (c_dst.n_points * c_dst.pointdata_ncomp[i]));
+  }
+
+  const size_t n_cells =
+    (c_dst.n_vertices_offsets - 1) + (c_dst.n_lines_offsets - 1) +
+    (c_dst.n_strips_offsets - 1) + (c_dst.n_polygons_offsets - 1);
+
+  celldata_names.resize(c_dst.n_celldata);
+  celldata_ncomp.resize(c_dst.n_celldata);
+  celldata_data.resize(c_dst.n_celldata);
+
+  for (size_t i = 0; i < c_dst.n_celldata; ++i) {
+    celldata_names[i] = c_dst.celldata_names[i];
+    celldata_ncomp[i] = c_dst.celldata_ncomp[i];
+    celldata_data[i].assign(c_dst.celldata_data[i],
+                            c_dst.celldata_data[i] +
+                              (n_cells * c_dst.celldata_ncomp[i]));
   }
 
   C::vtk_polydata_free(&c_dst);

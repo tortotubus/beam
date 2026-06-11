@@ -2,6 +2,7 @@
 
 #include "elff/models/capsule/Capsule.hpp"
 #include "elff/models/capsule/CapsuleBending.hpp"
+#include "elff/models/capsule/CapsuleMeshVTK.hpp"
 
 #include "elff/models/ibm/IBVelocityCoupled.hpp"
 
@@ -36,6 +37,11 @@ public:
     updateNodalMeasures();
     capsuleToIBMeshCurrent();
     capsuleToIBMeshNext();
+  }
+
+  void append_vtk_polydata(
+      std::vector<IO::CXX::vtkPolyData> &datasets) const override {
+    datasets.push_back(CapsuleMeshVTK::to_vtk_polydata(Capsule::mesh()));
   }
 
   void pack_state(IBModelState &state) const override {

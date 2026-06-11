@@ -51,6 +51,9 @@ protected:
   std::vector<std::string> pointdata_names;
   std::vector<size_t> pointdata_ncomp;
   std::vector<std::vector<double>> pointdata_data;
+  std::vector<std::string> celldata_names;
+  std::vector<size_t> celldata_ncomp;
+  std::vector<std::vector<double>> celldata_data;
 
   /**
    * @brief Returns true if the points are sealed
@@ -135,9 +138,19 @@ public:
   const size_t number_of_polygons() const;
 
   /**
+   * @brief Returns the total number of cells
+   */
+  const size_t number_of_cells() const;
+
+  /**
    * @brief Returns the number of point-data fields
    */
   const size_t number_of_pointdata() const;
+
+  /**
+   * @brief Returns the number of cell-data fields
+   */
+  const size_t number_of_celldata() const;
 
   /**
    * @brief Pre-allocation for points data
@@ -190,6 +203,33 @@ public:
   void set_pointdata_vector3(int64_t field,
                              size_t point_id,
                              const std::array<double, 3>& value);
+
+  /**
+   * @brief Add a scalar cell-data field
+   */
+  int64_t add_celldata_scalar(const std::string& name);
+
+  /**
+   * @brief Add a vector cell-data field
+   */
+  int64_t add_celldata_vector(const std::string& name, size_t ncomp);
+
+  /**
+   * @brief Get mutable storage for a cell-data field
+   */
+  std::vector<double>& get_celldata(int64_t field);
+
+  /**
+   * @brief Get read-only storage for a cell-data field
+   */
+  const std::vector<double>& get_celldata(int64_t field) const;
+
+  /**
+   * @brief Set one tuple of a 3-component vector cell-data field
+   */
+  void set_celldata_vector3(int64_t field,
+                            size_t cell_id,
+                            const std::array<double, 3>& value);
 
   /**
    * @brief Add a new point to the dataset

@@ -139,14 +139,35 @@ event logfile(i++) {
 event csvfile(i++) {
   static int have_prev_Cd = 0;
   static double prev_Cd = 0.;
+  static double prev_Cd_t = 0.;
 
   double Cd = 0., Cl = 0.;
   double fx = 0., fy = 0., fz = 0.;
+  double eulvel_absmax = 0., eulvel_normmax = 0.;
   foreach (reduction(+ : fx) reduction(+ : fy) reduction(+ : fz)) {
     fx += -ibmf.x[] * dv();
     fy += -ibmf.y[] * dv();
     fz += -ibmf.z[] * dv();
   }
+  foreach_ibnode(true) {
+    double norm2 = 0.;
+    foreach_dimension() {
+      const double v = ibval(eulvel.x);
+      const double av = fabs(v);
+      if (av > eulvel_absmax)
+        eulvel_absmax = av;
+      norm2 += sq(v);
+    }
+    const double norm = sqrt(norm2);
+    if (norm > eulvel_normmax)
+      eulvel_normmax = norm;
+  }
+#if _MPI
+  MPI_Allreduce(MPI_IN_PLACE, &eulvel_absmax, 1, MPI_DOUBLE, MPI_MAX,
+                MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &eulvel_normmax, 1, MPI_DOUBLE, MPI_MAX,
+                MPI_COMM_WORLD);
+#endif
 
   double qA = 0.5 * sq(U0) * A_fibre;
   Cd = fx / qA;
@@ -155,11 +176,16 @@ event csvfile(i++) {
     double dCd_rel = have_prev_Cd && fabs(prev_Cd) > 0.
                          ? fabs(Cd - prev_Cd) / fabs(prev_Cd)
                          : 0.;
+    double dCd_dt = have_prev_Cd && t > prev_Cd_t ? t - prev_Cd_t : 0.;
+    double dCd_rel_rate = dCd_dt > 0. ? dCd_rel / dCd_dt : 0.;
+    double dCd_rel_tadv =
+        fabs(U0) > 0. ? dCd_rel_rate * L_fibre / fabs(U0) : 0.;
     double Cl_over_Cd = fabs(Cd) > 0. ? Cl / fabs(Cd) : 0.;
 
     fprintf(stderr,
             "stats i=%d t=%g fx=%g Cd=%g Cd_target=%g Cd/Cd_target=%g "
-            "dCd_rel=%g Cl=%g Cl/Cd=%g\n",
+            "dCd_rel=%g dCd_rel_rate=%g dCd_rel_tadv=%g Cl=%g "
+            "Cl/Cd=%g eulvel_absmax=%g eulvel_normmax=%g\n",
             i,
             t,
             fx,
@@ -167,10 +193,15 @@ event csvfile(i++) {
             Cd_sbt_fibre,
             Cd / Cd_sbt_fibre,
             dCd_rel,
+            dCd_rel_rate,
+            dCd_rel_tadv,
             Cl,
-            Cl_over_Cd);
+            Cl_over_Cd,
+            eulvel_absmax,
+            eulvel_normmax);
     fflush(stderr);
     prev_Cd = Cd;
+    prev_Cd_t = t;
     have_prev_Cd = 1;
 
     if (!base_path) {
@@ -197,9 +228,10 @@ event csvfile(i++) {
     if (i == 0)
       fprintf(fp,
               "t,fx,fy,fz,Cd,Cl,Cd_sbt,Cd_over_Cd_sbt,h,ds,"
-              "support_over_D,ds_over_D,aspect_ratio\n");
+              "support_over_D,ds_over_D,aspect_ratio,dCd_rel,dCd_rel_rate,"
+              "dCd_rel_tadv,eulvel_absmax,eulvel_normmax\n");
     fprintf(fp,
-            "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n",
+            "%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f\n",
             t,
             fx,
             fy,
@@ -212,7 +244,12 @@ event csvfile(i++) {
             ds_fibre,
             2. * h_fluid / D_fibre,
             ds_fibre / D_fibre,
-            aspect_ratio_fibre);
+            aspect_ratio_fibre,
+            dCd_rel,
+            dCd_rel_rate,
+            dCd_rel_tadv,
+            eulvel_absmax,
+            eulvel_normmax);
     fclose(fp);
   }
 }

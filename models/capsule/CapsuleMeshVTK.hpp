@@ -48,6 +48,8 @@ public:
     addScalarField(pd, mesh.state.refCurv, "reference_curvature");
     addScalarField(pd, mesh.state.gaussCurv, "gaussian_curvature");
 
+    addTriangleFields(pd, mesh);
+
     return pd;
   }
 
@@ -76,6 +78,38 @@ private:
     std::vector<double> &data = pd.get_pointdata(fieldId);
     for (Eigen::Index i = 0; i < field.size(); ++i)
       data[static_cast<size_t>(i)] = field(i);
+  }
+
+  static void addTriangleFields(IO::CXX::vtkPolyData &pd,
+                                const CapsuleMesh &mesh) {
+    if (mesh.state.triGeom.size() != static_cast<size_t>(mesh.numTriangles()))
+      return;
+
+    const int64_t areaId = pd.add_celldata_scalar("triangle_area");
+    const int64_t normalId = pd.add_celldata_vector("triangle_normal", 3);
+    const int64_t stretchId = pd.add_celldata_vector("stretch", 2);
+    const int64_t tensionId = pd.add_celldata_vector("tension", 2);
+
+    std::vector<double> &area = pd.get_celldata(areaId);
+    std::vector<double> &stretch = pd.get_celldata(stretchId);
+    std::vector<double> &tension = pd.get_celldata(tensionId);
+
+    for (int tid = 0; tid < mesh.numTriangles(); ++tid) {
+      const CapsuleTriangleGeometry &geom =
+          mesh.state.triGeom[static_cast<size_t>(tid)];
+
+      area[static_cast<size_t>(tid)] = geom.area;
+      pd.set_celldata_vector3(normalId,
+                              static_cast<size_t>(tid),
+                              { geom.normal.x(), geom.normal.y(),
+                                geom.normal.z() });
+
+      const size_t vectorOffset = 2 * static_cast<size_t>(tid);
+      stretch[vectorOffset + 0] = geom.stretch.x();
+      stretch[vectorOffset + 1] = geom.stretch.y();
+      tension[vectorOffset + 0] = geom.tension.x();
+      tension[vectorOffset + 1] = geom.tension.y();
+    }
   }
 };
 

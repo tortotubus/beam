@@ -1,0 +1,148 @@
+#include "ibm/IBConfig.h"
+#include "ibm/IBNode.h"
+#include "ibm/IBMacros.h"
+
+macro peskin_cosine_kernel_gather_dimensionless (IBNode* node = node) {
+  // bool ib_set_dirty = true;
+  IBNODE_VARIABLES();
+#if TREE
+  foreach_neighbor_coord_level (PESKIN_SUPPORT_RADIUS, node->depth, pos) {
+    if (!is_local (cell))
+      continue;
+#else
+  foreach_neighbor_coord (PESKIN_SUPPORT_RADIUS, pos) {
+#endif
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      kernel_dist.x = fabs (d.x - cell_centre.x) / Delta;
+      if (kernel_dist.x <= PESKIN_SUPPORT_RADIUS) {
+        weight *= .25 * (1 + cos (.5 * pi * kernel_dist.x));
+      } else {
+        weight = 0;
+      }
+    }
+    // clang-format off
+    {...}
+    // clang-format on
+  }
+}
+
+macro peskin_cosine_kernel_spread_dimensionless (IBNode* node = node) {
+  // bool ib_set_dirty = false;
+  IBNODE_VARIABLES();
+#if TREE
+  foreach_neighbor_coord_level (PESKIN_SUPPORT_RADIUS, node->depth, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      kernel_dist.x = fabs (d.x - cell_centre.x) / Delta;
+      if (kernel_dist.x <= PESKIN_SUPPORT_RADIUS) {
+        weight *= .25 * (1 + cos (.5 * pi * kernel_dist.x));
+      } else {
+        weight = 0;
+      }
+    }
+    if (is_local (cell)) {
+      // clang-format off
+          {...}
+      // clang-format on
+    }
+  }
+#else
+  foreach_neighbor_coord_nonlocal (PESKIN_SUPPORT_RADIUS, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      kernel_dist.x = fabs (d.x - cell_centre.x) / Delta;
+      if (kernel_dist.x <= PESKIN_SUPPORT_RADIUS) {
+        weight *= .25 * (1 + cos (.5 * pi * kernel_dist.x));
+      } else {
+        weight = 0;
+      }
+    }
+
+    {
+      // clang-format off
+          {...}
+      // clang-format on
+    }
+  }
+#endif
+}
+
+macro peskin_cosine_kernel_gather (IBNode* node = node) {
+  // bool ib_set_dirty = true;
+  IBNODE_VARIABLES();
+#if TREE
+  foreach_neighbor_coord_level (PESKIN_SUPPORT_RADIUS, node->depth, pos) {
+    if (!is_local (cell))
+      continue;
+#else
+  foreach_neighbor_coord (PESKIN_SUPPORT_RADIUS, pos) {
+#endif
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      kernel_dist.x = fabs (d.x - cell_centre.x);
+      if (kernel_dist.x <= Delta * PESKIN_SUPPORT_RADIUS) {
+        weight *= (1. + cos (pi * kernel_dist.x / (Delta * PESKIN_SUPPORT_RADIUS))) / (2. * PESKIN_SUPPORT_RADIUS);
+      } else {
+        weight = 0;
+      }
+    }
+    // clang-format off
+    {...}
+    // clang-format on
+  }
+}
+
+macro peskin_cosine_kernel_spread (IBNode* node = node) {
+  IBNODE_VARIABLES();
+#if TREE
+  foreach_neighbor_coord_level (PESKIN_SUPPORT_RADIUS, node->depth, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      kernel_dist.x = fabs (d.x - cell_centre.x);
+      if (kernel_dist.x <= Delta *  PESKIN_SUPPORT_RADIUS)
+        weight *= (1. + cos (pi * kernel_dist.x / (Delta * PESKIN_SUPPORT_RADIUS))) / (2. * PESKIN_SUPPORT_RADIUS);
+      else 
+        weight = 0.;
+    }
+
+    // if (weight != 0.) {
+      if (is_local (cell)) {
+        // clang-format off
+          {...}
+        // clang-format on
+      }
+    // }
+  }
+#else
+  foreach_neighbor_coord_nonlocal (PESKIN_SUPPORT_RADIUS, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      kernel_dist.x = fabs (d.x - cell_centre.x);
+      if (kernel_dist.x <= Delta *  PESKIN_SUPPORT_RADIUS)
+        weight *= (1. + cos (pi * kernel_dist.x / (Delta * PESKIN_SUPPORT_RADIUS))) / (2. * PESKIN_SUPPORT_RADIUS);
+      else 
+        weight = 0.;
+    }
+
+    // if (weight != 0.) 
+    {
+      // clang-format off
+          {...}
+      // clang-format on
+    }
+  }
+#endif
+}

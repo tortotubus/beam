@@ -76,9 +76,41 @@ public:
 
     for (int tid = 0; tid < mesh.numTriangles(); ++tid) {
       const auto &tri = mesh.triangles[tid];
-      const double area = mesh.state.triGeom[tid].area / 3.0;
-      for (const int nid : tri.nodes)
-        nodeArea[static_cast<size_t>(nid)] += area;
+      const double area = mesh.state.triGeom[tid].area;
+      if (isObtuseTriangle(mesh, tid)) {
+        for (const int nid : tri.nodes) {
+          nodeArea[static_cast<size_t>(nid)] +=
+              isObtuseNode(mesh, tid, nid) ? 0.5 * area : 0.25 * area;
+        }
+      } else {
+        for (const int nid : tri.nodes) {
+          double voronoiArea = 0.0;
+          for (const int other : tri.nodes) {
+            if (other == nid)
+              continue;
+
+            const int eid = edgeIdInTriangle(mesh, tid, nid, other);
+            const auto &edge = mesh.edges[static_cast<size_t>(eid)];
+            const double edgeLengthSquared =
+                (mesh.state.x.col(nid) - mesh.state.x.col(other)).squaredNorm();
+
+            double cotangentSum = 0.0;
+            for (const int incidentTid : edge.triangles) {
+              if (incidentTid < 0)
+                throw std::runtime_error(
+                    "Capsule mixed area requires a closed triangle mesh");
+              const int opposite = oppositeNode(mesh.triangles[incidentTid],
+                                               nid,
+                                               other);
+              const Vec3 xOpposite = mesh.state.x.col(opposite);
+              cotangentSum += cotangent(mesh.state.x.col(nid) - xOpposite,
+                                        mesh.state.x.col(other) - xOpposite);
+            }
+            voronoiArea += cotangentSum * edgeLengthSquared;
+          }
+          nodeArea[static_cast<size_t>(nid)] += voronoiArea / 16.0;
+        }
+      }
     }
 
     return nodeArea;
@@ -104,6 +136,55 @@ private:
     if (crossNorm <= 1.0e-14)
       return 0.0;
     return a.dot(b) / crossNorm;
+  }
+
+  static bool isObtuseTriangle(const CapsuleMesh &mesh, int tid) {
+    const auto &tri = mesh.triangles[tid];
+    for (const int nid : tri.nodes) {
+      if (isObtuseNode(mesh, tid, nid))
+        return true;
+    }
+    return false;
+  }
+
+  static bool isObtuseNode(const CapsuleMesh &mesh, int tid, int nid) {
+    const auto &tri = mesh.triangles[tid];
+    int other[2] = { -1, -1 };
+    int count = 0;
+    for (const int triNode : tri.nodes) {
+      if (triNode != nid)
+        other[count++] = triNode;
+    }
+    if (count != 2)
+      throw std::runtime_error("Capsule triangle has invalid node topology");
+
+    const Vec3 e0 = mesh.state.x.col(other[0]) - mesh.state.x.col(nid);
+    const Vec3 e1 = mesh.state.x.col(other[1]) - mesh.state.x.col(nid);
+    return e0.dot(e1) < 0.0;
+  }
+
+  static int edgeIdInTriangle(const CapsuleMesh &mesh,
+                              int tid,
+                              int nodeA,
+                              int nodeB) {
+    const auto &tri = mesh.triangles[tid];
+    for (const int eid : tri.edges) {
+      const auto &edge = mesh.edges[static_cast<size_t>(eid)];
+      if ((edge.nodes[0] == nodeA || edge.nodes[1] == nodeA) &&
+          (edge.nodes[0] == nodeB || edge.nodes[1] == nodeB))
+        return eid;
+    }
+    throw std::runtime_error("Capsule triangle edge topology is inconsistent");
+  }
+
+  static int oppositeNode(const CapsuleTriangleTopology &tri,
+                          int nodeA,
+                          int nodeB) {
+    for (const int nid : tri.nodes) {
+      if (nid != nodeA && nid != nodeB)
+        return nid;
+    }
+    throw std::runtime_error("Capsule triangle has no opposite node");
   }
 
   static std::vector<double> computeAngleSums(const CapsuleMesh &mesh) {

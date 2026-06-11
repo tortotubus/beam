@@ -3,7 +3,7 @@
 
 \section{Introduction}
 
-Fluid--structure interaction (FSI) problems couple the motion of a fluid to the
+\emph{Fluid--structure interaction} (FSI) problems couple the motion of a fluid to the
 motion or deformation of an immersed solid. The two subsystems are not
 independent: the fluid exerts hydrodynamic traction on the structure, while the
 structure changes the admissible fluid velocity through no-slip,
@@ -12,47 +12,49 @@ are therefore usually distinguished less by the governing equations themselves
 than by how the interface is represented and how strongly the fluid and
 structural subproblems are coupled during each time step.
 
-The physical coupling may be one-way or two-way. In a one-way calculation, the
-structure is prescribed or is advanced using fluid loads without allowing its
-motion to feed back onto the fluid. This is useful for imposed kinematics or
-post-processing force estimates, but it is not a fully coupled FSI problem. In
-two-way FSI, the fluid and structure mutually determine one another: fluid
-tractions drive the structural motion, and the resulting structural
-configuration changes the fluid domain, boundary condition, or body-force
-field. The remaining classifications in this section mainly concern how this
-two-way coupling is represented numerically.
+The physical coupling may be modeled as a one-way or two-way coupling. In a
+one-way calculation, the structure is prescribed or is otherwise advanced using
+fluid loads without allowing its motion to feed back onto the fluid. This is
+useful for imposed kinematics or post-processing force estimates, but it is not
+a fully coupled FSI problem. By contrast, in two-way FSI, the fluid and
+structure mutually determine one another; fluid tractions drive the structural
+motion, and the resulting structural configuration changes the fluid domain,
+boundary condition, or body-force field. The remaining classifications in this
+section mainly concern how this two-way coupling is represented numerically.
 
-One broad distinction is between boundary-fitted and non-boundary-fitted
-methods. In a boundary-fitted formulation, the fluid mesh conforms to the
-fluid--solid interface. Arbitrary Lagrangian--Eulerian (ALE) methods are the
-standard example: the structure is represented in Lagrangian coordinates, while
-the fluid mesh moves or deforms to track the interface. This gives a sharp
-representation of the boundary conditions and hydrodynamic tractions, but mesh
-quality becomes a central issue when the structure undergoes large
-displacements, rotations, contact, or topology changes. In contrast,
-non-boundary-fitted methods keep the fluid grid independent of the solid
-geometry. Immersed boundary, immersed interface, fictitious-domain, cut-cell,
-and related embedded-boundary methods all fall into this class. These methods
-avoid remeshing and are particularly attractive for large motion or many
-particles, at the cost of introducing additional machinery to transfer
-velocity, force, or constraint information between the Eulerian fluid grid and
-the Lagrangian solid description.
+One broad distinction is between \emph{boundary-fitted} and
+\emph{non-boundary-fitted} methods. In a boundary-fitted formulation, the fluid
+mesh conforms to the fluid--solid interface. Arbitrary Lagrangian--Eulerian
+(ALE) methods represent the standard example: In this method, the structure is
+represented in Lagrangian coordinates, while the fluid mesh moves or deforms to
+track the interface. This gives a sharp representation of the boundary
+conditions and hydrodynamic tractions, but mesh quality becomes a central issue
+when the structure undergoes large displacements, rotations, contact, or
+topology changes. In contrast, a large body of non-boundary-fitted methods keep
+the fluid grid independent of the solid geometry. Immersed boundary, immersed
+interface, fictitious-domain, cut-cell, and related embedded-boundary methods
+all fall into this class. These methods avoid remeshing and are particularly
+attractive for large motion or many particles, at the cost of introducing
+additional machinery to transfer velocity, force, or constraint information
+between the Eulerian fluid grid and the Lagrangian solid description.
 
-FSI methods are also commonly categorized by their coupling architecture. In a
-monolithic method, the fluid unknowns, structural unknowns, and interface
-constraints are assembled into a single nonlinear algebraic system at each time
-step. This formulation treats the coupled problem as one system, which can be
-advantageous for stability and for problems with strong added-mass effects, but
-it requires solvers and preconditioners for a large multiphysics system. In a
-partitioned method, existing fluid and structural solvers are retained as
-separate modules and communicate through interface data. The fluid solver may
-provide tractions or body forces to the structure, while the structural solver
-returns displacements, velocities, or constraint targets to the fluid. This
-modularity is attractive in practice, especially when mature solvers already
-exist for each subsystem, but the coupling algorithm must be designed carefully
-so that splitting errors do not dominate the dynamics.
+FSI methods are also commonly categorized by their coupling architecture
+\cite{hou_numerical_2012}. In a \emph{monolithic method}, the fluid unknowns,
+structural unknowns, and interface constraints are assembled into a single
+nonlinear algebraic system at each time step. This formulation treats the
+coupled problem as one system, which can be advantageous for stability and for
+problems with strong added-mass effects, but it requires solvers and
+preconditioners for a large multiphysics system. In a \emph{partitioned
+method}, existing fluid and structural solvers are retained as separate modules
+and communicate through interface data. The fluid solver may provide tractions
+or body forces to the structure, while the structural solver returns
+displacements, velocities, or constraint targets to the fluid. This modularity
+is attractive in practice, especially when mature solvers already exist for
+each subsystem, although the coupling algorithm must be designed carefully so
+that splitting errors do not dominate the dynamics, or otherwise accept these
+splitting errors as a trade-off in exchange for gained modularity.
 
-Within partitioned methods, a further distinction is made between weak and
+Within partitioned methods, a further distinction can be made between weak and
 strong coupling. A weakly coupled or explicit scheme advances each subsystem
 once per time step using interface data extrapolated from the previous time
 level or from an intermediate predictor. Such schemes are simple and cheap, but

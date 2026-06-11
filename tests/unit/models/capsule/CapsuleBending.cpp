@@ -54,6 +54,29 @@ TEST(CapsuleBendingAssemblerTest, PerturbedMeshProducesFiniteBendingForces) {
   EXPECT_GT(mesh.state.f.norm(), 0.0);
 }
 
+TEST(CapsuleBendingAssemblerTest, MixedNodeAreasRemainPositiveAndSurfaceScaled) {
+  for (CapsuleMesh mesh :
+       { CapsuleMeshBuilder::sphere({ 1.0, Vec3::Zero(), 2 }),
+         CapsuleMeshBuilder::biconcave({ 1.0, Vec3::Zero(), 2 }) }) {
+    CapsuleGeometryOps::updateTriangleGeometry(mesh);
+
+    const std::vector<double> nodeArea =
+        CapsuleBendingAssembler::computeNodeAreas(mesh);
+
+    double nodeAreaSum = 0.0;
+    for (const double area : nodeArea) {
+      EXPECT_GT(area, 0.0);
+      nodeAreaSum += area;
+    }
+
+    double triangleAreaSum = 0.0;
+    for (const auto &geom : mesh.state.triGeom)
+      triangleAreaSum += geom.area;
+
+    EXPECT_NEAR(nodeAreaSum, triangleAreaSum, 0.01 * triangleAreaSum);
+  }
+}
+
 TEST(CapsuleBendingAssemblerTest, CapsuleAddsOptionalBendingForces) {
   Capsule capsule(CapsuleMeshBuilder::sphere({ 1.0, Vec3::Zero(), 1 }));
   capsule.setBendingLaw(std::make_unique<CapsuleLinearBendingLaw>(0.1));

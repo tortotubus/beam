@@ -10,7 +10,7 @@
 
 /* Default simulations parameters */
 
-double dt_fluid = 0.0005;
+double dt_fluid = 0.001; // 5e-2,5e-3
 double L_fluid = 16.;
 double U0 = 0.;
 

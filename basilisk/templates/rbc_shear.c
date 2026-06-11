@@ -209,6 +209,7 @@ event output(i += output_interval; t <= t_end) {
   output_hdf_imagedata(slist, vlist, base_path);
 #endif
   output_hdf_pd(NULL, NULL, base_path);
+  output_hdf_elff_pd(base_path);
 }
 
 #if TREE
