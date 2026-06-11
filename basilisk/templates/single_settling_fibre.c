@@ -43,7 +43,7 @@ double experiment_ib_force_relaxation = 0.8;
 int experiment_ib_richardson_iters = 2;
 
 int experiment_stats_interval = 1;
-double experiment_output_interval = 0.05;
+double experiment_output_interval = 1.0;
 int experiment_output_iter = 1;
 
 double experiment_t_end = 500.0;
@@ -241,7 +241,7 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
   }
 }
 
-event output(i += experiment_output_iter; t <= experiment_t_end) {
+event output(t += experiment_output_interval; t <= experiment_t_end) {
   scalar l2[], omega_z[];
   lambda2(u, l2);
   vorticity(u, omega_z);
