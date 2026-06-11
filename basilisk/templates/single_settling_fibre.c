@@ -34,7 +34,7 @@ double banaei_Ga = 40.;
 double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
 int b_nodes = 65;
-double b_penalty = 1e3;
+double b_penalty_hat = 1.;
 double b_theta = 0.00;
 int b_pid = 0;
 
@@ -56,10 +56,11 @@ char *base_path = "single_settling_fibre_output";
 #define b_linear_density_difference (banaei_r * b_rho_0 * b_area)
 #define b_mu ((1. + banaei_r) * b_rho_0 * b_area)
 #define b_submerged_weight_per_length (b_linear_density_difference * b_g)
-#define b_EI                                                                   \
-  (banaei_gamma * banaei_r * b_submerged_weight_per_length * b_length *        \
-   b_length * b_length)
+#define b_EI (banaei_gamma * banaei_r * b_submerged_weight_per_length * b_length * b_length * b_length)
 #define b_gravity -(b_submerged_weight_per_length)
+#define b_ds (b_length / (b_nodes - 1))
+#define b_penalty_scale (0.5 * b_EI / (b_ds * b_ds) + 2.0 * b_mu * b_ds * b_ds / (dt_fluid * dt_fluid))
+#define b_penalty (b_penalty_hat * b_penalty_scale)
 
 #define fluid_nu (sqrt(banaei_r * b_g * b_length * b_length * b_length) / banaei_Ga)
 #define fluid_dynamic_viscosity (b_rho_0 * fluid_nu)
@@ -99,28 +100,19 @@ int main(int argc, char **argv) {
   input_file_register_option("basilisk.fluid", maxlevel, PARAM_VALUE_INT);
   input_file_register_option("basilisk.fluid", ibmlevel, PARAM_VALUE_INT);
   input_file_register_option("basilisk.output", base_path, PARAM_VALUE_STRING);
-  input_file_register_option_named("banaei", "rp", banaei_rp,
-                                   PARAM_VALUE_DOUBLE);
-  input_file_register_option_named("banaei", "gamma", banaei_gamma,
-                                   PARAM_VALUE_DOUBLE);
+  input_file_register_option_named("banaei", "rp", banaei_rp, PARAM_VALUE_DOUBLE);
+  input_file_register_option_named("banaei", "gamma", banaei_gamma, PARAM_VALUE_DOUBLE);
   input_file_register_option_named("banaei", "r", banaei_r, PARAM_VALUE_DOUBLE);
-  input_file_register_option_named("banaei", "Ga", banaei_Ga,
-                                   PARAM_VALUE_DOUBLE);
+  input_file_register_option_named("banaei", "Ga", banaei_Ga,  PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_length, PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_nodes, PARAM_VALUE_INT);
-  input_file_register_option_named("beam", "r_penalty", b_penalty,
-                                   PARAM_VALUE_DOUBLE);
+  input_file_register_option_named("beam", "r_penalty", b_penalty_hat, PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_theta, PARAM_VALUE_DOUBLE);
-  input_file_register_option("experiment", experiment_ib_force_relaxation,
-                             PARAM_VALUE_DOUBLE);
-  input_file_register_option("experiment", experiment_ib_richardson_iters,
-                             PARAM_VALUE_INT);
-  input_file_register_option("experiment", experiment_t_end,
-                             PARAM_VALUE_DOUBLE);
-  input_file_register_option("experiment", experiment_stats_interval,
-                             PARAM_VALUE_INT);
-  input_file_register_option("experiment", experiment_output_interval,
-                             PARAM_VALUE_DOUBLE);
+  input_file_register_option("experiment", experiment_ib_force_relaxation, PARAM_VALUE_DOUBLE);
+  input_file_register_option("experiment", experiment_ib_richardson_iters, PARAM_VALUE_INT);
+  input_file_register_option("experiment", experiment_t_end, PARAM_VALUE_DOUBLE);
+  input_file_register_option("experiment", experiment_stats_interval, PARAM_VALUE_INT);
+  input_file_register_option("experiment", experiment_output_interval, PARAM_VALUE_DOUBLE);
 
   /* Here we parse the options given through the command-line */
   int input_file_parse_result = input_file_parse_cli(argc, argv);
@@ -160,13 +152,9 @@ event properties(i++) {
 
 /* Beam setup */
 event init(i = 0) {
-  ib_euler_beam_bcs_t b_bcs =
-      elff_euler_beam_bcs_types(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
+  ib_euler_beam_bcs_t b_bcs = elff_euler_beam_bcs_types(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
   int m_id = ibmeshmanager_add_mesh();
-
-  IBMeshModel beam_model = elff_euler_beam_addm_new_theta(
-      b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs, b_s0, b_pid);
-
+  IBMeshModel beam_model = elff_euler_beam_addm_new_theta(b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs, b_s0, b_pid);
   ibmeshmanager_set_model(m_id, beam_model);
 
   foreach_ibnode_per_ibmesh() {
