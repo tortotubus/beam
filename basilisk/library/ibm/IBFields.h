@@ -49,6 +49,7 @@ size_t nibvar = 0;
 IBvector npos;
 IBvector nvel;
 IBvector nforce;
+IBscalar nweight;
 
 // ============================================================================
 // Function Declarations
@@ -166,6 +167,8 @@ void init_ibsolver () {
   new_ibvector (nvel);
   new_ibvector (nforce);
   new_ibvector (npos);
+  new_ibscalar (nweight);
+  ibnodump (nweight) = true;
 
   int n = nibvar;
   if (iball)

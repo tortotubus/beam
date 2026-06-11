@@ -20,7 +20,6 @@ face vector uf[];
 vector ibmf[];
 
 IBvector gravity;
-IBscalar nweight;
 IBvector eulvel;
 IBscalar eulrho;
 IBscalar sumw2;
@@ -83,11 +82,9 @@ event defaults (i = 0) {
 
   new_ibscalar (eulrho);
   new_ibscalar (sumw2);
-  new_ibscalar (nweight);
 
   ibnodump (eulrho) = true;
   ibnodump (sumw2) = true;
-  ibnodump (nweight) = true;
 
   ibmeshmanager_init (0);
 

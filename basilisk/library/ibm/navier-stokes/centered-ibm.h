@@ -19,8 +19,6 @@ face vector uf[];
 
 vector ibmf[];
 
-IBscalar nweight;
-
 #ifndef ADVECT_LAG_RK2
 #define ADVECT_LAG_RK2 1
 #endif
@@ -65,9 +63,6 @@ void pressure_embed_gradient (Point point, scalar p, coord* g) {
 #endif // TREE && EMBED
 
 event defaults (i = 0) {
-  new_ibscalar (nweight);
-  ibnodump (nweight) = true;
-
   ibmeshmanager_init (0);
 
   if (is_constant (a.x)) {

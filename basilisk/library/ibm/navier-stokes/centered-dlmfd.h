@@ -24,7 +24,6 @@ vector tmp_vel[];
 
 IBvector gravity;
 
-IBscalar nweight;
 IBvector eulvel; 
 IBvector rhs;
 IBvector res;
@@ -74,7 +73,6 @@ void pressure_embed_gradient (Point point, scalar p, coord* g) {
 #endif // TREE && EMBED
 
 event defaults (i = 0) {
-  new_ibscalar (nweight);
   new_ibvector (eulvel);
   new_ibvector (gravity);
   new_ibvector (rhs);
