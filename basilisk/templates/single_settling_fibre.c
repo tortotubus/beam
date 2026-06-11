@@ -33,16 +33,19 @@ double banaei_Ga = 40.;
 
 double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
-int b_nodes = 65;
+int b_nodes = 62;
 double b_penalty_hat = 1.;
 double b_theta = 0.00;
 int b_pid = 0;
 
 /* Nonphysical experiment controls */
-double experiment_ib_force_relaxation = 0.4;
-int experiment_ib_richardson_iters = 3;
+double experiment_ib_force_relaxation = 0.8;
+int experiment_ib_richardson_iters = 2;
+
 int experiment_stats_interval = 1;
 double experiment_output_interval = 0.05;
+int experiment_output_iter = 1;
+
 double experiment_t_end = 500.0;
 
 char *base_path = "single_settling_fibre_output";
@@ -238,7 +241,7 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
   }
 }
 
-event output(t += experiment_output_interval; t <= experiment_t_end) {
+event output(i += experiment_output_iter; t <= experiment_t_end) {
   scalar l2[], omega_z[];
   lambda2(u, l2);
   vorticity(u, omega_z);
