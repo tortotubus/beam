@@ -24,7 +24,7 @@ vector tmp_vel[];
 
 IBvector gravity;
 
-IBvector eulvel; 
+IBvector eulvel;
 IBvector rhs;
 IBvector res;
 IBvector w;
@@ -244,7 +244,11 @@ event alpha_viscous_term (i++, last) {
 #include "library/ibm/IBKernels.h"
 
 event advance_lagrangian_mesh (i++, last) {
-  foreach_ibnode () foreach_dimension () node->f.x += ibval (gravity.x);
+  foreach_ibnode () {
+    foreach_dimension () {
+      ibval (nforce.x) += ibval (gravity.x);
+    }
+  }
 
   ibmeshmanager_advance_positions (dt);
 }
@@ -265,7 +269,7 @@ event interpolate_eulerian_velocities (i++, last) {
 event compute_constraint_rhs (i++, last) {
   foreach_ibnode () {
     foreach_dimension () {
-      ibval (rhs.x) = ibval (eulvel.x) - node->vel.x;
+      ibval (rhs.x) = ibval (eulvel.x) - ibval (nvel.x);
     }
   }
 }
@@ -299,10 +303,15 @@ void ib_matvec_Aw (double dt) {
   foreach_ibnode () {
     foreach_dimension () ibval (Ay.x) = 0.;
 
-    peskin_cosine_kernel_gather_dimensionless (node) foreach_dimension () ibval (Ay.x) +=
-      weight * tmp_vel.x[];
+    peskin_cosine_kernel_gather_dimensionless (node) {
+      foreach_dimension () {
+        ibval (Ay.x) += weight * tmp_vel.x[];
+      }
+    }
 
-    foreach_dimension () ibval (Ay.x) *= dt;
+    foreach_dimension () {
+      ibval (Ay.x) *= dt;
+    }
   }
 }
 
@@ -313,7 +322,7 @@ int cgiter_max = 50;
 void ib_solve_lambda_CG (double dt) {
   foreach_ibnode () {
     foreach_dimension () {
-      node->f.x = 0.;
+      ibval (nforce.x) = 0.;
       ibval (res.x) = ibval (rhs.x);
       ibval (w.x) = ibval (res.x);
     }
@@ -351,8 +360,8 @@ void ib_solve_lambda_CG (double dt) {
     // - \alpha y_k
     foreach_ibnode () {
       foreach_dimension () {
-        node->f.x += alpha * ibval (w.x);      // lambda update
-        ibval (res.x) -= alpha * ibval (Ay.x); // residual update
+        ibval (nforce.x) += alpha * ibval (w.x); // lambda update
+        ibval (res.x) -= alpha * ibval (Ay.x);   // residual update
         rr_new += sq (ibval (res.x)) * ibval (nweight);
       }
     }
@@ -383,8 +392,13 @@ event spread_eulerian_forcing (i++, last) {
   foreach ()
     foreach_dimension () ibmf.x[] = 0.;
 
-  foreach_ibnode () peskin_cosine_kernel_spread_dimensionless (node) foreach_dimension ()
-    ibmf.x[] -= weight / dv () * node->f.x * ibval (nweight);
+  foreach_ibnode () {
+    peskin_cosine_kernel_spread_dimensionless (node) {
+      foreach_dimension () {
+        ibmf.x[] -= weight / dv () * ibval (nforce.x) * ibval (nweight);
+      }
+    }
+  }
 
   // foreach_face ()
   //   if (fm.x[] > 1e-20)
