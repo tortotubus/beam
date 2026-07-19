@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "library/ibm/IBMeshManager.h"
 #include "library/ibm/navier-stokes/centered-mdf.h"
 #include "library/elff/elff.h"
@@ -10,13 +12,13 @@
 
 /* Default simulations parameters */
 
-double dt_fluid = 0.001; // 5e-2,5e-3
-double L_fluid = 16.;
+double dt_fluid = 0.05; // 5e-2,5e-3
+double L_fluid = 4.*M_PI;
 double U0 = 0.;
 
-int maxlevel = 10;
+int maxlevel = 8;
 int minlevel = 4;
-int ibmlevel = 11;
+int ibmlevel = 8;
 
 /*
  * Banaei et al. (2020) nondimensional groups:
@@ -27,20 +29,20 @@ int ibmlevel = 11;
  */
 
 double banaei_rp = 30.;
-double banaei_gamma = 0.1;
+double banaei_gamma = 1.0;
 double banaei_r = 0.1;
 double banaei_Ga = 40.;
 
 double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
-int b_nodes = 62;
-double b_penalty_hat = 1.;
+int b_nodes = 21;
+double b_penalty = 1000; // 0.01 -> 2000, 1.0 -> 1000
 double b_theta = 0.00;
 int b_pid = 0;
 
 /* Nonphysical experiment controls */
-double experiment_ib_force_relaxation = 0.8;
-int experiment_ib_richardson_iters = 2;
+double experiment_ib_force_relaxation = 0.05;
+int experiment_ib_richardson_iters = 3;
 
 int experiment_stats_interval = 1;
 double experiment_output_interval = 1.0;
@@ -62,12 +64,14 @@ char *base_path = "single_settling_fibre_output";
 #define b_EI (banaei_gamma * banaei_r * b_submerged_weight_per_length * b_length * b_length * b_length)
 #define b_gravity -(b_submerged_weight_per_length)
 #define b_ds (b_length / (b_nodes - 1))
-#define b_penalty_scale (0.5 * b_EI / (b_ds * b_ds) + 2.0 * b_mu * b_ds * b_ds / (dt_fluid * dt_fluid))
-#define b_penalty (b_penalty_hat * b_penalty_scale)
 
 #define fluid_nu (sqrt(banaei_r * b_g * b_length * b_length * b_length) / banaei_Ga)
 #define fluid_dynamic_viscosity (b_rho_0 * fluid_nu)
 #define fluid_velocity_scale (sqrt(banaei_r * b_g * b_length))
+
+#define b_penalty_scale (0.5 * b_EI / (b_ds * b_ds) + 2.0 * b_mu * b_ds * b_ds / (dt_fluid * dt_fluid))
+#define b_tension_scale (b_linear_density_difference * fluid_velocity_scale * fluid_velocity_scale)
+
 
 /* Additional fields */
 
@@ -109,7 +113,7 @@ int main(int argc, char **argv) {
   input_file_register_option_named("banaei", "Ga", banaei_Ga,  PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_length, PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_nodes, PARAM_VALUE_INT);
-  input_file_register_option_named("beam", "r_penalty", b_penalty_hat, PARAM_VALUE_DOUBLE);
+  input_file_register_option_named("beam", "r_penalty", b_penalty, PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_theta, PARAM_VALUE_DOUBLE);
   input_file_register_option("experiment", experiment_ib_force_relaxation, PARAM_VALUE_DOUBLE);
   input_file_register_option("experiment", experiment_ib_richardson_iters, PARAM_VALUE_INT);
@@ -187,8 +191,23 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
 
   double delta_first;
   double delta_last;
+  double measure_sum = 0.;
+  double nodal_force_y = 0.;
+  double gravity_force_y = 0.;
+  double mean_velocity_y = 0.;
+  double eulerian_ibm_force_y = 0.;
+
+  foreach(reduction(+:eulerian_ibm_force_y)) {
+    eulerian_ibm_force_y += ibmf.y[] * dv();
+  }
 
   foreach_ibnode() {
+    double w = ibval(nweight);
+    measure_sum += w;
+    nodal_force_y += ibval(nforce.y) * w;
+    gravity_force_y += b_gravity * w;
+    mean_velocity_y += ibval(nvel.y) * w;
+
     if (node_id == 0) {
       foreach_dimension() { pos_first.x = ibval(npos.x); }
     } else if (node_id == ibmm.pool.active.size - 1) {
@@ -203,10 +222,21 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
 
   delta_first = (pos_first.y - pos_min_vert.y) / (0.5 * b_length);
   delta_last = (pos_last.y - pos_min_vert.y) / (0.5 * b_length);
+  if (measure_sum > 0.)
+    mean_velocity_y /= measure_sum;
+  double hydro_force_y = -eulerian_ibm_force_y;
+  double force_balance_y = hydro_force_y + gravity_force_y;
 
   if (pid() == 0) {
     fprintf(stderr, "%d %g %g %g %g\n", i, t, pos_min_vert.y, delta_first,
             delta_last);
+    fprintf(stderr,
+            "diag %d %g hydro_y=%g ibmf_int_y=%g nodal_force_y=%g "
+            "gravity_y=%g balance_y=%g mean_vy=%g measure=%g "
+            "expected_weight_y=%g\n",
+            i, t, hydro_force_y, eulerian_ibm_force_y, nodal_force_y,
+            gravity_force_y, force_balance_y, mean_velocity_y, measure_sum,
+            b_gravity * b_length);
 
     FILE *fp = NULL;
 
@@ -216,6 +246,28 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
     }
 
     create_path(base_path);
+    char gpname[4096];
+    snprintf(gpname, sizeof(gpname), "%s/plot.gp", base_path);
+
+    FILE *fp_gp = fopen(gpname, "w");
+    if (!fp_gp) {
+      fprintf(stderr, "warning: failed to open %s for write\n", gpname);
+    } else {
+      fprintf(fp_gp,
+              "set terminal qt size 1100,700\n"
+              "set datafile separator comma\n"
+              "file = \"banaei-marchetti-validation.csv\"\n"
+              "set title \"Settling fibre delta\"\n"
+              "set xlabel \"i\"\n"
+              "set ylabel \"delta / (L/2)\"\n"
+              "set grid\n"
+              "set key top left\n"
+              "plot file every 100 using 1:20 with linespoints title \"delta_0\", \\\n"
+              "     file every 100 using 1:21 with linespoints title \"delta_f\"\n"
+              "pause -1\n");
+      fclose(fp_gp);
+    }
+
     char fname[4096];
     snprintf(fname, sizeof(fname), "%s/banaei-marchetti-validation.csv",
              base_path);
@@ -229,19 +281,24 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
 
     if (i == 0) {
       fprintf(fp, "i,t,banaei_Ga,banaei_gamma,banaei_r,banaei_rp,B,x0,xm,xmy,xf,"
-                  "y0,ym,ymy,yf,z0,zm,zmy,zf,delta_0,delta_f\n");
+                  "y0,ym,ymy,yf,z0,zm,zmy,zf,delta_0,delta_f,"
+                  "measure_sum,hydro_force_y,eulerian_ibm_force_y,"
+                  "nodal_force_y,gravity_force_y,force_balance_y,"
+                  "mean_velocity_y\n");
     }
 
-    fprintf(fp, "%d,%g,%g,%g,%g,%g%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+    fprintf(fp, "%d,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             i, t, banaei_Ga, banaei_gamma, banaei_r, banaei_rp, (1./(banaei_gamma * banaei_r)), pos_first.x,
             pos_middle.x, pos_min_vert.x, pos_last.x, pos_first.y, pos_middle.y,
             pos_min_vert.y, pos_last.y, pos_first.z, pos_middle.z,
-            pos_min_vert.z, pos_last.z, delta_first, delta_last);
+            pos_min_vert.z, pos_last.z, delta_first, delta_last, measure_sum,
+            hydro_force_y, eulerian_ibm_force_y, nodal_force_y,
+            gravity_force_y, force_balance_y, mean_velocity_y);
     fclose(fp);
   }
 }
 
-event output(t += experiment_output_interval; t <= experiment_t_end) {
+event output(i+=1; t <= experiment_t_end) {
   scalar l2[], omega_z[];
   lambda2(u, l2);
   vorticity(u, omega_z);

@@ -23,8 +23,11 @@ elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/static_sphere_mpi.
 # elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/static_fibre.c")
 # elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/static_fibre_mpi.c")
 
-elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fibre.c")
-elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fibre_mpi.c")
+elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fibre_admm.c")
+elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fibre_admm_mpi.c")
+
+elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fibre_ggl.c")
+elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fibre_ggl_mpi.c")
 
 elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/quadtree_moving_mesh.c")
 elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/quadtree_moving_mesh_mpi.c")
