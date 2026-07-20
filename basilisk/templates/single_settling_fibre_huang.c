@@ -10,7 +10,7 @@
 
 /* Default simulations parameters */
 
-double dt_fluid = 0.0005; // 5e-2,5e-3
+double dt_fluid = 0.001; // 5e-2,5e-3
 double L_fluid = 16.;
 double U0 = 0.;
 
@@ -231,7 +231,7 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
                   "y0,ym,ymy,yf,z0,zm,zmy,zf,delta_0,delta_f\n");
     }
 
-    fprintf(fp, "%d,%g,%g,%g,%g,%g%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+    fprintf(fp, "%d,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             i, t, banaei_Ga, banaei_gamma, banaei_r, banaei_rp, (1./(banaei_gamma * banaei_r)), pos_first.x,
             pos_middle.x, pos_min_vert.x, pos_last.x, pos_first.y, pos_middle.y,
             pos_min_vert.y, pos_last.y, pos_first.z, pos_middle.z,
