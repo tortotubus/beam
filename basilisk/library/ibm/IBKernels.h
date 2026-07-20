@@ -2,6 +2,17 @@
 #include "library/ibm/IBNode.h"
 #include "library/ibm/IBMacros.h"
 
+static inline double roma_three_point_kernel_1d (double r) {
+  double q = fabs (r);
+  if (q <= 0.5)
+    return (1. + sqrt (1. - 3. * q * q)) / 3.;
+  if (q <= 1.5) {
+    double a = 1. - 3. * sq (1. - q);
+    return (5. - 3. * q - sqrt (max (0., a))) / 6.;
+  }
+  return 0.;
+}
+
 macro peskin_cosine_kernel_gather_dimensionless (IBNode* node = node) {
   // bool ib_set_dirty = true;
   IBNODE_VARIABLES();
@@ -23,6 +34,123 @@ macro peskin_cosine_kernel_gather_dimensionless (IBNode* node = node) {
     {...}
     // clang-format on
   }
+}
+
+macro roma_three_point_kernel_gather_dimensionless (IBNode* node = node) {
+  IBNODE_VARIABLES();
+  foreach_neighbor_coord (2, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      double delta = pos.x - cell_centre.x;
+      periodic_minimum_image_delta (delta, Period.x);
+      kernel_dist.x = fabs (delta) / Delta;
+      weight *= roma_three_point_kernel_1d (kernel_dist.x);
+    }
+    // clang-format off
+    {...}
+    // clang-format on
+  }
+}
+
+macro roma_three_point_kernel_spread_dimensionless (IBNode* node = node) {
+  IBNODE_VARIABLES();
+#if TREE
+  foreach_neighbor_coord_level (2, node->depth, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      double delta = pos.x - cell_centre.x;
+      periodic_minimum_image_delta (delta, Period.x);
+      kernel_dist.x = fabs (delta) / Delta;
+      weight *= roma_three_point_kernel_1d (kernel_dist.x);
+    }
+    if (is_local (cell)) {
+      // clang-format off
+          {...}
+      // clang-format on
+    }
+  }
+#else
+  foreach_neighbor_coord_nonlocal (2, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      double delta = pos.x - cell_centre.x;
+      periodic_minimum_image_delta (delta, Period.x);
+      kernel_dist.x = fabs (delta) / Delta;
+      weight *= roma_three_point_kernel_1d (kernel_dist.x);
+    }
+
+    {
+      // clang-format off
+          {...}
+      // clang-format on
+    }
+  }
+#endif
+}
+
+macro roma_three_point_kernel_gather (IBNode* node = node) {
+  IBNODE_VARIABLES();
+  foreach_neighbor_coord (2, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      double delta = pos.x - cell_centre.x;
+      periodic_minimum_image_delta (delta, Period.x);
+      kernel_dist.x = fabs (delta);
+      weight *= roma_three_point_kernel_1d (kernel_dist.x / Delta);
+    }
+    // clang-format off
+    {...}
+    // clang-format on
+  }
+}
+
+macro roma_three_point_kernel_spread (IBNode* node = node) {
+  IBNODE_VARIABLES();
+#if TREE
+  foreach_neighbor_coord_level (2, node->depth, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      double delta = pos.x - cell_centre.x;
+      periodic_minimum_image_delta (delta, Period.x);
+      kernel_dist.x = fabs (delta);
+      weight *= roma_three_point_kernel_1d (kernel_dist.x / Delta);
+    }
+
+    if (is_local (cell)) {
+      // clang-format off
+          {...}
+      // clang-format on
+    }
+  }
+#else
+  foreach_neighbor_coord_nonlocal (2, pos) {
+    double weight = 1.0;
+    coord kernel_dist = {0};
+    coord cell_centre = {.x = x, .y = y, .z = z};
+    foreach_dimension () {
+      double delta = pos.x - cell_centre.x;
+      periodic_minimum_image_delta (delta, Period.x);
+      kernel_dist.x = fabs (delta);
+      weight *= roma_three_point_kernel_1d (kernel_dist.x / Delta);
+    }
+
+    {
+      // clang-format off
+          {...}
+      // clang-format on
+    }
+  }
+#endif
 }
 
 macro peskin_cosine_kernel_spread_dimensionless (IBNode* node = node) {
