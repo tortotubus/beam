@@ -93,7 +93,7 @@ IBEulerBeamADDM::ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
     load[ni][2] = force[ni].z;
   }
 
-  EulerBeamInextensibleADDM::solve(dt, load);
+  EulerBeamInextensibleADDM::solve_averaged_load(dt, load);
   EBMeshToIBMeshNext();
 }
 
