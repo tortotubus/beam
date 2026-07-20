@@ -292,7 +292,7 @@ EulerBeamInextensibleGGL::solve(real_t dt, std::array<real_t, 3> load)
     final_iter = iter;
     final_res_norm = res_norm;
 
-    if (res_norm < tol_newton) {
+    if (res_norm == 0.0 || (iter > 0 && res_norm < tol_newton)) {
       break;
     }
 
@@ -382,7 +382,7 @@ EulerBeamInextensibleGGL::solve(
     final_iter = iter;
     final_res_norm = res_norm;
 
-    if (res_norm < tol_newton) {
+    if (res_norm == 0.0 || (iter > 0 && res_norm < tol_newton)) {
       break;
     }
 
