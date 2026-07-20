@@ -33,7 +33,7 @@ double banaei_Ga = 40.;
 
 double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
-int b_nodes = 72;
+int b_nodes = 67;
 double b_penalty_hat = 5.;
 double b_theta = 0.00;
 int b_pid = 0;
