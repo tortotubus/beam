@@ -62,48 +62,11 @@ EulerBeamInextensibleHuang::solve(std::vector<std::array<real_t, 3>> load)
 void
 EulerBeamInextensibleHuang::solve(real_t dt, std::array<real_t, 3> load)
 {
-  ELFF_ASSERT(dt > 0.0, "Time step must be positive.");
-  ELFF_ASSERT(mu > 0.0,
-              "EulerBeamInextensibleHuang requires mu > 0 for the dynamic solve.");
-
-  if (mesh.get_nodes() < 3) {
-    ELFF_ABORT("EulerBeamInextensibleHuang requires at least 3 nodes for the BC1 "
-               "finite-difference stencil.");
-  }
-
-  if (initial_velocity_pending) {
-    X_nm1 = X_n - dt * V_init;
-    initial_velocity_pending = false;
-  }
-
-  last_dt = dt;
-
   Vec3 body_force = Vec3::Zero();
   body_force(0) = load[0];
   body_force(1) = load[1];
   body_force(2) = load[2];
-  const Vec3 body_accel = body_force / mu;
-
-  const MatX3 X_star = 2.0 * X_n - X_nm1;
-  const MatX3 Fb_star = bending_force(X_star);
-
-  // The Huang tension solve is formulated in specific-tension units
-  // consistent with acceleration-form forcing. Convert back to a physical
-  // tension so the position equation matches the force-balance form used by
-  // the other beam solvers.
-  last_T = mu * solve_tension(dt, body_accel);
-  MatX3 X_np1 = solve_position(last_T, dt, body_force, Fb_star);
-
-  const auto [inext_linf, inext_l2] = compute_inextensibility_error(X_np1);
-  ELFF_LOG(time_iter << "\t" << (t + dt) << "\t|g|_inf=" << inext_linf
-                     << "\t|g|_l2=" << inext_l2);
-
-  X_nm1 = X_n;
-  X_n = X_np1;
-
-  update_mesh();
-  time_iter++;
-  t += dt;
+  solve_dynamic(dt, uniform_nodal_field(body_force));
 }
 
 void
@@ -117,19 +80,14 @@ EulerBeamInextensibleHuang::solve(real_t dt, std::vector<std::array<real_t, 3>> 
     return;
   }
 
-  const auto& load0 = load.front();
-  for (size_t i = 1; i < load.size(); ++i) {
-    const auto& li = load[i];
-    const real_t diff = std::abs(li[0] - load0[0]) +
-                        std::abs(li[1] - load0[1]) +
-                        std::abs(li[2] - load0[2]);
-    if (diff > tol_inner) {
-      ELFF_ABORT("EulerBeamInextensibleHuang prototype currently supports only uniform "
-                 "distributed loading.");
-    }
+  MatX3 body_force(static_cast<Index>(load.size()), 3);
+  for (size_t i = 0; i < load.size(); ++i) {
+    body_force(static_cast<Index>(i), 0) = load[i][0];
+    body_force(static_cast<Index>(i), 1) = load[i][1];
+    body_force(static_cast<Index>(i), 2) = load[i][2];
   }
 
-  solve(dt, load0);
+  solve_dynamic(dt, body_force);
 }
 
 void
@@ -370,13 +328,72 @@ EulerBeamInextensibleHuang::build_bending_matrix() const
   return B;
 }
 
+EulerBeamInextensibleHuang::MatX3
+EulerBeamInextensibleHuang::uniform_nodal_field(const Vec3& value) const
+{
+  const Index n = static_cast<Index>(mesh.get_nodes());
+  MatX3 field(n, 3);
+  for (Index i = 0; i < n; ++i) {
+    field.row(i) = value.transpose();
+  }
+  return field;
+}
+
+void
+EulerBeamInextensibleHuang::solve_dynamic(real_t dt, const MatX3& body_force)
+{
+  ELFF_ASSERT(dt > 0.0, "Time step must be positive.");
+  ELFF_ASSERT(mu > 0.0,
+              "EulerBeamInextensibleHuang requires mu > 0 for the dynamic solve.");
+  ELFF_ASSERT(body_force.rows() == static_cast<Index>(mesh.get_nodes()) &&
+                body_force.cols() == 3,
+              "Nodal load field must have one 3D force per beam node.");
+
+  if (mesh.get_nodes() < 3) {
+    ELFF_ABORT("EulerBeamInextensibleHuang requires at least 3 nodes for the BC1 "
+               "finite-difference stencil.");
+  }
+
+  if (initial_velocity_pending) {
+    X_nm1 = X_n - dt * V_init;
+    initial_velocity_pending = false;
+  }
+
+  last_dt = dt;
+
+  const MatX3 body_accel = body_force / mu;
+  const MatX3 X_star = 2.0 * X_n - X_nm1;
+  const MatX3 Fb_star = bending_force(X_star);
+
+  // The Huang tension solve is formulated in specific-tension units
+  // consistent with acceleration-form forcing. Convert back to a physical
+  // tension so the position equation matches the force-balance form used by
+  // the other beam solvers.
+  last_T = mu * solve_tension(dt, body_accel);
+  MatX3 X_np1 = solve_position(last_T, dt, body_force, Fb_star);
+
+  const auto [inext_linf, inext_l2] = compute_inextensibility_error(X_np1);
+  ELFF_LOG(time_iter << "\t" << (t + dt) << "\t|g|_inf=" << inext_linf
+                     << "\t|g|_l2=" << inext_l2);
+
+  X_nm1 = X_n;
+  X_n = X_np1;
+
+  update_mesh();
+  time_iter++;
+  t += dt;
+}
+
 VectorXd
-EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) const
+EulerBeamInextensibleHuang::solve_tension(real_t dt, const MatX3& body_accel) const
 {
   const Index segments = static_cast<Index>(mesh.get_nodes() - 1);
   const Index last = segments - 1;
   ELFF_ASSERT(mu > 0.0,
               "EulerBeamInextensibleHuang requires mu > 0 for the tension solve.");
+  ELFF_ASSERT(body_accel.rows() == static_cast<Index>(mesh.get_nodes()) &&
+                body_accel.cols() == 3,
+              "Nodal acceleration field must have one 3D value per beam node.");
 
   MatX3 X_star = 2.0 * X_n - X_nm1;
   MatX3 U_n = (X_n - X_nm1) / dt;
@@ -385,6 +402,7 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
   MatX3 tau_n = tau_half(X_n);
   MatX3 tau_nm1 = tau_half(X_nm1);
   MatX3 Fb_star = bending_force(X_star) / mu;
+  MatX3 total_accel_star = Fb_star + body_accel;
 
   VectorXd corr = VectorXd::Zero(segments);
   VectorXd velsq = VectorXd::Zero(segments);
@@ -408,7 +426,7 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
     A(i, i + 1) = tau_star.row(i).dot(tau_star.row(i + 1)) / (ds * ds);
     b(i) =
       corr(i) - velsq(i) -
-      tau_star.row(i).dot((Fb_star.row(i + 1) - Fb_star.row(i)).transpose()) /
+      tau_star.row(i).dot((total_accel_star.row(i + 1) - total_accel_star.row(i)).transpose()) /
         ds;
   }
 
@@ -419,15 +437,14 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
     }
     b(0) =
       corr(0) - velsq(0) -
-      tau_star.row(0).dot((Fb_star.row(1) - Fb_star.row(0)).transpose()) / ds;
+      tau_star.row(0).dot((total_accel_star.row(1) - total_accel_star.row(0)).transpose()) / ds;
   } else {
     A(0, 0) = -tau_star.row(0).squaredNorm() / (ds * ds);
     if (segments > 1) {
       A(0, 1) = tau_star.row(0).dot(tau_star.row(1)) / (ds * ds);
     }
     b(0) = corr(0) - velsq(0) +
-           tau_star.row(0).dot((-Fb_star.row(1)).transpose()) / ds -
-           tau_star.row(0).dot(body_force.transpose()) / ds;
+           tau_star.row(0).dot((-total_accel_star.row(1)).transpose()) / ds;
   }
 
   if (is_free(EulerBeam::right)) {
@@ -439,7 +456,7 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
     b(last) =
       corr(last) - velsq(last) +
       tau_star.row(last).dot(
-        (Fb_star.row(segments - 1) - Fb_star.row(segments)).transpose()) /
+        (total_accel_star.row(segments - 1) - total_accel_star.row(segments)).transpose()) /
         ds;
   } else {
     if (segments > 1) {
@@ -448,8 +465,7 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
     }
     A(last, last) = -tau_star.row(last).squaredNorm() / (ds * ds);
     b(last) = corr(last) - velsq(last) +
-              tau_star.row(last).dot(Fb_star.row(last).transpose()) / ds +
-              tau_star.row(last).dot(body_force.transpose()) / ds;
+              tau_star.row(last).dot(total_accel_star.row(last).transpose()) / ds;
   }
 
   return A.partialPivLu().solve(b);
@@ -458,16 +474,18 @@ EulerBeamInextensibleHuang::solve_tension(real_t dt, const Vec3& body_force) con
 EulerBeamInextensibleHuang::MatX3
 EulerBeamInextensibleHuang::solve_position(const VectorXd& T_half,
                                real_t dt,
-                               const Vec3& body_force,
+                               const MatX3& body_force,
                                const MatX3& Fb_star) const
 {
   const Index n = static_cast<Index>(mesh.get_nodes());
   ELFF_ASSERT(mu > 0.0,
               "EulerBeamInextensibleHuang requires mu > 0 for the position solve.");
+  ELFF_ASSERT(body_force.rows() == n && body_force.cols() == 3,
+              "Nodal load field must have one 3D force per beam node.");
 
   MatX3 rhs = mu * (2.0 * X_n - X_nm1) / (dt * dt);
   for (Index i = 0; i < n; ++i) {
-    rhs.row(i) += body_force.transpose();
+    rhs.row(i) += body_force.row(i);
     if (!implicit_bending) {
       rhs.row(i) += Fb_star.row(i);
     }
