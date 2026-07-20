@@ -107,6 +107,13 @@ ib_euler_beam_huang_new_theta(vertex_t s0,
 }
 
 void
+ib_euler_beam_huang_set_implicit_bending(ib_euler_beam_huang_t handle,
+                                         int                   enabled)
+{
+  reinterpret_cast<IBEulerBeamHuang*>(handle)->set_implicit_bending(enabled != 0);
+}
+
+void
 ib_euler_beam_huang_destroy(ib_euler_beam_huang_t handle)
 {
   delete reinterpret_cast<IBEulerBeamHuang*>(handle);

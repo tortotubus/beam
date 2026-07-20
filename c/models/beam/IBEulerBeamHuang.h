@@ -24,6 +24,10 @@ extern "C"
                                                       int nodes,
                                                       double theta);
 
+  void ib_euler_beam_huang_set_implicit_bending(
+    ib_euler_beam_huang_t handle,
+    int enabled);
+
   void ib_euler_beam_huang_destroy(ib_euler_beam_huang_t handle);
 
 #ifdef __cplusplus

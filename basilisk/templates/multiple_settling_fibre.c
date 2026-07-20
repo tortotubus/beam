@@ -12,13 +12,13 @@
 
 /* Default simulations parameters */
 
-double dt_fluid = 0.0005; // 5e-2,5e-3
-double L_fluid = 16;
+double dt_fluid = 0.05; // 5e-2,5e-3
+double L_fluid = 4.*M_PI;
 double U0 = 0.;
 
-int maxlevel = 11;
+int maxlevel = 8;
 int minlevel = 4;
-int ibmlevel = 11;
+int ibmlevel = 8;
 
 /*
  * Banaei et al. (2020) nondimensional groups:
@@ -35,14 +35,14 @@ double banaei_Ga = 40.;
 
 double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
-int b_nodes = 80;
-double b_penalty = 1; // 0.01 -> 2000, 1.0 -> 1000
+int b_nodes = 21;
+double b_penalty = 1000; // 0.01 -> 2000, 1.0 -> 1000
 double b_theta = 0.00;
 int b_pid = 0;
 
 /* Nonphysical experiment controls */
-double experiment_ib_force_relaxation = 0.4;
-int experiment_ib_richardson_iters = 5;
+double experiment_ib_force_relaxation = 0.05;
+int experiment_ib_richardson_iters = 3;
 
 int experiment_stats_interval = 1;
 double experiment_output_interval = 1.0;
@@ -50,7 +50,7 @@ int experiment_output_iter = 1;
 
 double experiment_t_end = 500.0;
 
-char *base_path = "single_settling_fibre_ggl_output";
+char *base_path = "multiple_settling_fibre_output";
 
 /* Derived parameters */
 #define b_rho_0 (1.)
@@ -98,20 +98,6 @@ u.n[bottom] = dirichlet(0.);
 u.t[bottom] = dirichlet(0.);
 p[bottom] = neumann(0.);
 pf[bottom] = neumann(0.);
-
-#if dimension > 2
-u.n[front] = dirichlet(0.);
-u.t[front] = dirichlet(0.);
-u.r[front] = dirichlet(0.);
-p[front] = neumann(0.);
-pf[front] = neumann(0.);
-
-u.n[back] = dirichlet(0.);
-u.t[back] = dirichlet(0.);
-u.r[back] = dirichlet(0.);
-p[back] = neumann(0.);
-pf[back] = neumann(0.);
-#endif
 
 int main(int argc, char **argv) {
   /* Here we register runtime options for the simulation */
@@ -175,8 +161,7 @@ event properties(i++) {
 event init(i = 0) {
   ib_euler_beam_bcs_t b_bcs = elff_euler_beam_bcs_types(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
   int m_id = ibmeshmanager_add_mesh();
-  // IBMeshModel beam_model = elff_euler_beam_addm_new_theta(b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs, b_s0, b_pid);
-  IBMeshModel beam_model = elff_euler_beam_ggl_new_theta(b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs, b_s0, b_pid);
+  IBMeshModel beam_model = elff_euler_beam_addm_new_theta(b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs, b_s0, b_pid);
   ibmeshmanager_set_model(m_id, beam_model);
 
   foreach_ibnode_per_ibmesh() {
@@ -208,29 +193,20 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
   double delta_last;
   double measure_sum = 0.;
   double nodal_force_y = 0.;
-  double nodal_force_z = 0.;
   double gravity_force_y = 0.;
   double mean_velocity_y = 0.;
-  double mean_velocity_z = 0.;
   double eulerian_ibm_force_y = 0.;
-  double eulerian_ibm_force_z = 0.;
-  double max_abs_z = 0.;
 
-  foreach(reduction(+:eulerian_ibm_force_y) reduction(+:eulerian_ibm_force_z)) {
+  foreach(reduction(+:eulerian_ibm_force_y)) {
     eulerian_ibm_force_y += ibmf.y[] * dv();
-    eulerian_ibm_force_z += ibmf.z[] * dv();
   }
 
   foreach_ibnode() {
     double w = ibval(nweight);
     measure_sum += w;
     nodal_force_y += ibval(nforce.y) * w;
-    nodal_force_z += ibval(nforce.z) * w;
     gravity_force_y += b_gravity * w;
     mean_velocity_y += ibval(nvel.y) * w;
-    mean_velocity_z += ibval(nvel.z) * w;
-    if (max_abs_z < fabs(ibval(npos.z)))
-      max_abs_z = fabs(ibval(npos.z));
 
     if (node_id == 0) {
       foreach_dimension() { pos_first.x = ibval(npos.x); }
@@ -249,10 +225,7 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
   if (measure_sum > 0.)
     mean_velocity_y /= measure_sum;
   double hydro_force_y = -eulerian_ibm_force_y;
-  double hydro_force_z = -eulerian_ibm_force_z;
   double force_balance_y = hydro_force_y + gravity_force_y;
-  if (measure_sum > 0.)
-    mean_velocity_z /= measure_sum;
 
   if (pid() == 0) {
     fprintf(stderr, "%d %g %g %g %g\n", i, t, pos_min_vert.y, delta_first,
@@ -260,12 +233,10 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
     fprintf(stderr,
             "diag %d %g hydro_y=%g ibmf_int_y=%g nodal_force_y=%g "
             "gravity_y=%g balance_y=%g mean_vy=%g measure=%g "
-            "expected_weight_y=%g hydro_z=%g ibmf_int_z=%g "
-            "nodal_force_z=%g mean_vz=%g max_abs_z=%g\n",
+            "expected_weight_y=%g\n",
             i, t, hydro_force_y, eulerian_ibm_force_y, nodal_force_y,
             gravity_force_y, force_balance_y, mean_velocity_y, measure_sum,
-            b_gravity * b_length, hydro_force_z, eulerian_ibm_force_z,
-            nodal_force_z, mean_velocity_z, max_abs_z);
+            b_gravity * b_length);
 
     FILE *fp = NULL;
 

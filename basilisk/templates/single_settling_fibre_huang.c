@@ -1,5 +1,3 @@
-#include <math.h>
-
 #include "library/ibm/IBMeshManager.h"
 #include "library/ibm/navier-stokes/centered-mdf.h"
 #include "library/elff/elff.h"
@@ -13,7 +11,7 @@
 /* Default simulations parameters */
 
 double dt_fluid = 0.0005; // 5e-2,5e-3
-double L_fluid = 16;
+double L_fluid = 16.;
 double U0 = 0.;
 
 int maxlevel = 11;
@@ -35,14 +33,14 @@ double banaei_Ga = 40.;
 
 double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
-int b_nodes = 80;
-double b_penalty = 1; // 0.01 -> 2000, 1.0 -> 1000
+int b_nodes = 90;
 double b_theta = 0.00;
 int b_pid = 0;
 
 /* Nonphysical experiment controls */
-double experiment_ib_force_relaxation = 0.4;
-int experiment_ib_richardson_iters = 5;
+double experiment_ib_force_relaxation = 0.8;
+int experiment_ib_richardson_iters = 2;
+int experiment_huang_implicit_bending = 1;
 
 int experiment_stats_interval = 1;
 double experiment_output_interval = 1.0;
@@ -50,7 +48,7 @@ int experiment_output_iter = 1;
 
 double experiment_t_end = 500.0;
 
-char *base_path = "single_settling_fibre_ggl_output";
+char *base_path = "single_settling_fibre_huang_output";
 
 /* Derived parameters */
 #define b_rho_0 (1.)
@@ -63,15 +61,10 @@ char *base_path = "single_settling_fibre_ggl_output";
 #define b_submerged_weight_per_length (b_linear_density_difference * b_g)
 #define b_EI (banaei_gamma * banaei_r * b_submerged_weight_per_length * b_length * b_length * b_length)
 #define b_gravity -(b_submerged_weight_per_length)
-#define b_ds (b_length / (b_nodes - 1))
 
 #define fluid_nu (sqrt(banaei_r * b_g * b_length * b_length * b_length) / banaei_Ga)
 #define fluid_dynamic_viscosity (b_rho_0 * fluid_nu)
 #define fluid_velocity_scale (sqrt(banaei_r * b_g * b_length))
-
-#define b_penalty_scale (0.5 * b_EI / (b_ds * b_ds) + 2.0 * b_mu * b_ds * b_ds / (dt_fluid * dt_fluid))
-#define b_tension_scale (b_linear_density_difference * fluid_velocity_scale * fluid_velocity_scale)
-
 
 /* Additional fields */
 
@@ -99,20 +92,6 @@ u.t[bottom] = dirichlet(0.);
 p[bottom] = neumann(0.);
 pf[bottom] = neumann(0.);
 
-#if dimension > 2
-u.n[front] = dirichlet(0.);
-u.t[front] = dirichlet(0.);
-u.r[front] = dirichlet(0.);
-p[front] = neumann(0.);
-pf[front] = neumann(0.);
-
-u.n[back] = dirichlet(0.);
-u.t[back] = dirichlet(0.);
-u.r[back] = dirichlet(0.);
-p[back] = neumann(0.);
-pf[back] = neumann(0.);
-#endif
-
 int main(int argc, char **argv) {
   /* Here we register runtime options for the simulation */
   input_file_register_option("basilisk.fluid", L_fluid, PARAM_VALUE_DOUBLE);
@@ -127,10 +106,10 @@ int main(int argc, char **argv) {
   input_file_register_option_named("banaei", "Ga", banaei_Ga,  PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_length, PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_nodes, PARAM_VALUE_INT);
-  input_file_register_option_named("beam", "r_penalty", b_penalty, PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_theta, PARAM_VALUE_DOUBLE);
   input_file_register_option("experiment", experiment_ib_force_relaxation, PARAM_VALUE_DOUBLE);
   input_file_register_option("experiment", experiment_ib_richardson_iters, PARAM_VALUE_INT);
+  input_file_register_option("experiment", experiment_huang_implicit_bending, PARAM_VALUE_INT);
   input_file_register_option("experiment", experiment_t_end, PARAM_VALUE_DOUBLE);
   input_file_register_option("experiment", experiment_stats_interval, PARAM_VALUE_INT);
   input_file_register_option("experiment", experiment_output_interval, PARAM_VALUE_DOUBLE);
@@ -175,8 +154,9 @@ event properties(i++) {
 event init(i = 0) {
   ib_euler_beam_bcs_t b_bcs = elff_euler_beam_bcs_types(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
   int m_id = ibmeshmanager_add_mesh();
-  // IBMeshModel beam_model = elff_euler_beam_addm_new_theta(b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs, b_s0, b_pid);
-  IBMeshModel beam_model = elff_euler_beam_ggl_new_theta(b_length, b_EI, b_mu, b_nodes, b_penalty, b_theta, b_bcs, b_s0, b_pid);
+  IBMeshModel beam_model = elff_euler_beam_huang_new_theta(b_length, b_EI, b_mu, b_nodes, b_theta, b_bcs, b_s0, b_pid);
+  ib_euler_beam_huang_set_implicit_bending((ib_euler_beam_huang_t) beam_model.ctx,
+                                           experiment_huang_implicit_bending);
   ibmeshmanager_set_model(m_id, beam_model);
 
   foreach_ibnode_per_ibmesh() {
@@ -206,32 +186,8 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
 
   double delta_first;
   double delta_last;
-  double measure_sum = 0.;
-  double nodal_force_y = 0.;
-  double nodal_force_z = 0.;
-  double gravity_force_y = 0.;
-  double mean_velocity_y = 0.;
-  double mean_velocity_z = 0.;
-  double eulerian_ibm_force_y = 0.;
-  double eulerian_ibm_force_z = 0.;
-  double max_abs_z = 0.;
-
-  foreach(reduction(+:eulerian_ibm_force_y) reduction(+:eulerian_ibm_force_z)) {
-    eulerian_ibm_force_y += ibmf.y[] * dv();
-    eulerian_ibm_force_z += ibmf.z[] * dv();
-  }
 
   foreach_ibnode() {
-    double w = ibval(nweight);
-    measure_sum += w;
-    nodal_force_y += ibval(nforce.y) * w;
-    nodal_force_z += ibval(nforce.z) * w;
-    gravity_force_y += b_gravity * w;
-    mean_velocity_y += ibval(nvel.y) * w;
-    mean_velocity_z += ibval(nvel.z) * w;
-    if (max_abs_z < fabs(ibval(npos.z)))
-      max_abs_z = fabs(ibval(npos.z));
-
     if (node_id == 0) {
       foreach_dimension() { pos_first.x = ibval(npos.x); }
     } else if (node_id == ibmm.pool.active.size - 1) {
@@ -246,26 +202,10 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
 
   delta_first = (pos_first.y - pos_min_vert.y) / (0.5 * b_length);
   delta_last = (pos_last.y - pos_min_vert.y) / (0.5 * b_length);
-  if (measure_sum > 0.)
-    mean_velocity_y /= measure_sum;
-  double hydro_force_y = -eulerian_ibm_force_y;
-  double hydro_force_z = -eulerian_ibm_force_z;
-  double force_balance_y = hydro_force_y + gravity_force_y;
-  if (measure_sum > 0.)
-    mean_velocity_z /= measure_sum;
 
   if (pid() == 0) {
     fprintf(stderr, "%d %g %g %g %g\n", i, t, pos_min_vert.y, delta_first,
             delta_last);
-    fprintf(stderr,
-            "diag %d %g hydro_y=%g ibmf_int_y=%g nodal_force_y=%g "
-            "gravity_y=%g balance_y=%g mean_vy=%g measure=%g "
-            "expected_weight_y=%g hydro_z=%g ibmf_int_z=%g "
-            "nodal_force_z=%g mean_vz=%g max_abs_z=%g\n",
-            i, t, hydro_force_y, eulerian_ibm_force_y, nodal_force_y,
-            gravity_force_y, force_balance_y, mean_velocity_y, measure_sum,
-            b_gravity * b_length, hydro_force_z, eulerian_ibm_force_z,
-            nodal_force_z, mean_velocity_z, max_abs_z);
 
     FILE *fp = NULL;
 
@@ -275,28 +215,6 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
     }
 
     create_path(base_path);
-    char gpname[4096];
-    snprintf(gpname, sizeof(gpname), "%s/plot.gp", base_path);
-
-    FILE *fp_gp = fopen(gpname, "w");
-    if (!fp_gp) {
-      fprintf(stderr, "warning: failed to open %s for write\n", gpname);
-    } else {
-      fprintf(fp_gp,
-              "set terminal qt size 1100,700\n"
-              "set datafile separator comma\n"
-              "file = \"banaei-marchetti-validation.csv\"\n"
-              "set title \"Settling fibre delta\"\n"
-              "set xlabel \"i\"\n"
-              "set ylabel \"delta / (L/2)\"\n"
-              "set grid\n"
-              "set key top left\n"
-              "plot file every 100 using 1:20 with linespoints title \"delta_0\", \\\n"
-              "     file every 100 using 1:21 with linespoints title \"delta_f\"\n"
-              "pause -1\n");
-      fclose(fp_gp);
-    }
-
     char fname[4096];
     snprintf(fname, sizeof(fname), "%s/banaei-marchetti-validation.csv",
              base_path);
@@ -310,24 +228,19 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
 
     if (i == 0) {
       fprintf(fp, "i,t,banaei_Ga,banaei_gamma,banaei_r,banaei_rp,B,x0,xm,xmy,xf,"
-                  "y0,ym,ymy,yf,z0,zm,zmy,zf,delta_0,delta_f,"
-                  "measure_sum,hydro_force_y,eulerian_ibm_force_y,"
-                  "nodal_force_y,gravity_force_y,force_balance_y,"
-                  "mean_velocity_y\n");
+                  "y0,ym,ymy,yf,z0,zm,zmy,zf,delta_0,delta_f\n");
     }
 
-    fprintf(fp, "%d,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
+    fprintf(fp, "%d,%g,%g,%g,%g,%g%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
             i, t, banaei_Ga, banaei_gamma, banaei_r, banaei_rp, (1./(banaei_gamma * banaei_r)), pos_first.x,
             pos_middle.x, pos_min_vert.x, pos_last.x, pos_first.y, pos_middle.y,
             pos_min_vert.y, pos_last.y, pos_first.z, pos_middle.z,
-            pos_min_vert.z, pos_last.z, delta_first, delta_last, measure_sum,
-            hydro_force_y, eulerian_ibm_force_y, nodal_force_y,
-            gravity_force_y, force_balance_y, mean_velocity_y);
+            pos_min_vert.z, pos_last.z, delta_first, delta_last);
     fclose(fp);
   }
 }
 
-event output(i+=1; t <= experiment_t_end) {
+event output(i += experiment_output_interval; t <= experiment_t_end) {
   scalar l2[], omega_z[];
   lambda2(u, l2);
   vorticity(u, omega_z);
