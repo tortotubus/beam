@@ -34,6 +34,25 @@
       }
     },
     {
+      "name": "Fir",
+      "displayName": "HPC Release for Fir",
+      "description": "Release build for Fir with local ELFF cache options.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/fir_release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/fir_release",
+        "CMAKE_SKIP_INSTALL_RPATH": "FALSE",
+        "CMAKE_INSTALL_RPATH": "${sourceDir}/install/fir_release/lib64",
+        "CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
+        "ELFF_USE_SUBMODULES": "ON",
+        "ELFF_BUILD_THIRD_PARTY_BASILISK": "ON",
+        "ELFF_BUILD_THIRD_PARTY_HDF5": "OFF",
+        "ELFF_BUILD_DOC": "OFF",
+        "ELFF_BUILD_TESTS": "OFF"
+      }
+    },
+    {
       "name": "SockeyeRelease",
       "displayName": "HPC Release for Sockeye",
       "description": "Release build for Sockeye with specific compiler and flags.",
@@ -84,6 +103,12 @@
       "configurePreset": "Debug",
       "description": "Build the debug configuration",
       "jobs": 16
+    },
+    {
+      "name": "Fir",
+      "configurePreset": "Fir",
+      "description": "Build the Fir configuration",
+      "jobs": 1
     },
     {
       "name": "SockeyeRelease",
