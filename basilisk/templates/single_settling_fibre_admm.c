@@ -48,7 +48,7 @@ int experiment_output_iter = 1;
 
 double experiment_t_end = 500.0;
 
-char *base_path = "single_settling_fibre_output";
+char *base_path = "single_settling_fibre_addm_output";
 
 /* Derived parameters */
 #define b_rho_0 (1.)
