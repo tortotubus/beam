@@ -14,9 +14,9 @@ double dt_fluid = 0.0005; // 5e-2,5e-3
 double L_fluid = 16.;
 double U0 = 0.;
 
-int maxlevel = 10;
-int minlevel = 3;
-int ibmlevel = 10;
+int maxlevel = 11;
+int minlevel = 2;
+int ibmlevel = 11;
 
 /*
  * Banaei et al. (2020) nondimensional groups:
@@ -33,14 +33,14 @@ double banaei_Ga = 40.;
 
 double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
-int b_nodes = 31;
-double b_penalty_hat = 10;
+int b_nodes = 62;
+double b_penalty_hat = 6;
 double b_theta = 0.00;
 int b_pid = 0;
 
 /* Nonphysical experiment controls */
-double experiment_ib_force_relaxation = 0.4;
-int experiment_ib_richardson_iters = 10;
+double experiment_ib_force_relaxation = 1.;
+int experiment_ib_richardson_iters = 1;
 
 int experiment_stats_interval = 1;
 double experiment_output_interval = 1.0;
