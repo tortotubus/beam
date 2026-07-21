@@ -10,13 +10,13 @@
 
 /* Default simulations parameters */
 
-double dt_fluid = 0.001; // 5e-2,5e-3
+double dt_fluid = 0.0005; // 5e-2,5e-3
 double L_fluid = 16.;
 double U0 = 0.;
 
-int maxlevel = 11;
-int minlevel = 4;
-int ibmlevel = 11;
+int maxlevel = 10;
+int minlevel = 3;
+int ibmlevel = 10;
 
 /*
  * Banaei et al. (2020) nondimensional groups:
@@ -27,20 +27,20 @@ int ibmlevel = 11;
  */
 
 double banaei_rp = 30.;
-double banaei_gamma = 1.0;
+double banaei_gamma = 0.1;
 double banaei_r = 0.1;
 double banaei_Ga = 40.;
 
 double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
-int b_nodes = 67;
-double b_penalty_hat = 5.;
+int b_nodes = 31;
+double b_penalty_hat = 10;
 double b_theta = 0.00;
 int b_pid = 0;
 
 /* Nonphysical experiment controls */
-double experiment_ib_force_relaxation = 0.8;
-int experiment_ib_richardson_iters = 2;
+double experiment_ib_force_relaxation = 0.4;
+int experiment_ib_richardson_iters = 10;
 
 int experiment_stats_interval = 1;
 double experiment_output_interval = 1.0;
@@ -48,7 +48,7 @@ int experiment_output_iter = 1;
 
 double experiment_t_end = 500.0;
 
-char *base_path = "single_settling_fibre_addm_output";
+char *base_path = "single_settling_fibre_admm_output";
 
 /* Derived parameters */
 #define b_rho_0 (1.)
@@ -256,7 +256,7 @@ event output(i += experiment_output_interval; t <= experiment_t_end) {
 
 #if TREE
 event adapt(i++) {
-  double adapt_rel_u_tol = 1e-4;
+  double adapt_rel_u_tol = 1e-3;
   double val = adapt_rel_u_tol * fluid_velocity_scale;
   adapt_wavelet_ibm({u}, (double[]){val, val, val}, maxlevel, minlevel);
 }
