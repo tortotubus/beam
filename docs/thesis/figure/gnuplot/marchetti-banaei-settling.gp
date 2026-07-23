@@ -25,4 +25,6 @@ set key inside bottom right
 plot \
   csv_file every ::1 using (strcol(1) eq "bead_spring" ? $2 : 1/0):3 with lines lw 2 dt 1 title "Bead-spring model", \
   csv_file every ::1 using (strcol(1) eq "slender_body" ? $2 : 1/0):3 with lines lw 2 dt 1 title "Slender body", \
-  csv_file every ::1 using (strcol(1) eq "present" ? $2 : 1/0):3 with points pt 7 ps 0.9 title "Present results"
+  csv_file every ::1 using (strcol(1) eq "huang" ? $2 : 1/0):3 with points pt 7 ps 0.9 title "huang", \
+  csv_file every ::1 using (strcol(1) eq "admm" ? $2 : 1/0):3 with points pt 7 ps 0.9 title "admm", \
+  csv_file every ::1 using (strcol(1) eq "present" ? $2 : 1/0):3 with points pt 7 ps 0.9 title "present"
