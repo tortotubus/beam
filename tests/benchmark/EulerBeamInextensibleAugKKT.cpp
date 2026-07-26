@@ -1,8 +1,11 @@
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
 #include <elff/models/beam/EulerBeamInextensibleAugKKT.hpp>
 #include <gtest/gtest.h>
+
+#include <fstream>
 #include <string>
 
+#include "EulerBeamGlowinskiCsv.hpp"
 #include "EulerBeamStaticInextensibleReferences.hpp"
 
 namespace ELFF {
@@ -55,6 +58,10 @@ TEST(EulerBeamInextensibleAugKKTTest, Glowinski)
 
   dynamic_beam.apply_initial_condition(static_beam.get_mesh());
 
+  std::ofstream csv("glowinski_augkkt.csv");
+  ASSERT_TRUE(csv.good());
+  Benchmark::write_glowinski_csv_header(csv);
+
   ELFF_LOG("Dynamic Solve:");
   for (size_t ti = 0; ti < Nt; ti++) {
 
@@ -70,6 +77,8 @@ TEST(EulerBeamInextensibleAugKKTTest, Glowinski)
       hdf_pd.append_transient(ti * dt);
     }
 
+    Benchmark::write_glowinski_csv_frame(
+      csv, ti, ti * dt, dynamic_beam.get_mesh());
     dynamic_beam.solve(dt, load);
   }
 };

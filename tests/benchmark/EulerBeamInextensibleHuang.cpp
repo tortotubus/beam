@@ -2,11 +2,14 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <fstream>
 #include <string>
 
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
 #include <elff/models/beam/EulerBeamInextensibleHuang.hpp>
 #include <elff/models/beam/EulerBeamInextensibleMoM.hpp>
+
+#include "EulerBeamGlowinskiCsv.hpp"
 
 namespace ELFF {
 
@@ -135,6 +138,10 @@ TEST(EulerBeamInextensibleHuangTest, Glowinski)
   beam.set_implicit_bending(true);
   beam.apply_initial_condition(static_beam.get_mesh());
 
+  std::ofstream csv("glowinski_huang.csv");
+  ASSERT_TRUE(csv.good());
+  Benchmark::write_glowinski_csv_header(csv);
+
   for (size_t ti = 0; ti < Nt; ++ti) {
     const std::string filename = "glowinski_huang.vtkhdf";
 
@@ -148,6 +155,7 @@ TEST(EulerBeamInextensibleHuangTest, Glowinski)
       hdf_pd.append_transient(ti * dt);
     }
 
+    Benchmark::write_glowinski_csv_frame(csv, ti, ti * dt, beam.get_mesh());
     beam.solve(dt, load);
   }
 }

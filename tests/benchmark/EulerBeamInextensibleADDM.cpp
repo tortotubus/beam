@@ -8,13 +8,12 @@
 
 #include <fstream>
 #include <gtest/gtest.h>
-#include <iomanip>
-#include <limits>
-#include <sstream>
+
+#include <fstream>
 #include <string>
 #include <vector>
 
-#include "EulerBeamDynamicInextensibleReferences.hpp"
+#include "EulerBeamGlowinskiCsv.hpp"
 #include "EulerBeamStaticInextensibleReferences.hpp"
 
 namespace ELFF {
@@ -529,7 +528,10 @@ TEST(EulerBeamInextensibleADDMTest, Glowinski) {
   EulerBeamInextensibleADDM beam(length, EI, mu, nodes, boundary_conditions,
                                  r_penalty);
   beam.apply_initial_condition(static_beam.get_mesh());
-  beam.set_outer_tolerance(1e-10);
+
+  std::ofstream csv("glowinski_addm.csv");
+  ASSERT_TRUE(csv.good());
+  Benchmark::write_glowinski_csv_header(csv);
 
   ELFF_LOG("Dynamic Solve:");
   for (size_t ti = 0; ti < Nt; ti++) {
@@ -545,6 +547,7 @@ TEST(EulerBeamInextensibleADDMTest, Glowinski) {
       hdf_pd.append_transient(ti * dt);
     }
 
+    Benchmark::write_glowinski_csv_frame(csv, ti, ti * dt, beam.get_mesh());
     beam.solve(dt, load);
   }
 }

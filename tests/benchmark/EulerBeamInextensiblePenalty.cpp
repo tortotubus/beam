@@ -5,7 +5,10 @@
 #include "EulerBeamStaticInextensibleReferences.hpp"
 
 #include <cmath>
+#include <fstream>
 #include <string>
+
+#include "EulerBeamGlowinskiCsv.hpp"
 
 namespace ELFF {
 
@@ -84,6 +87,10 @@ TEST(EulerBeamInextensiblePenaltyTest, Glowinski)
     length, EI, mu, nodes, boundary_conditions, r_penalty);
   dynamic_beam.apply_initial_condition(static_beam.get_mesh());
 
+  std::ofstream csv("glowinski_penalty.csv");
+  ASSERT_TRUE(csv.good());
+  Benchmark::write_glowinski_csv_header(csv);
+
   ELFF_LOG("Dynamic Solve:");
   for (size_t ti = 0; ti < Nt; ++ti) {
     const std::string filename = "glowinski_penalty.vtkhdf";
@@ -96,6 +103,8 @@ TEST(EulerBeamInextensiblePenaltyTest, Glowinski)
       hdf_pd.append_transient(ti * dt);
     }
 
+    Benchmark::write_glowinski_csv_frame(
+      csv, ti, ti * dt, dynamic_beam.get_mesh());
     dynamic_beam.solve(dt, load);
   }
 }
