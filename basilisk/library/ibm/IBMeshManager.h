@@ -345,23 +345,32 @@ trace void ibmeshmanager_advance_positions_filtered (double dt, int model_type) 
     double* f_global = calloc (n, sizeof (double));
     double* vel_global = calloc (n, sizeof (double));
 
-    foreach_ibnode_per_ibmesh () {
-      if (model_type != IB_MODEL_INVALID && mesh->model.type != model_type)
-        continue;
-      if (node->pid == pid ()) {
-        int di = 0;
-        foreach_dimension () {
-          f_global[node_id * stride + di] = ibval (nforce.x);
-          vel_global[node_id * stride + di] = ibval (nvel.x);
-          di++;
+    size_t global_node_id = 0;
+    foreach_ibmesh () {
+      for (size_t node_id = 0; node_id < mesh->nodes.size; node_id++) {
+        IBNode* node = mesh->nodes.ptrs[node_id];
+        const size_t idx = global_node_id++;
+        if (model_type != IB_MODEL_INVALID && mesh->model.type != model_type)
+          continue;
+        if (node->pid == pid ()) {
+          int di = 0;
+          foreach_dimension () {
+            f_global[idx * stride + di] = ibval (nforce.x);
+            vel_global[idx * stride + di] = ibval (nvel.x);
+            di++;
+          }
         }
       }
     }
+    assert (global_node_id == ibmm.pool.active.size);
+
+    assert (n <= (size_t) INT_MAX);
+    const int mpi_n = (int) n;
 
     MPI_Allreduce (
-      MPI_IN_PLACE, f_global, n, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      MPI_IN_PLACE, f_global, mpi_n, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     MPI_Allreduce (
-      MPI_IN_PLACE, vel_global, n, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+      MPI_IN_PLACE, vel_global, mpi_n, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
     // if (pid () == 0) {
     //   printf ("[proc %d]: ", pid ());
@@ -371,19 +380,25 @@ trace void ibmeshmanager_advance_positions_filtered (double dt, int model_type) 
     //   printf ("\n");
     // }
 
-    foreach_ibnode_per_ibmesh () {
-      if (model_type != IB_MODEL_INVALID && mesh->model.type != model_type)
-        continue;
-      const int owner = mesh->pid >= 0 ? mesh->pid : 0;
-      if (owner == pid ()) {
-        int di = 0;
-        foreach_dimension () {
-          ibval (nforce.x) = f_global[node_id * stride + di];
-          ibval (nvel.x) = vel_global[node_id * stride + di];
-          di++;
+    global_node_id = 0;
+    foreach_ibmesh () {
+      for (size_t node_id = 0; node_id < mesh->nodes.size; node_id++) {
+        IBNode* node = mesh->nodes.ptrs[node_id];
+        const size_t idx = global_node_id++;
+        if (model_type != IB_MODEL_INVALID && mesh->model.type != model_type)
+          continue;
+        const int owner = mesh->pid >= 0 ? mesh->pid : 0;
+        if (owner == pid ()) {
+          int di = 0;
+          foreach_dimension () {
+            ibval (nforce.x) = f_global[idx * stride + di];
+            ibval (nvel.x) = vel_global[idx * stride + di];
+            di++;
+          }
         }
       }
     }
+    assert (global_node_id == ibmm.pool.active.size);
 
     free (f_global);
     free (vel_global);
