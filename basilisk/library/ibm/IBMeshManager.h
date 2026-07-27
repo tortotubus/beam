@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits.h>
+
 #include "library/ibm/IBNode.h"
 #include "library/ibm/IBMempool.h"
 #include "library/ibm/IBMesh.h"
@@ -64,6 +66,9 @@ void ibmeshmanager_advance_velocity_coupled_positions (double dt);
 int _ibmeshmanager_get_pid (Point p);
 void ibmeshmanager_update_pid ();
 void ibmeshmanager_boundary (IBscalar* list = iball);
+static void ibmeshmanager_check_exchange_counts (const char* kind,
+                                                 IBExchangeList* snd,
+                                                 IBExchangeList* rcv);
 #endif
 
 // ============================================================================
@@ -634,6 +639,74 @@ trace inline int _ibmeshmanager_get_pid (Point p) {
 #endif
 }
 
+static void ibmeshmanager_check_exchange_counts (const char* kind,
+                                                 IBExchangeList* snd,
+                                                 IBExchangeList* rcv) {
+  const int np = npe ();
+  unsigned long long* send_counts =
+    (unsigned long long*) calloc ((size_t) np, sizeof (unsigned long long));
+  unsigned long long* recv_counts =
+    (unsigned long long*) calloc ((size_t) np, sizeof (unsigned long long));
+  unsigned long long* all_send_counts =
+    (unsigned long long*) calloc ((size_t) np * np, sizeof (unsigned long long));
+  unsigned long long* all_recv_counts =
+    (unsigned long long*) calloc ((size_t) np * np, sizeof (unsigned long long));
+  assert (send_counts && recv_counts && all_send_counts && all_recv_counts);
+
+  for (int peer = 0; peer < np; peer++) {
+    send_counts[peer] = (unsigned long long) snd[peer].nodes.size;
+    recv_counts[peer] = (unsigned long long) rcv[peer].nodes.size;
+  }
+
+  MPI_Allgather (send_counts, np, MPI_UNSIGNED_LONG_LONG, all_send_counts, np,
+                 MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD);
+  MPI_Allgather (recv_counts, np, MPI_UNSIGNED_LONG_LONG, all_recv_counts, np,
+                 MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD);
+
+  int mismatch_count = 0;
+  for (int src = 0; src < np; src++) {
+    for (int dst = 0; dst < np; dst++) {
+      const unsigned long long sent = all_send_counts[src * np + dst];
+      const unsigned long long posted = all_recv_counts[dst * np + src];
+      if (sent != posted)
+        mismatch_count++;
+    }
+  }
+
+  if (mismatch_count) {
+    if (pid () == 0) {
+      int printed = 0;
+      fprintf (stderr,
+               "ERROR: inconsistent IB %s exchange counts: %d rank-pair "
+               "mismatches\n",
+               kind, mismatch_count);
+      for (int src = 0; src < np && printed < 32; src++) {
+        for (int dst = 0; dst < np && printed < 32; dst++) {
+          const unsigned long long sent = all_send_counts[src * np + dst];
+          const unsigned long long posted = all_recv_counts[dst * np + src];
+          if (sent != posted) {
+            fprintf (stderr,
+                     "  %s src=%d dst=%d send_nodes=%llu "
+                     "dst_recv_nodes_from_src=%llu\n",
+                     kind, src, dst, sent, posted);
+            printed++;
+          }
+        }
+      }
+    }
+    free (send_counts);
+    free (recv_counts);
+    free (all_send_counts);
+    free (all_recv_counts);
+    MPI_Abort (MPI_COMM_WORLD, 4);
+  }
+
+  free (send_counts);
+  free (recv_counts);
+  free (all_send_counts);
+  free (all_recv_counts);
+}
+
 /**
  * @brief Update all IBNode pids
  *
@@ -657,12 +730,16 @@ trace void ibmeshmanager_update_pid () {
 
   const int nnode = (int) ibmm.pool.active.size;
   int* node_pids = (int*) malloc ((size_t) nnode * sizeof (int));
-  int* node_is_local = (int*) calloc ((size_t) nnode, sizeof (int));
-  assert (node_pids && node_is_local);
+  const int support_mask_words = (npe () + 63) / 64;
+  const size_t support_mask_count = (size_t) nnode * support_mask_words;
+  unsigned long long* node_support_masks =
+    (unsigned long long*) calloc (support_mask_count,
+                                  sizeof (unsigned long long));
+  assert (node_pids && node_support_masks);
   for (int i = 0; i < nnode; i++)
     node_pids[i] = -1;
 
-  /* Pass 1: local owner candidates only. */
+  /* Pass 1: local owner and support candidates only. */
   foreach_ibnode () {
     IBNODE_VARIABLES();
     // coord d = {0};
@@ -670,7 +747,7 @@ trace void ibmeshmanager_update_pid () {
 
     // coord_periodic_boundary (d);
 #if TREE
-    Point point = locate_level (pos.x, pos.y, pos.z, node->depth);
+    Point point = locate_nonlocal (pos.x, pos.y, pos.z);
     int ig = 0, jg = 0, kg = 0;
     NOT_UNUSED (ig);
     NOT_UNUSED (jg);
@@ -681,8 +758,21 @@ trace void ibmeshmanager_update_pid () {
       if (allocated (0)) {
         if (is_local (cell)) {
           node_pids[node_id] = pid ();
-          node_is_local[node_id] = 1;
         }
+      }
+    }
+    point = locate_level (pos.x, pos.y, pos.z, node->depth);
+    if (point.level >= 0) {
+      bool has_local_support = false;
+      foreach_neighbor (PESKIN_SUPPORT_RADIUS) {
+        if (!has_local_support && allocated (0) && is_local (cell))
+          has_local_support = true;
+      }
+      if (has_local_support) {
+        const int word = pid () / 64;
+        const int bit = pid () % 64;
+        node_support_masks[node_id * support_mask_words + word] |=
+          1ull << bit;
       }
     }
 #else
@@ -690,16 +780,26 @@ trace void ibmeshmanager_update_pid () {
     if (point.level >= 0) {
       if (!is_boundary (point)) {
         node_pids[node_id] = pid ();
-        node_is_local[node_id] = 1;
       }
+    }
+    point = locate_nonlocal (pos.x, pos.y, pos.z);
+    if (point.level >= 0) {
+      const int word = pid () / 64;
+      const int bit = pid () % 64;
+      node_support_masks[node_id * support_mask_words + word] |= 1ull << bit;
     }
 #endif
   }
 
   // return;
 
-  /* Synchronize globally: each node gets one agreed owner pid. */
+  /* Synchronize globally: each node gets one owner and one support mask. */
   mpi_all_reduce_array (node_pids, MPI_INT, MPI_MAX, nnode);
+  if (support_mask_count > 0) {
+    assert (support_mask_count <= (size_t) INT_MAX);
+    MPI_Allreduce (MPI_IN_PLACE, node_support_masks, (int) support_mask_count,
+                   MPI_UNSIGNED_LONG_LONG, MPI_BOR, MPI_COMM_WORLD);
+  }
 
   // return;
 
@@ -709,6 +809,32 @@ trace void ibmeshmanager_update_pid () {
     // Check if the owner has actually changed
     int old_pid = node->pid;
     int new_pid = node_pids[node_id];
+#if _MPI
+    if (new_pid < 0 || new_pid >= npe ()) {
+      IBNODE_VARIABLES ();
+      coord wrapped_pos = pos;
+      coord_periodic_boundary (wrapped_pos);
+#if TREE
+      Point failed_point =
+        locate_level (wrapped_pos.x, wrapped_pos.y, wrapped_pos.z, node->depth);
+#else
+      Point failed_point =
+        locate_nonlocal (wrapped_pos.x, wrapped_pos.y, wrapped_pos.z);
+#endif
+      fprintf (stderr,
+               "[rank %d] ERROR: unresolved IB node owner in "
+               "ibmeshmanager_update_pid: node_id=%zu old_pid=%d "
+               "new_pid=%d node_depth=%d raw_pos=(%g,%g,%g) "
+               "wrapped_pos=(%g,%g,%g) locate_level=%d "
+               "point=(%d,%d,%d) grid_depth=%d cells=%ld L0=%g "
+               "origin=(%g,%g,%g)\n",
+               pid (), node_id, old_pid, new_pid, node->depth, pos.x, pos.y,
+               pos.z, wrapped_pos.x, wrapped_pos.y, wrapped_pos.z,
+               failed_point.level, failed_point.i, failed_point.j,
+               failed_point.k, depth (), grid->tn, L0, X0, Y0, Z0);
+      MPI_Abort (MPI_COMM_WORLD, 3);
+    }
+#endif
     node->pid = new_pid;
 
     // If the new or old owner was us, we must exchange
@@ -721,74 +847,37 @@ trace void ibmeshmanager_update_pid () {
       }
     }
 
-#if TREE
-    int ig = 0, jg = 0, kg = 0;
-    NOT_UNUSED (ig);
-    NOT_UNUSED (jg);
-    NOT_UNUSED (kg);
-    IBNODE_VARIABLES();
-    // coord d = {0};
-    // foreach_dimension()
-    //   d.x = ibval(npos.x);
-    // coord_periodic_boundary (d);
-    Point point = locate_level (pos.x, pos.y, pos.z, node->depth);
-    POINT_VARIABLES ();
-
+    const int support_word = pid () / 64;
+    const int support_bit = pid () % 64;
+    const bool has_local_support =
+      node_support_masks[node_id * support_mask_words + support_word] &
+      (1ull << support_bit);
     if (node->pid == pid ()) { // local node
       ibnodelist_push (&ibmm.local, node);
-      if (point.level >= 0 && allocated (0)) {
-        foreach_neighbor (PESKIN_SUPPORT_RADIUS) {
-          if (allocated (0) && !is_local (cell))
-            ibexchangelist_push_unique (&ibmm.snd_boundary[cell.pid], node);
-        }
+      for (int peer = 0; peer < npe (); peer++) {
+        const int peer_word = peer / 64;
+        const int peer_bit = peer % 64;
+        if (peer != pid () &&
+            (node_support_masks[node_id * support_mask_words + peer_word] &
+             (1ull << peer_bit)))
+          ibexchangelist_push_unique (&ibmm.snd_boundary[peer], node);
       }
     } // local node
     else { // remote node
-      bool has_local_support = false;
-      if (point.level >= 0 && allocated (0)) {
-        foreach_neighbor (PESKIN_SUPPORT_RADIUS) {
-          if (!has_local_support && allocated (0) && is_local (cell)) {
-            has_local_support = true;
-          }
-        }
-      }
       if (has_local_support)
         ibexchangelist_push_unique (&ibmm.rcv_boundary[node->pid], node);
     } // remote node
-#else // !TREE
-    // coord d = node->pos;
-    // coord_periodic_boundary (d);
-    IBNODE_VARIABLES();
-    Point point = locate_nonlocal (pos.x, pos.y, pos.z);
-
-    int ig = 0, jg = 0, kg = 0;
-    NOT_UNUSED (ig);
-    NOT_UNUSED (jg);
-    NOT_UNUSED (kg);
-
-    if (point.level >= 0) {
-      if (node->pid == pid ()) { // local node
-        foreach_neighbor (PESKIN_SUPPORT_RADIUS) {
-          if (is_boundary (point)) {
-            int point_pid = _ibmeshmanager_get_pid (point);
-            // printf("%d\n", point_pid);
-            if (point_pid >= 0) // MPI boundary, not domain boundary
-              ibexchangelist_push_unique (&ibmm.snd_boundary[point_pid], node);
-          }
-        }
-      } else { // remote node
-        ibexchangelist_push_unique (&ibmm.rcv_boundary[node->pid], node);
-      }
-    } // remote node
-#endif
   }
 
-  free (node_is_local);
+  free (node_support_masks);
   free (node_pids);
 
   // Migrate nodes
   IBscalar* slist = iball;
   size_t nscalars = iblist_len (slist);
+
+  //ibmeshmanager_check_exchange_counts ("migration", ibmm.snd_migrate,
+                                       ibmm.rcv_migrate);
 
   for (int peer = 0; peer < npe (); peer++) {
     if (peer != pid ()) {
@@ -885,6 +974,9 @@ trace void ibmeshmanager_boundary (IBscalar* slist = iball) {
 
   if (!nscalars)
     return;
+
+  //ibmeshmanager_check_exchange_counts ("boundary", ibmm.snd_boundary,
+                                       ibmm.rcv_boundary);
 
   for (int peer = 0; peer < npe (); peer++) {
     if (peer != pid ()) {
