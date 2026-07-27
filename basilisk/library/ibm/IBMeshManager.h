@@ -876,8 +876,7 @@ trace void ibmeshmanager_update_pid () {
   IBscalar* slist = iball;
   size_t nscalars = iblist_len (slist);
 
-  //ibmeshmanager_check_exchange_counts ("migration", ibmm.snd_migrate,
-                                       ibmm.rcv_migrate);
+  //ibmeshmanager_check_exchange_counts ("migration", ibmm.snd_migrate, ibmm.rcv_migrate);
 
   for (int peer = 0; peer < npe (); peer++) {
     if (peer != pid ()) {
@@ -975,8 +974,7 @@ trace void ibmeshmanager_boundary (IBscalar* slist = iball) {
   if (!nscalars)
     return;
 
-  //ibmeshmanager_check_exchange_counts ("boundary", ibmm.snd_boundary,
-                                       ibmm.rcv_boundary);
+  //ibmeshmanager_check_exchange_counts ("boundary", ibmm.snd_boundary, ibmm.rcv_boundary);
 
   for (int peer = 0; peer < npe (); peer++) {
     if (peer != pid ()) {
