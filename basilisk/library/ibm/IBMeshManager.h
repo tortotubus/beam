@@ -821,17 +821,17 @@ trace void ibmeshmanager_update_pid () {
       Point failed_point =
         locate_nonlocal (wrapped_pos.x, wrapped_pos.y, wrapped_pos.z);
 #endif
-      fprintf (stderr,
-               "[rank %d] ERROR: unresolved IB node owner in "
-               "ibmeshmanager_update_pid: node_id=%zu old_pid=%d "
-               "new_pid=%d node_depth=%d raw_pos=(%g,%g,%g) "
-               "wrapped_pos=(%g,%g,%g) locate_level=%d "
-               "point=(%d,%d,%d) grid_depth=%d cells=%ld L0=%g "
-               "origin=(%g,%g,%g)\n",
-               pid (), node_id, old_pid, new_pid, node->depth, pos.x, pos.y,
-               pos.z, wrapped_pos.x, wrapped_pos.y, wrapped_pos.z,
-               failed_point.level, failed_point.i, failed_point.j,
-               failed_point.k, depth (), grid->tn, L0, X0, Y0, Z0);
+      // fprintf (stderr,
+      //          "[rank %d] ERROR: unresolved IB node owner in "
+      //          "ibmeshmanager_update_pid: node_id=%zu old_pid=%d "
+      //          "new_pid=%d node_depth=%d raw_pos=(%g,%g,%g) "
+      //          "wrapped_pos=(%g,%g,%g) locate_level=%d "
+      //          "point=(%d,%d,%d) grid_depth=%d cells=%ld L0=%g "
+      //          "origin=(%g,%g,%g)\n",
+      //          pid (), node_id, old_pid, new_pid, node->depth, pos.x, pos.y,
+      //          pos.z, wrapped_pos.x, wrapped_pos.y, wrapped_pos.z,
+      //          failed_point.level, failed_point.i, failed_point.j,
+      //          failed_point.k, depth (), grid->tn, L0, X0, Y0, Z0);
       MPI_Abort (MPI_COMM_WORLD, 3);
     }
 #endif
