@@ -134,3 +134,56 @@ TEST(IBEulerBeamCAPITest, ThetaConstructorUsesSuppliedBoundaryConditions)
 
   ib_euler_beam_addm_destroy(handle);
 }
+
+TEST(IBEulerBeamCAPITest, HuangAcceptsInitialVelocity)
+{
+  const int nodes = 6;
+  const vertex_t s0 = { -0.5, 0.0, 0.0 };
+  ib_euler_beam_bcs_t bcs =
+    make_bcs(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
+  ib_euler_beam_huang_t handle =
+    ib_euler_beam_huang_new_theta(s0, bcs, 1.0, 0.01, 1.0, nodes, 0.0);
+  ASSERT_NE(handle, nullptr);
+
+  vertex_t velocity[nodes] = {};
+  for (int i = 0; i < nodes; ++i) {
+    velocity[i] = { 1.0, 0.25 * i, 0.0 };
+  }
+  ib_euler_beam_huang_set_initial_velocity(handle, velocity, nodes);
+
+  ib_mesh_t mesh = ib_force_coupled_get_current(handle);
+  ASSERT_EQ(mesh.n, nodes);
+  for (int i = 0; i < nodes; ++i) {
+    EXPECT_DOUBLE_EQ(mesh.velocity[i].x, velocity[i].x);
+    EXPECT_DOUBLE_EQ(mesh.velocity[i].y, velocity[i].y);
+    EXPECT_DOUBLE_EQ(mesh.velocity[i].z, velocity[i].z);
+  }
+
+  ib_mesh_free(&mesh);
+  ib_euler_beam_huang_destroy(handle);
+}
+
+TEST(IBEulerBeamCAPITest, HuangAcceptsThreeDimensionalDirection)
+{
+  const int nodes = 6;
+  const double length = 2.0;
+  const vertex_t s0 = { 1.0, 2.0, 3.0 };
+  const vertex_t direction = { 0.0, 3.0, 4.0 };
+  ib_euler_beam_bcs_t bcs =
+    make_bcs(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
+  ib_euler_beam_huang_t handle = ib_euler_beam_huang_new_direction(
+    s0, bcs, length, 0.01, 1.0, nodes, direction);
+  ASSERT_NE(handle, nullptr);
+
+  ib_mesh_t mesh = ib_force_coupled_get_current(handle);
+  ASSERT_EQ(mesh.n, nodes);
+  EXPECT_NEAR(mesh.position[0].x, s0.x, 1e-14);
+  EXPECT_NEAR(mesh.position[0].y, s0.y + 0.6 * length, 1e-14);
+  EXPECT_NEAR(mesh.position[0].z, s0.z + 0.8 * length, 1e-14);
+  EXPECT_NEAR(mesh.position[nodes - 1].x, s0.x, 1e-14);
+  EXPECT_NEAR(mesh.position[nodes - 1].y, s0.y, 1e-14);
+  EXPECT_NEAR(mesh.position[nodes - 1].z, s0.z, 1e-14);
+
+  ib_mesh_free(&mesh);
+  ib_euler_beam_huang_destroy(handle);
+}

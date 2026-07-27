@@ -24,6 +24,20 @@ extern "C"
                                                       int nodes,
                                                       double theta);
 
+  ib_euler_beam_huang_t ib_euler_beam_huang_new_direction(
+    vertex_t s0,
+    ib_euler_beam_bcs_t bcs,
+    double length,
+    double EI,
+    double mu,
+    int nodes,
+    vertex_t direction);
+
+  void ib_euler_beam_huang_set_initial_velocity(
+    ib_euler_beam_huang_t handle,
+    const vertex_t* velocity,
+    int nodes);
+
   void ib_euler_beam_huang_set_implicit_bending(
     ib_euler_beam_huang_t handle,
     int enabled);

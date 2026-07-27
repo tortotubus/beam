@@ -70,7 +70,9 @@ void ibmeshmanager_boundary (IBscalar* list = iball);
 // Macros
 // ============================================================================
 
+#ifndef IBMESHMANAGER_POOL_SIZE_BYTES
 #define IBMESHMANAGER_POOL_SIZE_BYTES (1 << 19)
+#endif
 
 /**
  * @def foreach_ibmesh

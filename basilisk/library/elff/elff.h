@@ -374,6 +374,14 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
                                              ib_euler_beam_bcs_t bcs,
                                              coord s0,
                                              int pid);
+IBMeshModel elff_euler_beam_huang_new_direction (double length,
+                                                 double EI,
+                                                 double mu,
+                                                 int nodes,
+                                                 coord direction,
+                                                 ib_euler_beam_bcs_t bcs,
+                                                 coord s0,
+                                                 int pid);
 void elff_euler_beam_huang_destroy (void* ctx);
 
 IBMeshModel elff_capsule_sphere_new (double radius,
@@ -752,6 +760,36 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_theta (
     v0, bcs, length, EI, mu, nodes, theta);
+
+  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+
+  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
+
+  ib_model.ctx = beam_ptr;
+  ib_model.force_ops->node_count = elff_fc_node_count;
+  ib_model.force_ops->sync = elff_fc_sync;
+  ib_model.force_ops->advance = elff_fc_advance;
+  ib_model.force_ops->destroy = elff_euler_beam_huang_destroy;
+
+  return ib_model;
+}
+
+/**
+ * @brief
+ */
+IBMeshModel elff_euler_beam_huang_new_direction (
+  double length,
+  double EI,
+  double mu,
+  int nodes,
+  coord direction,
+  ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
+  coord s0 = {0},
+  int pid = 0) {
+  vertex_t v0 = {s0.x, s0.y, s0.z};
+  vertex_t tangent = {direction.x, direction.y, direction.z};
+  ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_direction (
+    v0, bcs, length, EI, mu, nodes, tangent);
 
   elff_runtime_register ((ib_model_t) beam_ptr, pid);
 
