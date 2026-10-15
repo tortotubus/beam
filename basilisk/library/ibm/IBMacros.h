@@ -1,3 +1,4 @@
+#include "library/common/DomainGeometry.h"
 #include "library/ibm/IBLocate.h"
 
 /**
@@ -6,15 +7,7 @@
  * @brief Wraps the @c coord struct when periodic boundary conditions are set
  */
 macro coord_periodic_boundary (coord c) {
-  if (Period.x) {
-    c.x = X0 + fmod (fmod (c.x - X0, L0) + L0, L0);
-  }
-  if (Period.y) {
-    c.y = Y0 + fmod (fmod (c.y - Y0, L0) + L0, L0);
-  }
-  if (Period.z) {
-    c.z = Z0 + fmod (fmod (c.z - Z0, L0) + L0, L0);
-  }
+  domain_wrap_coord (c);
 }
 
 /**
@@ -37,28 +30,7 @@ macro periodic_minimum_image_delta (double delta, bool is_periodic) {
  * @brief Wraps the @c Point struct when periodic boundary conditions are set
  */
 macro point_periodic_boundary (Point p) {
-  int N = (1 << p.level);
-#if dimension >= 1
-  if (Period.x) {
-    int t = p.i - GHOSTS;
-    t = (t % N + N) % N;
-    p.i = t + GHOSTS;
-  }
-#endif
-#if dimension >= 2
-  if (Period.y) {
-    int t = p.j - GHOSTS;
-    t = (t % N + N) % N;
-    p.j = t + GHOSTS;
-  }
-#endif
-#if dimension >= 3
-  if (Period.z) {
-    int t = p.k - GHOSTS;
-    t = (t % N + N) % N;
-    p.k = t + GHOSTS;
-  }
-#endif
+  domain_wrap_point (p);
 }
 
 /**
@@ -67,7 +39,9 @@ macro point_periodic_boundary (Point p) {
 macro2 foreach_neighbor_coord(int r, coord c) {
   int ig = 0, jg = 0, kg = 0;
   NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  Point point = locate(c.x,c.y,c.z);
+  coord d = c;
+  domain_wrap_coord (d);
+  Point point = locate(d.x,d.y,d.z);
   if (point.level >= 0) {
     foreach_neighbor(r) {
       if (allocated(0) && is_leaf(cell)) {
@@ -85,9 +59,9 @@ macro2 foreach_neighbor_coord_nonlocal(int r, coord c) {
   int ig = 0, jg = 0, kg = 0;
   NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
   coord d = c;
-  coord_periodic_boundary(d);
+  domain_wrap_coord (d);
 #if TREE
-  Point point = locate_nonlocal(c.x,c.y,c.z);
+  Point point = domain_locate_nonlocal(d.x,d.y,d.z);
   if (point.level >= 0) {
     foreach_neighbor(r) {
       if (allocated (0) && is_leaf (cell)) {
@@ -98,7 +72,7 @@ macro2 foreach_neighbor_coord_nonlocal(int r, coord c) {
     }
   }
 #else // !TREE
-  Point point = locate_nonlocal(c.x,c.y,c.z);
+  Point point = domain_locate_nonlocal(d.x,d.y,d.z);
   if (point.level >= 0) {
     foreach_neighbor(r) {
 #if dimension == 1
@@ -134,8 +108,13 @@ macro2 foreach_neighbor_coord_nonlocal(int r, coord c) {
 macro2 foreach_neighbor_coord_level(int r, int l, coord c) {
   int ig = 0, jg = 0, kg = 0;
   NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
+  coord d = c;
+  domain_wrap_coord (d);
 #if TREE
-  Point point = locate_level(c.x,c.y,c.z,l);
+  int effective_l = l;
+  if (effective_l > depth())
+    effective_l = depth();
+  Point point = domain_locate_level(d.x,d.y,d.z,effective_l);
   if (point.level >= 0) {
     foreach_neighbor(r) {
       if (allocated(0) && is_leaf(cell))
@@ -145,7 +124,7 @@ macro2 foreach_neighbor_coord_level(int r, int l, coord c) {
     }
   }
 #else 
-  Point point = locate_level(c.x,c.y,c.z,l);
+  Point point = domain_locate_level(d.x,d.y,d.z,l);
   if (point.level >= 0) {
     foreach_neighbor(r) {
       // clang-format off

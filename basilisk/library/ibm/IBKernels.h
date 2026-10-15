@@ -20,10 +20,10 @@ macro peskin_cosine_kernel_gather_dimensionless (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta) / Delta;
+      kernel_dist.x = fabs (kernel_delta.x) / Delta;
       if (kernel_dist.x <= PESKIN_SUPPORT_RADIUS) {
         weight *= .25 * (1 + cos (.5 * pi * kernel_dist.x));
       } else {
@@ -42,10 +42,10 @@ macro roma_three_point_kernel_gather_dimensionless (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta) / Delta;
+      kernel_dist.x = fabs (kernel_delta.x) / Delta;
       weight *= roma_three_point_kernel_1d (kernel_dist.x);
     }
     // clang-format off
@@ -61,10 +61,10 @@ macro roma_three_point_kernel_spread_dimensionless (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta) / Delta;
+      kernel_dist.x = fabs (kernel_delta.x) / Delta;
       weight *= roma_three_point_kernel_1d (kernel_dist.x);
     }
     if (is_local (cell)) {
@@ -78,10 +78,10 @@ macro roma_three_point_kernel_spread_dimensionless (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta) / Delta;
+      kernel_dist.x = fabs (kernel_delta.x) / Delta;
       weight *= roma_three_point_kernel_1d (kernel_dist.x);
     }
 
@@ -100,10 +100,10 @@ macro roma_three_point_kernel_gather (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta);
+      kernel_dist.x = fabs (kernel_delta.x);
       weight *= roma_three_point_kernel_1d (kernel_dist.x / Delta);
     }
     // clang-format off
@@ -119,10 +119,10 @@ macro roma_three_point_kernel_spread (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta);
+      kernel_dist.x = fabs (kernel_delta.x);
       weight *= roma_three_point_kernel_1d (kernel_dist.x / Delta);
     }
 
@@ -137,10 +137,10 @@ macro roma_three_point_kernel_spread (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta);
+      kernel_dist.x = fabs (kernel_delta.x);
       weight *= roma_three_point_kernel_1d (kernel_dist.x / Delta);
     }
 
@@ -161,10 +161,10 @@ macro peskin_cosine_kernel_spread_dimensionless (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta) / Delta;
+      kernel_dist.x = fabs (kernel_delta.x) / Delta;
       if (kernel_dist.x <= PESKIN_SUPPORT_RADIUS) {
         weight *= .25 * (1 + cos (.5 * pi * kernel_dist.x));
       } else {
@@ -182,10 +182,10 @@ macro peskin_cosine_kernel_spread_dimensionless (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta) / Delta;
+      kernel_dist.x = fabs (kernel_delta.x) / Delta;
       if (kernel_dist.x <= PESKIN_SUPPORT_RADIUS) {
         weight *= .25 * (1 + cos (.5 * pi * kernel_dist.x));
       } else {
@@ -209,10 +209,10 @@ macro peskin_cosine_kernel_gather (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta);
+      kernel_dist.x = fabs (kernel_delta.x);
       if (kernel_dist.x <= Delta * PESKIN_SUPPORT_RADIUS) {
         weight *= (1. + cos (pi * kernel_dist.x / (Delta * PESKIN_SUPPORT_RADIUS))) / (2. * PESKIN_SUPPORT_RADIUS);
       } else {
@@ -232,10 +232,10 @@ macro peskin_cosine_kernel_spread (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta);
+      kernel_dist.x = fabs (kernel_delta.x);
       if (kernel_dist.x <= Delta *  PESKIN_SUPPORT_RADIUS)
         weight *= (1. + cos (pi * kernel_dist.x / (Delta * PESKIN_SUPPORT_RADIUS))) / (2. * PESKIN_SUPPORT_RADIUS);
       else 
@@ -255,10 +255,10 @@ macro peskin_cosine_kernel_spread (IBNode* node = node) {
     double weight = 1.0;
     coord kernel_dist = {0};
     coord cell_centre = {.x = x, .y = y, .z = z};
+    coord kernel_delta = {0};
+    domain_displacement (kernel_delta, d, cell_centre);
     foreach_dimension () {
-      double delta = pos.x - cell_centre.x;
-      periodic_minimum_image_delta (delta, Period.x);
-      kernel_dist.x = fabs (delta);
+      kernel_dist.x = fabs (kernel_delta.x);
       if (kernel_dist.x <= Delta *  PESKIN_SUPPORT_RADIUS)
         weight *= (1. + cos (pi * kernel_dist.x / (Delta * PESKIN_SUPPORT_RADIUS))) / (2. * PESKIN_SUPPORT_RADIUS);
       else 

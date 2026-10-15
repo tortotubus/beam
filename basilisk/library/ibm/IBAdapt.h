@@ -78,31 +78,36 @@ astats adapt_wavelet_ibm (
 #if dimension == 1
       for (int i = -r; i <= r; i++) {
         coord e = {pos.x + i * d, pos.y, pos.z};
-        coord_periodic_boundary (e);
-        Point point = locate_nonlocal (e.x, e.y, e.z);
+        domain_wrap_coord (e);
+        Point point = domain_locate_nonlocal (e.x, e.y, e.z);
         int ig = 0, jg = 0, kg = 0;
         NOT_UNUSED (ig);
         NOT_UNUSED (jg);
         NOT_UNUSED (kg);
+        POINT_VARIABLES ();
         if (point.level >= 0) {
-          double rd = sq (x - c.x);
-          ib_noise_0[] += exp (-rd / (2 * Delta));
+          coord cell_centre = {.x = x, .y = y, .z = z};
+          double rd = 0.;
+          domain_distance2 (rd, pos, cell_centre);
+          ib_noise_0[] += exp (-rd / (2. * sq (Delta)));
         }
       }
 #elif dimension == 2
       for (int i = -r; i <= r; i++) {
         for (int j = -r; j <= r; j++) {
           coord e = {pos.x + i * d, pos.y + j * d, pos.z};
-          coord_periodic_boundary (e);
-          Point point = locate_nonlocal (e.x, e.y, e.z);
+          domain_wrap_coord (e);
+          Point point = domain_locate_nonlocal (e.x, e.y, e.z);
           int ig = 0, jg = 0, kg = 0;
           NOT_UNUSED (ig);
           NOT_UNUSED (jg);
           NOT_UNUSED (kg);
           POINT_VARIABLES ();
           if (point.level >= 0) {
-            double rd = sq (x - pos.x) + sq (y - pos.y);
-            ib_noise_0[] += exp (-rd / (2 * Delta));
+            coord cell_centre = {.x = x, .y = y, .z = z};
+            double rd = 0.;
+            domain_distance2 (rd, pos, cell_centre);
+            ib_noise_0[] += exp (-rd / (2. * sq (Delta)));
           }
         }
       }
@@ -111,16 +116,18 @@ astats adapt_wavelet_ibm (
         for (int j = -r; j <= r; j++) {
           for (int k = -r; k <= r; k++) {
             coord e = {pos.x + i * d, pos.y + j * d, pos.z + k * d};
-            coord_periodic_boundary (e);
-            Point point = locate_nonlocal (e.x, e.y, e.z);
+            domain_wrap_coord (e);
+            Point point = domain_locate_nonlocal (e.x, e.y, e.z);
             int ig = 0, jg = 0, kg = 0;
             NOT_UNUSED (ig);
             NOT_UNUSED (jg);
             NOT_UNUSED (kg);
             POINT_VARIABLES ();
             if (point.level >= 0) {
-              double rd = sq (x - pos.x) + sq (y - pos.y) + sq (z - pos.z);
-              ib_noise_0[] += exp (-rd / (2 * Delta));
+              coord cell_centre = {.x = x, .y = y, .z = z};
+              double rd = 0.;
+              domain_distance2 (rd, pos, cell_centre);
+              ib_noise_0[] += exp (-rd / (2. * sq (Delta)));
             }
           }
         }

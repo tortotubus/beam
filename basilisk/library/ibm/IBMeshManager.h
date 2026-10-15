@@ -757,12 +757,10 @@ trace void ibmeshmanager_update_pid () {
   /* Pass 1: local owner and support candidates only. */
   foreach_ibnode () {
     IBNODE_VARIABLES();
-    // coord d = {0};
-    // foreach_dimension () d.x = ibval (npos.x);
-
-    // coord_periodic_boundary (d);
+    coord d = pos;
+    domain_wrap_coord (d);
 #if TREE
-    Point point = locate_nonlocal (pos.x, pos.y, pos.z);
+    Point point = domain_locate_nonlocal (d.x, d.y, d.z);
     int ig = 0, jg = 0, kg = 0;
     NOT_UNUSED (ig);
     NOT_UNUSED (jg);
@@ -776,7 +774,8 @@ trace void ibmeshmanager_update_pid () {
         }
       }
     }
-    point = locate_level (pos.x, pos.y, pos.z, node->depth);
+    int effective_depth = node->depth > depth () ? depth () : node->depth;
+    point = domain_locate_level (d.x, d.y, d.z, effective_depth);
     if (point.level >= 0) {
       bool has_local_support = false;
       foreach_neighbor (PESKIN_SUPPORT_RADIUS) {
@@ -797,7 +796,7 @@ trace void ibmeshmanager_update_pid () {
         node_pids[node_id] = pid ();
       }
     }
-    point = locate_nonlocal (pos.x, pos.y, pos.z);
+    point = domain_locate_nonlocal (d.x, d.y, d.z);
     if (point.level >= 0) {
       const int word = pid () / 64;
       const int bit = pid () % 64;
