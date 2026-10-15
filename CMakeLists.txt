@@ -1,12 +1,14 @@
 #
 # CMake Settings
 # 
+
 cmake_minimum_required(VERSION 3.12.0...4.0.0)
 message(STATUS "CMake version: ${CMAKE_VERSION}")
 
 #
 # Project Names
 #
+
 project(ELFF
   VERSION 0.0.1
 )
@@ -15,12 +17,14 @@ set(${PROJECT_NAME}_VERSION 0.0.1)
 #
 # Enable languages
 #
+
 enable_language(C)
 enable_language(CXX)
 
 #
 # C/C++ Language Settings
 #
+
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to use.")
 set(CMAKE_CXX_STANDARD_REQUIRED ON CACHE BOOL
   "Force the use of the chosen C++ standard.")
@@ -29,19 +33,21 @@ set(CMAKE_CXX_EXTENSIONS OFF CACHE BOOL "Enable C++ standard extensions.")
 #
 # Default Options
 #
+
 include("${CMAKE_CURRENT_SOURCE_DIR}/config/defaults.cmake")
 
 #
 # Set CMAKE_MODULE_PATH
 #
+
 set(ELFF_CMAKE_PATH ${PROJECT_SOURCE_DIR}/config)
 set(CMAKE_MODULE_PATH ${ELFF_CMAKE_PATH}/cmake/modules)
 
 # 
 # Load ELFF CMake utilities.
 #
-include(ElffCmakeUtilities)
 
+include(ElffCmakeUtilities)
 include(GNUInstallDirs)
 
 if(DEFINED CMAKE_MPI_INSTALL_LIBDIR AND CMAKE_MPI_INSTALL_LIBDIR)
@@ -71,6 +77,7 @@ add_subdirectory(third_party)
 # 
 # Floating point precision settings
 #
+
 if (ELFF_PRECISION MATCHES "^(double|Double|DOUBLE)$")
   set(ELFF_USE_SINGLE OFF)
   set(ELFF_USE_DOUBLE ON)
@@ -85,6 +92,7 @@ endif()
 #
 # Collect project sources
 # 
+
 set(ELFF_SOURCES "")
 set(ELFF_BUILD_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 set(ELFF_PUBLIC_INCLUDE_ROOT "${ELFF_BUILD_INCLUDE_DIR}/elff")
@@ -148,6 +156,7 @@ endforeach()
 # 
 # Configure config/_config.hpp which is included in config/config.hpp
 #
+
 configure_file(
   "${PROJECT_SOURCE_DIR}/config/cmake/config.hpp.in"
   "${ELFF_PUBLIC_INCLUDE_ROOT}/config/_config.hpp"
@@ -156,6 +165,7 @@ configure_file(
 #
 # Declare shared (.so) library
 #
+
 add_library(ELFF SHARED ${ELFF_SOURCES})
 add_library(ELFF::ELFF ALIAS ELFF) 
 
@@ -177,6 +187,7 @@ set_target_properties(ELFF PROPERTIES
 #
 # Coverage instrumentation
 #
+
 if (ELFF_USE_COVERAGE)
   if (NOT CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     message(FATAL_ERROR
@@ -208,6 +219,7 @@ endif()
 #
 # OpenMP
 #
+
 if (ELFF_USE_OPENMP)
   find_package(OpenMP COMPONENTS CXX REQUIRED)
   target_link_libraries(ELFF PUBLIC OpenMP::OpenMP_CXX)
@@ -217,6 +229,7 @@ endif()
 #
 # MPI
 #
+
 if (ELFF_USE_MPI)
   find_package(MPI COMPONENTS C CXX REQUIRED)
   target_link_libraries(ELFF PUBLIC MPI::MPI_CXX)
@@ -225,6 +238,7 @@ endif()
 #
 # Eigen3
 #
+
 if (ELFF_USE_EIGEN3)
   if (ELFF_BUILD_THIRD_PARTY_EIGEN3)
     # add_dependencies(ELFF eigen_ep)
@@ -238,11 +252,17 @@ endif()
 #
 # HDF5
 #
+
 if (ELFF_USE_HDF5)
   if (ELFF_USE_MPI)
     set(HDF5_PREFER_PARALLEL TRUE)
   endif()
+
   if (ELFF_BUILD_THIRD_PARTY_HDF5)
+    target_link_libraries(ELFF PUBLIC
+      hdf5::hdf5
+      hdf5::hdf5_hl
+    )
   else()
     find_package(HDF5 COMPONENTS C HL REQUIRED)
     target_link_libraries(ELFF PUBLIC
@@ -256,6 +276,7 @@ endif()
 #
 # Basilisk
 #
+
 if (ELFF_USE_BASILISK)
   add_subdirectory(basilisk)
 endif()
@@ -284,7 +305,6 @@ endif()
 #
 # Installation
 #
-
 
 # ------------------------------------------------------------------------------
 # Handle optional MPI install prefix: This is entirely used for Fedora/RHEL 

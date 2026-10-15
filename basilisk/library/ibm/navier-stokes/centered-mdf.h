@@ -289,7 +289,7 @@ event interface_force_richardson (i++, last) {
     }
 
     // Refresh working field for gathers
-    foreach_dimension () uib.x.dirty = true;
+    // foreach_dimension () uib.x.dirty = true;
     boundary ((scalar*) {uib});
 
     // Gather current interpolated velocity and diagonal self-mobility proxy
@@ -321,16 +321,7 @@ event interface_force_richardson (i++, last) {
       ibmeshmanager_boundary (list);
     }
 #endif
-
-    // Compute Richardson increment in an approximate Lagrangian force density
-    //
-    // delta f_density = -omega * rho_L * slip / (dt * q * sumw2 / dV)
-    //
-    // where q = nodal quadrature measure and rho_L is a gathered fluid density
-    // proxy near the marker. The extra dV factor keeps node->f in the same
-    // Lagrangian density units as the DLMFD implementation.
     foreach_ibnode () {
-
 #if dimension == 1
       double dV = (L0 / (1 << node->depth));
 #elif dimension == 2
@@ -355,11 +346,7 @@ event interface_force_richardson (i++, last) {
       ibmeshmanager_boundary (list);
     }
 #endif
-
-    // Spread force density -> Eulerian correction using nodal measure q
-    //
-    // nodal force = force_density * q, then divide by cell measure to recover
-    // the Eulerian force density used in the fluid update.
+ 
     foreach_ibnode () {
       peskin_cosine_kernel_spread_dimensionless (node) {
         foreach_dimension () {
@@ -367,11 +354,9 @@ event interface_force_richardson (i++, last) {
         }
       }
     }
-
-    foreach_dimension () dibmf.x.dirty = true;
+ 
     boundary ((scalar*) {dibmf});
-
-    // Apply current Eulerian increment and accumulate total Eulerian forcing
+ 
     foreach () {
       foreach_dimension () {
         uib.x[] += dt * dibmf.x[] / (rho[] + SEPS);
@@ -379,15 +364,13 @@ event interface_force_richardson (i++, last) {
       }
     }
   }
-
-  // Commit corrected velocity back to main field
+ 
   foreach () {
     foreach_dimension () {
       u.x[] = uib.x[];
     }
   }
 
-  foreach_dimension () u.x.dirty = true;
   boundary ((scalar*) {u});
 }
 

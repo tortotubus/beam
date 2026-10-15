@@ -51,6 +51,7 @@ endif()
 file(MAKE_DIRECTORY "${ELFF_HDF5_PREFIX}/include")
 file(MAKE_DIRECTORY "${ELFF_HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 
+# hdf5
 add_library(hdf5::hdf5 UNKNOWN IMPORTED GLOBAL)
 set(_hdf5_hdf5 "${ELFF_HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libhdf5.so")
 set_target_properties(hdf5::hdf5 PROPERTIES
@@ -59,6 +60,7 @@ set_target_properties(hdf5::hdf5 PROPERTIES
 )
 add_dependencies(hdf5::hdf5 hdf5_ep)
 
+# hdf5_hl
 add_library(hdf5::hdf5_hl UNKNOWN IMPORTED GLOBAL)
 set(_hdf5_hdf5hl "${ELFF_HDF5_PREFIX}/${CMAKE_INSTALL_LIBDIR}/libhdf5_hl.so")
 set_target_properties(hdf5::hdf5_hl PROPERTIES
@@ -66,5 +68,3 @@ set_target_properties(hdf5::hdf5_hl PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "$<BUILD_INTERFACE:${ELFF_HDF5_PREFIX}/include>"
 )
 add_dependencies(hdf5::hdf5_hl hdf5_ep)
-
-list(PREPEND CMAKE_PREFIX_PATH "${ELFF_HDF5_PREFIX}")

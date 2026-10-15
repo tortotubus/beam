@@ -46,10 +46,8 @@ trace void output_hdf_htg (scalar* scalar_list = NULL,
                            bool overwrite = true,
                            bool use_ab = false) {
 #if _MPI
-  for (scalar s in scalar_list)
-    s.dirty = true;
-  for (scalar s in vector_list)
-    s.dirty = true;
+  // for (scalar s in scalar_list) s.dirty = true;
+  // for (scalar s in vector_list) s.dirty = true;
   boundary (scalar_list);
   boundary (vector_list);
 #endif

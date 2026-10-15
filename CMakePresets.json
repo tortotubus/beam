@@ -8,15 +8,34 @@
   "configurePresets": [
     {
       "name": "Default",
-      "displayName": "Default (Release)",
+      "displayName": "Release",
       "description": "Release build with system default generator.",
       "generator": "Unix Makefiles",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
-        "ELFF_BUILD_DOC": "On",
-        "ELFF_BUILD_TESTS": "On"
+        "ELFF_BUILD_DOC": "Off",
+        "ELFF_BUILD_TESTS": "Off",
+        "ELFF_USE_COVERAGE": "Off",
+        "ELFF_USE_MPI": "On",
+        "ELFF_USE_BASILISK": "On",
+        "ELFF_USE_SUBMODULES": "Off"
+      }
+    },{
+      "name": "Vendored Release",
+      "displayName": "Vendored Release",
+      "description": "Release build with third-party submodules built",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/release_vendored",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release_vendored",
+        "ELFF_USE_SUBMODULES": "On",
+        "ELFF_BUILD_THIRD_PARTY_HDF5": "On",
+        "ELFF_BUILD_THIRD_PARTY_BASILISK": "On",
+        "ELFF_BUILD_THIRD_PARTY_EIGEN3": "On",
+        "ELFF_BUILD_THIRD_PARTY_GTEST": "On"
       }
     },
     {
@@ -77,17 +96,17 @@
 	    "generator": "Unix Makefiles",
 	    "binaryDir": "${sourceDir}/build/u-11666u1",
 	    "cacheVariables": {
-		"CMAKE_BUILD_TYPE": "Release",
-		"CMAKE_INSTALL_PREFIX": "${sourceDir}/install/u-11666u1",
-		"CMAKE_SKIP_INSTALL_RPATH": "FALSE",
-		"CMAKE_INSTALL_RPATH": "${sourceDir}/install/u-11666u1/lib64",
-		"CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
-		"ELFF_BUILD_TESTS": "OFF",
-		"ELFF_USE_SUBMODULES": "OFF",
-		"ELFF_BUILD_THIRD_PARTY_EIGEN3": "FALSE",
-		"ELFF_BUILD_THIRD_PARTY_BASILISK": "TRUE",
-		"ELFF_BUILD_THIRD_PARTY_GTEST": "FALSE",
-		"ELFF_BUILD_THIRD_PARTY_HDF5": "FALSE"
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/u-11666u1",
+        "CMAKE_SKIP_INSTALL_RPATH": "FALSE",
+        "CMAKE_INSTALL_RPATH": "${sourceDir}/install/u-11666u1/lib64",
+        "CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
+        "ELFF_BUILD_TESTS": "OFF",
+        "ELFF_USE_SUBMODULES": "OFF",
+        "ELFF_BUILD_THIRD_PARTY_EIGEN3": "FALSE",
+        "ELFF_BUILD_THIRD_PARTY_BASILISK": "TRUE",
+        "ELFF_BUILD_THIRD_PARTY_GTEST": "FALSE",
+        "ELFF_BUILD_THIRD_PARTY_HDF5": "FALSE"
 	    }
     }
   ],
@@ -96,30 +115,37 @@
       "name": "Default",
       "configurePreset": "Default",
       "description": "Build the release configuration",
-      "jobs": 16
+      "jobs": 4
+    },
+    {
+      "name": "Vendored Release",
+      "configurePreset": "Vendored Release",
+      "description": "Build the release configuration",
+      "jobs": 4
     },
     {
       "name": "Debug",
       "configurePreset": "Debug",
       "description": "Build the debug configuration",
-      "jobs": 16
+      "jobs": 4
     },
     {
       "name": "Fir",
       "configurePreset": "Fir",
       "description": "Build the Fir configuration",
-      "jobs": 1
+      "jobs": 4
     },
     {
       "name": "SockeyeRelease",
       "configurePreset": "SockeyeRelease",
       "description": "Build on Sockeye",
-      "jobs": 8
+      "jobs": 4
     },
     {
       "name": "u-11666u1",
       "configurePreset": "u-11666u1",
-      "description": "Build on u-11666u1"
+      "description": "Build on u-11666u1",
+      "jobs": 64
     }
   ],
   "testPresets": [
