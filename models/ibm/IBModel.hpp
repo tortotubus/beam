@@ -3,6 +3,7 @@
 #include <vector>
 #include <cstdint>
 #include "elff/config/config.hpp"
+#include "elff/io/CXX/vtkPolyData.hpp"
 
 namespace ELFF {
 namespace Models {
@@ -45,6 +46,17 @@ public:
    * @param s Source state container holding serialized model data.
    */
   virtual void unpack_state(const IBModelState& s) = 0;
+
+  /**
+   * @brief Optionally append PolyData datasets exported by this model.
+   *
+   * Models without a useful mesh/topology export keep the default no-op.
+   */
+  virtual void append_vtk_polydata(
+    std::vector<IO::CXX::vtkPolyData>& datasets) const
+  {
+    (void)datasets;
+  }
 };
 
 }

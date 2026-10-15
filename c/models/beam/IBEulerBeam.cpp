@@ -1,5 +1,6 @@
 #include "elff/c/models/beam/IBEulerBeam.h"
 
+#include "elff/c/models/beam/IBEulerBeamBCs.hpp"
 #include "elff/config/config.hpp"
 #include "elff/models/beam/IBEulerBeam.hpp"
 
@@ -12,8 +13,7 @@ extern "C"
 {
 
   ib_euler_beam_t ib_euler_beam_new(vertex_t s0,
-                        int bc_type_1,
-                        int bc_type_2,
+                        ib_euler_beam_bcs_t bcs,
                         double length,
                         double EI,
                         double mu,
@@ -36,17 +36,13 @@ extern "C"
       ic_centerline[ni][2] += s0.z;
     }
 
-    EulerBeam::EulerBeamBCs bcs = {
-      .end = { EulerBeam::left, EulerBeam::right },
-      .type = { (EulerBeam::EulerBeamBCType)bc_type_1,
-                (EulerBeam::EulerBeamBCType)bc_type_2 }
-    };
+    EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
 
     IBEulerBeam* beam = new IBEulerBeam(static_cast<real_t>(length),
                                         static_cast<real_t>(EI),
                                         static_cast<real_t>(mu),
                                         static_cast<size_t>(nodes),
-                                        bcs,
+                                        boundary_conditions,
                                         static_cast<real_t>(r_penalty));
 
     beam->apply_initial_condition(ic_mesh);
@@ -55,8 +51,7 @@ extern "C"
   }
 
   ib_euler_beam_t ib_euler_beam_new_theta(vertex_t s0,
-                              int bc_type_1,
-                              int bc_type_2,
+                              ib_euler_beam_bcs_t bcs,
                               double length,
                               double EI,
                               double mu,
@@ -93,11 +88,7 @@ extern "C"
       ic_velocity[ni][2] = 0.;
     }
 
-    EulerBeam::EulerBeamBCs boundary_conditions = {
-      .end = { EulerBeam::left, EulerBeam::right },
-      .type = { EulerBeam::free_bc, EulerBeam::simple_bc },
-      .vals = { { .position = {} }, {.position = {x0,y0,z0}} }
-    };
+    EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
 
     IBEulerBeam* beam = new IBEulerBeam(static_cast<real_t>(length),
                                         static_cast<real_t>(EI),

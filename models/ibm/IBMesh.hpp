@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
+
 #include "elff/config/config.hpp"
 
 namespace ELFF {
@@ -30,13 +32,15 @@ protected:
   std::vector<IBVertex> points;
   std::vector<IBVertex> forces;
   std::vector<IBVertex> velocity;
+  std::vector<real_t> measures;
 
 public:
   IBMesh(size_t NumberOfPoints)
     : NumberOfPoints(NumberOfPoints)
     , points(NumberOfPoints, { 0, 0, 0 })
     , forces(NumberOfPoints, { 0, 0, 0 })
-    , velocity(NumberOfPoints, { 0, 0, 0 }) {};
+    , velocity(NumberOfPoints, { 0, 0, 0 })
+    , measures(NumberOfPoints, 1.0) {};
 
   /**
    * @brief Copy constructor
@@ -48,12 +52,20 @@ public:
   IBMesh(const IBMesh& other)
     : NumberOfPoints(other.NumberOfPoints)
     , points(other.points)
-    , forces(other.forces) {};
+    , forces(other.forces)
+    , velocity(other.velocity)
+    , measures(other.measures) {};
 
   size_t GetNumberOfPoints() { return NumberOfPoints; }
+  size_t GetNumberOfPoints() const { return NumberOfPoints; }
   std::vector<IBVertex>& GetPoints() { return points; }
+  const std::vector<IBVertex>& GetPoints() const { return points; }
   std::vector<IBVertex>& GetVelocity() { return velocity; }
+  const std::vector<IBVertex>& GetVelocity() const { return velocity; }
   std::vector<IBVertex>& GetForces() { return forces; }
+  const std::vector<IBVertex>& GetForces() const { return forces; }
+  std::vector<real_t>& GetMeasures() { return measures; }
+  const std::vector<real_t>& GetMeasures() const { return measures; }
 };
 
 

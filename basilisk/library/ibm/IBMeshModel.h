@@ -19,6 +19,7 @@ enum {
 typedef struct {
   int (*node_count) (void* ctx);
   int (*sync) (void* ctx, void* mesh);
+  int (*midpoint) (void* ctx, void* mesh, double dt);
   int (*advance) (void* ctx, void* mesh, double dt);
   void (*destroy) (void* ctx);
 } IBVelocityCoupledModelOps;
@@ -64,17 +65,36 @@ IBMeshModel ibmeshmodel_force_coupled_init () {
 /**
  * @relates IBMeshModel
  */
+IBMeshModel ibmeshmodel_velocity_coupled_init () {
+  IBMeshModel model = {0};
+  model.type = IB_MODEL_VELOCITY_COUPLED;
+  model.velocity_ops = (IBVelocityCoupledModelOps*) calloc (1, sizeof (IBVelocityCoupledModelOps));
+  return model;
+}
+
+/**
+ * @relates IBMeshModel
+ */
 void ibmeshmodel_destroy (IBMeshModel* model) {
   if (!model)
     return;
 
   switch (model->type) {
+  case IB_MODEL_VELOCITY_COUPLED: {
+    if (model->velocity_ops) {
+      if (model->velocity_ops->destroy)
+        model->velocity_ops->destroy (model->ctx);
+      free (model->velocity_ops);
+    }
+    break;
+  }
   case IB_MODEL_FORCE_COUPLED: {
     if (model->force_ops) {
       if (model->force_ops->destroy)
         model->force_ops->destroy (model->ctx);
       free (model->force_ops);
     }
+    break;
   }
   default: {
     break;

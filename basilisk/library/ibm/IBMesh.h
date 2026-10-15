@@ -131,7 +131,12 @@ void ibmesh_set_model (IBMesh* mesh, IBMempool* pool, IBMeshModel model) {
   
   switch (model.type) {
   case IB_MODEL_VELOCITY_COUPLED: {
-    // TODO
+    mesh->model = model;
+    ibmesh_delete_all_nodes (mesh, pool);
+    int node_count = mesh->model.velocity_ops->node_count (model.ctx);
+    ibmesh_add_nodes (mesh, pool, node_count);
+    mesh->model.velocity_ops->sync (model.ctx, mesh);
+    break;
   }
   case IB_MODEL_FORCE_COUPLED: {
     mesh->model = model;
@@ -139,6 +144,7 @@ void ibmesh_set_model (IBMesh* mesh, IBMempool* pool, IBMeshModel model) {
     int node_count = mesh->model.force_ops->node_count (model.ctx);
     ibmesh_add_nodes (mesh, pool, node_count);
     mesh->model.force_ops->sync (model.ctx, mesh);
+    break;
   }
   default:
     break;

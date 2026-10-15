@@ -11,6 +11,7 @@
   hdf5-mpi,
   pacific,
   criterion,
+  gcovr,
   makeWrapper,
 }:
 
@@ -23,6 +24,7 @@ stdenv.mkDerivation {
 
   nativeBuildInputs = [
     gcc
+    gcovr
     cmake
     gnumake
     pkg-config
@@ -49,6 +51,10 @@ stdenv.mkDerivation {
     "-DCMAKE_BUILD_TYPE=Release"
     "-DBUILD_BASILISK_EXAMPLES=OFF"
   ];
+
+  shellHook = ''
+    export GCOV="gcov -i"
+  '';
 
   meta = with lib; {
     description = "ELFF: ELastic Fibers in Fluid";

@@ -41,8 +41,6 @@ namespace Models {
  *   g(u)          = ||r'||^2 - 1
  *   C(u)          = d/ dv [ G(u) v ]
  *
- * This keeps the velocity constraint in its own variable space,
- * so no Schur-complement mass inversion is required.
  */
 class EulerBeamInextensibleGGL
   : public EulerBeam

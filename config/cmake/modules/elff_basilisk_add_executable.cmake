@@ -1,10 +1,12 @@
 function(elff_basilisk_add_executable SOURCE_FILE)
   get_filename_component(source_name ${SOURCE_FILE} NAME_WE)
   set(output_c "${CMAKE_CURRENT_BINARY_DIR}/_${source_name}.c")
+  set(qcc_options ${ARGN})
   
   file(GLOB_RECURSE basilisk_headers
     CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/basilisk/*.h"
+    "${CMAKE_SOURCE_DIR}/basilisk/templates/*.c"
   )
 
   add_custom_command(
@@ -13,6 +15,7 @@ function(elff_basilisk_add_executable SOURCE_FILE)
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${SOURCE_FILE}" "${CMAKE_CURRENT_BINARY_DIR}/${source_name}.c"
     COMMAND $<TARGET_FILE:basilisk::qcc>
+      ${qcc_options}
       -DTRACE=3
       "${source_name}.c"
       -I"${CMAKE_SOURCE_DIR}/basilisk" 
@@ -51,5 +54,9 @@ function(elff_basilisk_add_executable SOURCE_FILE)
     BUILD_RPATH "${CMAKE_CURRENT_BINARY_DIR}"
     BUILD_RPATH "${CMAKE_BINARY_DIR}"
   )
-endfunction()
 
+  install(TARGETS ${source_name}
+    RUNTIME DESTINATION ${ELFF_INSTALL_BINDIR}
+    COMPONENT ElFF_Runtime
+  )
+endfunction()

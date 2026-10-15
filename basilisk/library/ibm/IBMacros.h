@@ -18,6 +18,20 @@ macro coord_periodic_boundary (coord c) {
 }
 
 /**
+ * @def periodic_minimum_image_delta
+ *
+ * @brief Maps a displacement to the nearest periodic image.
+ */
+macro periodic_minimum_image_delta (double delta, bool is_periodic) {
+  if (is_periodic) {
+    delta = fmod (delta + 0.5 * L0, L0);
+    if (delta < 0.)
+      delta += L0;
+    delta -= 0.5 * L0;
+  }
+}
+
+/**
  * @def point_periodic_boundary
  *
  * @brief Wraps the @c Point struct when periodic boundary conditions are set
@@ -53,8 +67,6 @@ macro point_periodic_boundary (Point p) {
 macro2 foreach_neighbor_coord(int r, coord c) {
   int ig = 0, jg = 0, kg = 0;
   NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  // coord d = c;
-  // coord_periodic_boundary(d);
   Point point = locate(c.x,c.y,c.z);
   if (point.level >= 0) {
     foreach_neighbor(r) {
@@ -72,8 +84,8 @@ macro2 foreach_neighbor_coord(int r, coord c) {
 macro2 foreach_neighbor_coord_nonlocal(int r, coord c) {
   int ig = 0, jg = 0, kg = 0;
   NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  // coord d = c;
-  // coord_periodic_boundary(d);
+  coord d = c;
+  coord_periodic_boundary(d);
 #if TREE
   Point point = locate_nonlocal(c.x,c.y,c.z);
   if (point.level >= 0) {
@@ -122,8 +134,6 @@ macro2 foreach_neighbor_coord_nonlocal(int r, coord c) {
 macro2 foreach_neighbor_coord_level(int r, int l, coord c) {
   int ig = 0, jg = 0, kg = 0;
   NOT_UNUSED(ig); NOT_UNUSED(jg); NOT_UNUSED(kg);
-  // coord d = c;
-  // coord_periodic_boundary(d);
 #if TREE
   Point point = locate_level(c.x,c.y,c.z,l);
   if (point.level >= 0) {

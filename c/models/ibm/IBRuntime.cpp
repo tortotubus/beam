@@ -72,6 +72,17 @@ int ib_runtime_restore(ib_runtime_t runtime, const char* fname)
   return rt->read_checkpoint(fname);
 }
 
+int ib_runtime_write_polydata(ib_runtime_t runtime,
+                              const char* fname,
+                              int overwrite)
+{
+  if (!runtime || !fname)
+    return -1;
+
+  auto* rt = reinterpret_cast<IBRuntime*>(runtime);
+  return rt->write_polydata(fname, overwrite != 0);
+}
+
 void ib_runtime_delete(ib_runtime_t runtime)
 {
   delete reinterpret_cast<IBRuntime*>(runtime);

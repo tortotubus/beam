@@ -2,12 +2,26 @@
 
 #include <math.h>
 
+static inline double ib_locate_periodic_coord (double x,
+                                               double x0,
+                                               bool is_periodic) {
+  return is_periodic ? x0 + fmod (fmod (x - x0, L0) + L0, L0) : x;
+}
+
 #if TREE
 
 /**
  * @brief 
  */
 trace Point locate_nonlocal (double xp = 0., double yp = 0., double zp = 0.) {
+  xp = ib_locate_periodic_coord (xp, X0, Period.x);
+#if dimension >= 2
+  yp = ib_locate_periodic_coord (yp, Y0, Period.y);
+#endif
+#if dimension >= 3
+  zp = ib_locate_periodic_coord (zp, Z0, Period.z);
+#endif
+
   for (int l = depth (); l >= 0; l--) {
     Point point = {0};
     point.level = l;
@@ -43,6 +57,14 @@ trace Point locate_nonlocal (double xp = 0., double yp = 0., double zp = 0.) {
  * @brief
  */
 trace Point locate_nonlocal (double xp = 0., double yp = 0., double zp = 0.) {
+  xp = ib_locate_periodic_coord (xp, X0, Period.x);
+#if dimension >= 2
+  yp = ib_locate_periodic_coord (yp, Y0, Period.y);
+#endif
+#if dimension >= 3
+  zp = ib_locate_periodic_coord (zp, Z0, Period.z);
+#endif
+
   Point point = {0};
   point.level = depth ();
   SET_DIMENSIONS ();
@@ -94,6 +116,14 @@ trace Point locate_level (double xp = 0.,
                           double yp = 0.,
                           double zp = 0.,
                           int level) {
+  xp = ib_locate_periodic_coord (xp, X0, Period.x);
+#if dimension >= 2
+  yp = ib_locate_periodic_coord (yp, Y0, Period.y);
+#endif
+#if dimension >= 3
+  zp = ib_locate_periodic_coord (zp, Z0, Period.z);
+#endif
+
   {
     Point point = {0};
     point.level = level;
@@ -131,6 +161,14 @@ trace Point locate_level (double xp = 0.,
                           double yp = 0.,
                           double zp = 0.,
                           int level) {
+  xp = ib_locate_periodic_coord (xp, X0, Period.x);
+#if dimension >= 2
+  yp = ib_locate_periodic_coord (yp, Y0, Period.y);
+#endif
+#if dimension >= 3
+  zp = ib_locate_periodic_coord (zp, Z0, Period.z);
+#endif
+
   Point point = {0};
   point.level = depth ();
   SET_DIMENSIONS ();

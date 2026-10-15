@@ -1,6 +1,6 @@
 #pragma once
 
-#include "elff/c/models/ibm/IBMesh.h"
+#include "elff/c/models/beam/IBEulerBeamBCs.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -10,8 +10,7 @@ extern "C"
   typedef void* ib_euler_beam_addm_t;
 
   ib_euler_beam_addm_t ib_euler_beam_addm_new(vertex_t s0,
-                                              int bc_type_1,
-                                              int bc_type_2,
+                                              ib_euler_beam_bcs_t bcs,
                                               double length,
                                               double EI,
                                               double mu,
@@ -19,8 +18,7 @@ extern "C"
                                               double r_penalty);
 
   ib_euler_beam_addm_t ib_euler_beam_addm_new_theta(vertex_t s0,
-                                                    int bc_type_1,
-                                                    int bc_type_2,
+                                                    ib_euler_beam_bcs_t bcs,
                                                     double length,
                                                     double EI,
                                                     double mu,

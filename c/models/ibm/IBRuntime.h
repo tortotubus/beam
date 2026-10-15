@@ -80,6 +80,19 @@ int ib_runtime_checkpoint(ib_runtime_t runtime, const char *fname);
  */
 int ib_runtime_restore(ib_runtime_t runtime, const char *fname);
 
+/** @brief Writes all runtime-exportable model PolyData to a static VTKHDF file.
+ *
+ * Models that do not override the IBModel PolyData hook are skipped.
+ *
+ * @param runtime Runtime handle
+ * @param fname Output VTKHDF filename
+ * @param overwrite Nonzero to overwrite an existing file
+ * @return Zero on success, nonzero on failure
+ */
+int ib_runtime_write_polydata(ib_runtime_t runtime,
+                              const char *fname,
+                              int overwrite);
+
 /** @brief Destroys a runtime instance.
  *
  * @param runtime Runtime handle to destroy

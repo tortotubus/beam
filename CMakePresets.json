@@ -8,15 +8,34 @@
   "configurePresets": [
     {
       "name": "Default",
-      "displayName": "Default (Release)",
+      "displayName": "Release",
       "description": "Release build with system default generator.",
       "generator": "Unix Makefiles",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release",
-        "ELFF_BUILD_DOC": "On",
-        "ELFF_BUILD_TESTS": "On"
+        "ELFF_BUILD_DOC": "Off",
+        "ELFF_BUILD_TESTS": "Off",
+        "ELFF_USE_COVERAGE": "Off",
+        "ELFF_USE_MPI": "On",
+        "ELFF_USE_BASILISK": "On",
+        "ELFF_USE_SUBMODULES": "Off"
+      }
+    },{
+      "name": "Vendored Release",
+      "displayName": "Vendored Release",
+      "description": "Release build with third-party submodules built",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/release_vendored",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release_vendored",
+        "ELFF_USE_SUBMODULES": "On",
+        "ELFF_BUILD_THIRD_PARTY_HDF5": "On",
+        "ELFF_BUILD_THIRD_PARTY_BASILISK": "On",
+        "ELFF_BUILD_THIRD_PARTY_EIGEN3": "On",
+        "ELFF_BUILD_THIRD_PARTY_GTEST": "On"
       }
     },
     {
@@ -29,7 +48,27 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug",
         "ELFF_BUILD_DOC": "On",
-        "ELFF_BUILD_TESTS": "On"
+        "ELFF_BUILD_TESTS": "On",
+        "ELFF_USE_COVERAGE": "On"
+      }
+    },
+    {
+      "name": "Fir",
+      "displayName": "HPC Release for Fir",
+      "description": "Release build for Fir with local ELFF cache options.",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/fir_release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/fir_release",
+        "CMAKE_SKIP_INSTALL_RPATH": "FALSE",
+        "CMAKE_INSTALL_RPATH": "${sourceDir}/install/fir_release/lib64",
+        "CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
+        "ELFF_USE_SUBMODULES": "ON",
+        "ELFF_BUILD_THIRD_PARTY_BASILISK": "ON",
+        "ELFF_BUILD_THIRD_PARTY_HDF5": "OFF",
+        "ELFF_BUILD_DOC": "OFF",
+        "ELFF_BUILD_TESTS": "OFF"
       }
     },
     {
@@ -38,46 +77,37 @@
       "description": "Release build for Sockeye with specific compiler and flags.",
       "generator": "Unix Makefiles",
       "binaryDir": "${sourceDir}/build/sockeye_release",
-      "environment": {
-        "CC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
-        "CXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
-        "GCC_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef",
-        "MPICC" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin/mpicc",
-        "MPICXX" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/bin/mpic++",
-        "OPENMPI_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn",
-        "HDF5_ROOT" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf"
-      },
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/sockeye_release",
+      	"CMAKE_SKIP_INSTALL_RPATH": "FALSE",
+	      "CMAKE_INSTALL_RPATH": "${sourceDir}/install/sockeye_release/lib64",
+        "CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
         "ELFF_USE_SUBMODULES": "ON",
         "ELFF_BUILD_THIRD_PARTY_BASILISK": "ON",
-        "ELFF_BUILD_TESTS": "OFF",
-        "ELFF_BUILD_DOC": "OFF",
-        "CMAKE_C_COMPILER": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/gcc",
-        "CMAKE_CXX_COMPILER": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/bin/g++",
-        "CMAKE_PREFIX_PATH" : "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-11.4.1/gcc-9.4.0-xraorchustmpt5xtpv3f7z2mw4wdkpef/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/hdf5-1.10.7-4adrgv33fgmjh5tete3n4hzlk23cyudf/.;/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/zlib-ng-2.0.7-joh4ncvu4opnvgu5yk4dwsmaxq2attjo/.",
-        "MPI_HOME": "/arc/software/spack-2024/opt/spack/linux-rocky9-skylake_avx512/gcc-9.4.0/openmpi-4.1.1-7c42tpwdhfycqa3vdhit4mspyk6a32nn"
+	      "ELFF_BUILD_DOC": "OFF",
+        "ELFF_BUILD_TESTS": "OFF"
       }
     },
     {
-      "name": "r8k1",
-      "displayName": "r8k1",
-      "description": "Release build with system default generator.",
-      "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build/r8k1",
-      "environment": {
-        "CC": "/media/data/labdata/colive/.nix-profile/bin/gcc",
-        "CXX": "/media/data/labdata/colive/.nix-profile/bin/g++",
-        "MPICXX": "/media/data/labdata/colive/.nix-profile/bin/mpicxx",
-        "MPICC": "/media/data/labdata/colive/.nix-profile/bin/mpicc",
-        "PATH": "/media/data/labdata/colive/.nix-profile/bin:/usr/bin",
-        "LD_LIBRARY_PATH": "/media/data/labdata/colive/.nix-profile/lib"
-      },
-      "cacheVariables": {
+      "name": "u-11666u1",
+      "displayName": "u-11666u1",
+      "description": "r8k1-new",
+	    "generator": "Unix Makefiles",
+	    "binaryDir": "${sourceDir}/build/u-11666u1",
+	    "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/r8k1"
-      }
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/u-11666u1",
+        "CMAKE_SKIP_INSTALL_RPATH": "FALSE",
+        "CMAKE_INSTALL_RPATH": "${sourceDir}/install/u-11666u1/lib64",
+        "CMAKE_INSTALL_RPATH_USE_LINK_PATH": "TRUE",
+        "ELFF_BUILD_TESTS": "OFF",
+        "ELFF_USE_SUBMODULES": "OFF",
+        "ELFF_BUILD_THIRD_PARTY_EIGEN3": "FALSE",
+        "ELFF_BUILD_THIRD_PARTY_BASILISK": "TRUE",
+        "ELFF_BUILD_THIRD_PARTY_GTEST": "FALSE",
+        "ELFF_BUILD_THIRD_PARTY_HDF5": "FALSE"
+	    }
     }
   ],
   "buildPresets": [
@@ -85,25 +115,37 @@
       "name": "Default",
       "configurePreset": "Default",
       "description": "Build the release configuration",
-      "jobs": 16
+      "jobs": 4
+    },
+    {
+      "name": "Vendored Release",
+      "configurePreset": "Vendored Release",
+      "description": "Build the release configuration",
+      "jobs": 4
     },
     {
       "name": "Debug",
       "configurePreset": "Debug",
       "description": "Build the debug configuration",
-      "jobs": 16
+      "jobs": 4
+    },
+    {
+      "name": "Fir",
+      "configurePreset": "Fir",
+      "description": "Build the Fir configuration",
+      "jobs": 4
     },
     {
       "name": "SockeyeRelease",
       "configurePreset": "SockeyeRelease",
       "description": "Build on Sockeye",
-      "jobs": 8
+      "jobs": 4
     },
     {
-      "name": "r8k1",
-      "configurePreset": "r8k1",
-      "description": "Build on r8k1",
-      "jobs": 8
+      "name": "u-11666u1",
+      "configurePreset": "u-11666u1",
+      "description": "Build on u-11666u1",
+      "jobs": 64
     }
   ],
   "testPresets": [

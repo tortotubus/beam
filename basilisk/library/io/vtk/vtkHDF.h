@@ -980,6 +980,14 @@ void vtk_HDF_collective_write_dataset (const char* dataset_name,
 
   // Store the result of HDF5 functions that do not return an identifier
   herr_t result = 0;
+  bool global_empty = false;
+  bool local_empty = false;
+  for (int di = 0; di < rank; di++) {
+    if (dims[di] == 0)
+      global_empty = true;
+    if (local_size[di] == 0)
+      local_empty = true;
+  }
 
   // Create the data space with dimensions and maximum dimensions
   vtk_hdf->dset_space_id = H5Screate_simple (rank, dims, dims);
@@ -999,6 +1007,16 @@ void vtk_HDF_collective_write_dataset (const char* dataset_name,
                                  H5P_DEFAULT);
   vtk_HDF_check_object (vtk_hdf, vtk_hdf->dset_id);
 
+  if (global_empty) {
+    H5Tclose (vtk_hdf->dset_dtype_id);
+    vtk_hdf->dset_dtype_id = H5I_INVALID_HID;
+    H5Sclose (vtk_hdf->dset_space_id);
+    vtk_hdf->dset_space_id = H5I_INVALID_HID;
+    H5Dclose (vtk_hdf->dset_id);
+    vtk_hdf->dset_id = H5I_INVALID_HID;
+    return;
+  }
+
   // Create a property list for MPI-IO transfer
   vtk_hdf->xfer_plist = H5Pcreate (H5P_DATASET_XFER);
   vtk_HDF_check_object (vtk_hdf, vtk_hdf->xfer_plist);
@@ -1011,23 +1029,40 @@ void vtk_HDF_collective_write_dataset (const char* dataset_name,
   vtk_hdf->file_space = H5Dget_space (vtk_hdf->dset_id);
   vtk_HDF_check_object (vtk_hdf, vtk_hdf->file_space);
 
-  // Select a hyperslab for our process
-  result = H5Sselect_hyperslab (
-    vtk_hdf->file_space, H5S_SELECT_SET, local_offset, NULL, local_size, NULL);
-  vtk_HDF_check_result (vtk_hdf, result);
+  if (local_empty) {
+    hsize_t mem_dims[H5S_MAX_RANK];
+    for (int di = 0; di < rank; di++)
+      mem_dims[di] = 1;
 
-  // Create a memory dataspace for our process
-  vtk_hdf->mem_space = H5Screate_simple (rank, local_size, NULL);
-  vtk_HDF_check_object (vtk_hdf, vtk_hdf->mem_space);
+    result = H5Sselect_none (vtk_hdf->file_space);
+    vtk_HDF_check_result (vtk_hdf, result);
+
+    vtk_hdf->mem_space = H5Screate_simple (rank, mem_dims, NULL);
+    vtk_HDF_check_object (vtk_hdf, vtk_hdf->mem_space);
+
+    result = H5Sselect_none (vtk_hdf->mem_space);
+    vtk_HDF_check_result (vtk_hdf, result);
+  } else {
+    // Select a hyperslab for our process
+    result = H5Sselect_hyperslab (
+      vtk_hdf->file_space, H5S_SELECT_SET, local_offset, NULL, local_size, NULL);
+    vtk_HDF_check_result (vtk_hdf, result);
+
+    // Create a memory dataspace for our process
+    vtk_hdf->mem_space = H5Screate_simple (rank, local_size, NULL);
+    vtk_HDF_check_object (vtk_hdf, vtk_hdf->mem_space);
+  }
 
   // Actually do the collective write to the file
+  unsigned char empty_data = 0;
+  const void* write_data = data ? data : (const void*) &empty_data;
   result =
     H5Dwrite (vtk_hdf->dset_id,       /* dataset handle */
               vtk_hdf->dset_dtype_id, /* H5T_IEEE_F64LE */
               vtk_hdf->mem_space,     /* memory dataspace [local_nx] */
               vtk_hdf->file_space, /* file dataspace with hyperslab selected */
               vtk_hdf->xfer_plist, /* collective MPI‐IO transfer property */
-              data                 /* pointer to local data */
+              write_data           /* pointer to local data */
     );
   vtk_HDF_check_result (vtk_hdf, result);
 
@@ -1039,8 +1074,11 @@ void vtk_HDF_collective_write_dataset (const char* dataset_name,
   H5Sclose (vtk_hdf->file_space);
   vtk_hdf->file_space = H5I_INVALID_HID;
   H5Tclose (vtk_hdf->dset_dtype_id);
+  vtk_hdf->dset_dtype_id = H5I_INVALID_HID;
   H5Sclose (vtk_hdf->dset_space_id);
+  vtk_hdf->dset_space_id = H5I_INVALID_HID;
   H5Dclose (vtk_hdf->dset_id);
+  vtk_hdf->dset_id = H5I_INVALID_HID;
 }
 
 /**

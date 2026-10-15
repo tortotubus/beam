@@ -26,3 +26,5 @@ option(ELFF_BUILD_THIRD_PARTY_EIGEN3 "Build Eigen" OFF)
 
 option(ELFF_USE_BASILISK "Enable the basilisk subproject" ON)
 option(ELFF_BUILD_THIRD_PARTY_BASILISK "Build Basilisk" ON)
+
+option(ELFF_USE_COVERAGE "Enable compiler coverage instrumentation" OFF)

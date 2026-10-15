@@ -5,6 +5,7 @@
 #include "elff/models/ibm/IBMesh.hpp"
 #include "elff/models/ibm/IBModel.hpp"
 
+#include <algorithm>
 #include <vector>
 
 namespace ELFF {
@@ -21,6 +22,16 @@ protected:
   IBMesh mesh, mesh_next;
 
   void CopyCurrentToNext() { mesh_next = mesh; }
+
+  void SetNodalMeasures(const std::vector<real_t>& nodal_measures)
+  {
+    ELFF_ASSERT(nodal_measures.size() == mesh.GetNumberOfPoints(),
+                "Nodal measure length must match number of points.\n");
+    std::copy(nodal_measures.begin(), nodal_measures.end(), mesh.GetMeasures().begin());
+    std::copy(nodal_measures.begin(),
+              nodal_measures.end(),
+              mesh_next.GetMeasures().begin());
+  }
 
   virtual void ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
                                  real_t dt) = 0;

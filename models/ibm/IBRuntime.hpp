@@ -1,11 +1,14 @@
 #pragma once
 
 #include "elff/general/error.hpp"
+#include "elff/io/CXX/vtkHDFPolyData.hpp"
+#include "elff/io/CXX/vtkPolyData.hpp"
 #include "elff/mpi/CommHandle.hpp"
 #include "elff/models/ibm/IBModel.hpp"
 
 #include <cstdint>
 #include <cstdio>
+#include <string>
 #include <vector>
 
 namespace ELFF {
@@ -126,6 +129,29 @@ public:
                   "IBRuntime::import_state(): unknown model id in state.\n");
       entry->model->unpack_state(state.states[i]);
     }
+  }
+
+  IO::CXX::vtkPolyData to_vtk_polydata() const
+  {
+    std::vector<IO::CXX::vtkPolyData> datasets;
+    for (const auto& entry : entries)
+      entry.model->append_vtk_polydata(datasets);
+
+    return IO::CXX::vtkPolyData::append_many(datasets);
+  }
+
+  int write_polydata(const char* fname, bool overwrite = true) const
+  {
+    if (!should_checkpoint_locally())
+      return 0;
+
+    if (!fname)
+      return -1;
+
+    IO::CXX::vtkPolyData pd = to_vtk_polydata();
+    IO::CXX::vtkHDFPolyData writer(std::string(fname), pd);
+    writer.write_new_static(overwrite);
+    return 0;
   }
 
   int write_checkpoint(const char* fname) const

@@ -89,10 +89,12 @@ protected:
   MatX3 dss_nodes(const MatX3& X) const;
   MatX3 bending_force(const MatX3& X) const;
   MatrixXd build_bending_matrix() const;
-  VectorXd solve_tension(real_t dt, const Vec3& body_force) const;
+  MatX3 uniform_nodal_field(const Vec3& value) const;
+  void solve_dynamic(real_t dt, const MatX3& body_force);
+  VectorXd solve_tension(real_t dt, const MatX3& body_accel) const;
   MatX3 solve_position(const VectorXd& T_half,
                        real_t dt,
-                       const Vec3& body_force,
+                       const MatX3& body_force,
                        const MatX3& Fb_star) const;
   void update_mesh();
 };
