@@ -5,6 +5,10 @@
 #include "library/io/output-vtk.h"
 #include "library/io/params/params-cli.h"
 
+/* 
+  The default simulation parameters correspond to Figure 13 of https://doi.org/10.1016/j.jcp.2007.07.002 
+*/
+
 /* Default simulations parameters */
 
 double dt_fluid = 0.0003;
@@ -22,10 +26,13 @@ double huang_rho = 1.5;
 
 double b_length = 1.;
 int b_nodes = 65;
-double b_r = 1e4;
 double b_theta = (0.1 * pi);
 
-char * base_path = "huang_output";
+#if _MPI
+char * base_path = "flapping_fibre_mpi_output";
+#else 
+char * base_path = "flapping_fibre_serial_output";
+#endif 
 
 /* Derived parameters */
 
@@ -64,7 +71,6 @@ main(int argc, char ** argv)
   input_file_register_option("huang", huang_rho, PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_length, PARAM_VALUE_DOUBLE);
   input_file_register_option("beam", b_nodes, PARAM_VALUE_INT);
-  input_file_register_option("beam", b_r, PARAM_VALUE_DOUBLE);
 
   /* Here we parse the options given through the command-line */
   int input_file_parse_result = input_file_parse_cli(argc, argv);
@@ -103,8 +109,8 @@ init(i = 0)
 {
   int m_id = ibmeshmanager_add_mesh();
   ib_euler_beam_bcs_t b_bcs = elff_euler_beam_bcs_theta_pin((coord){0});
-  // IBMeshModel beam_model = elff_euler_beam_huang_new_theta(b_length, b_EI, b_mu, b_nodes, b_theta, b_bcs);
-  IBMeshModel beam_model = elff_euler_beam_addm_new_theta(b_length, b_EI, b_mu, b_nodes, b_r, b_theta, b_bcs);
+  IBMeshModel beam_model = elff_euler_beam_huang_new_theta(
+    b_length, b_EI, b_mu, b_nodes, b_theta, b_bcs, (coord){0}, 0);
   ibmeshmanager_set_model(m_id, beam_model);
 
   foreach_ibnode_per_ibmesh()

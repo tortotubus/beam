@@ -2,39 +2,22 @@
 
 [![Unit Tests](https://github.com/tortotubus/beam/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/tortotubus/beam/actions/workflows/unit-tests.yml)
 
-## Overview
-This C++ library provides tools for beam mechanics calculations, including:
-- Matrix and Vector operations
-- Euler beam solvers
-- Finite element implementations
 
 ## Dependencies
-For RPM-based distros:
+For RPM-based distros (e.g. Redhat, Fedora):
 ```bash
-sudo dnf install -y cmake gcc gcc-c++ gcc-gfortran make gawk gnuplot doxygen gtest-devel openmpi-devel eigen3-devel hdf5-devel hdf5-openmpi-devel
+sudo dnf install -y cmake gcc gcc-c++ git gcc-gfortran make gawk gnuplot doxygen gtest-devel openmpi-devel eigen3-devel hdf5-devel hdf5-openmpi-devel
 ```
-For apt-based distros:
+
+For apt-based distros (e.g. Ubuntu):
 ```bash
-sudo apt-get install -y  cmake gcc make gawk gnuplot doxygen libgtest-dev libopenmpi-dev libeigen3-dev libhdf5-dev  
-```
-On sockeye.arc.ubc.ca:
-```bash
-module load gcc openmpi hdf5 cmake eigen
+sudo apt-get install -y  cmake gcc g++ git make gawk gnuplot doxygen libgtest-dev libopenmpi-dev libeigen3-dev libhdf5-dev  
 ```
 
 ## Building
+From the repository root:
 ```bash
-mkdir build && cd build
-cmake ..
-make
+cmake -S . --preset Default 
+cmake --build --preset Default --parallel  
 ```
-
-## Documentation
-Generate documentation using:
-```bash
-make doc
-```
-Then open `docs/html/index.html` in your browser.
-
-\subpage manual/main.md
-
+ 
