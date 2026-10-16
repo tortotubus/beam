@@ -8,6 +8,10 @@ target_link_libraries(elff_benchmark_tests PRIVATE ELFF GTest::gtest_main)
 
 if(ELFF_BUILD_THIRD_PARTY_GTEST)
     add_test(
+        NAME BendingRodSegmentsImplicitBenchmark
+        COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsImplicitBenchmark.*
+    )
+    add_test(
         NAME BendingRodSegmentsIMEXBenchmark
         COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsIMEXBenchmark.*
     )
@@ -53,6 +57,10 @@ target_include_directories(elff_unit_tests PRIVATE ${CMAKE_SOURCE_DIR})
 target_link_libraries(elff_unit_tests PRIVATE ELFF GTest::gtest_main)
 
 if(ELFF_BUILD_THIRD_PARTY_GTEST)
+    add_test(
+        NAME BendingRodSegmentsImplicitTest
+        COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsImplicitTest.*
+    )
     add_test(
         NAME BendingRodSegmentsIMEXTest
         COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsIMEXTest.*

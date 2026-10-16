@@ -55,7 +55,7 @@ public:
   bool isFree() const;
 
   // Replace the internally owned state and refresh both IB meshes.
-  void setState(const Eigen::VectorXd &state);
+  virtual void setState(const Eigen::VectorXd &state);
   const Eigen::VectorXd &state() const { return state_; }
   // Input is force per unit length at the links()+1 endpoints, held constant
   // over dt. Advances the owned state and refreshes GetCurrent()/GetNext().

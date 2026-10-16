@@ -1,5 +1,6 @@
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
 #include <elff/models/articulated/BendingRodSegmentsIMEX.hpp>
+#include <elff/models/articulated/BendingRodSegmentsImplicit.hpp>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -144,6 +145,13 @@ TEST(BendingRodSegmentsIMEXBenchmark, GlowinskiStraightPinnedFree)
   // One second-order IMEX update every 0.01 s; no adaptive step control.
   run_glowinski_straight<BendingRodSegmentsIMEX>(BendingRodSegmentsIMEXConfig{},
       "glowinski_bending_rod_segments_imex_straight");
+}
+
+TEST(BendingRodSegmentsImplicitBenchmark, GlowinskiStraightPinnedFree)
+{
+  // One fully implicit generalized-alpha step per output interval.
+  run_glowinski_straight<BendingRodSegmentsImplicit>(BendingRodSegmentsImplicitConfig{},
+      "glowinski_bending_rod_segments_implicit_straight");
 }
 
 } // namespace ELFF
