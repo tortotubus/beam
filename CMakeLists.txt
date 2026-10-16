@@ -107,6 +107,7 @@ set(ELFF_DIRS
   general 
   io/C
   io/CXX 
+  models/articulated
   models/beam
   models/ibm 
   models/rigidbody

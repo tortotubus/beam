@@ -45,7 +45,7 @@
       "inherits": "Default",
       "binaryDir": "${sourceDir}/build/debug",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/debug",
         "ELFF_BUILD_DOC": "On",
         "ELFF_BUILD_TESTS": "On",
@@ -115,31 +115,31 @@
       "name": "Default",
       "configurePreset": "Default",
       "description": "Build the release configuration",
-      "jobs": 4
+      "jobs": 64
     },
     {
       "name": "Vendored Release",
       "configurePreset": "Vendored Release",
       "description": "Build the release configuration",
-      "jobs": 4
+      "jobs": 64
     },
     {
       "name": "Debug",
       "configurePreset": "Debug",
       "description": "Build the debug configuration",
-      "jobs": 4
+      "jobs": 64
     },
     {
       "name": "Fir",
       "configurePreset": "Fir",
       "description": "Build the Fir configuration",
-      "jobs": 4
+      "jobs": 64
     },
     {
       "name": "SockeyeRelease",
       "configurePreset": "SockeyeRelease",
       "description": "Build on Sockeye",
-      "jobs": 4
+      "jobs": 64
     },
     {
       "name": "u-11666u1",
