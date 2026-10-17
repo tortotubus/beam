@@ -6,6 +6,13 @@ if (ELFF_USE_HDF5)
     endif()
 endif()
 
+if (ELFF_USE_LIBXML2)
+    if (ELFF_BUILD_THIRD_PARTY_LIBXML2)
+        set(ELFF_LIBXML2_PREFIX "${CMAKE_INSTALL_PREFIX}" CACHE PATH "libxml2 install prefix")
+        add_subdirectory(libxml2)
+    endif()
+endif()
+
 
 if (ELFF_USE_BASILISK)
     if (ELFF_BUILD_THIRD_PARTY_BASILISK)

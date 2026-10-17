@@ -39,6 +39,9 @@
 // Enable functionality based on the HDF5 library (reading VTKHDF files).
 #cmakedefine ELFF_USE_HDF5
 
+// Enable XML parsing and DTD validation through libxml2.
+#cmakedefine ELFF_USE_LIBXML2
+
 // Enable functionality based on the HDF5 library (reading VTKHDF files).
 #cmakedefine ELFF_USE_EIGEN3
 

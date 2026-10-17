@@ -1,0 +1,51 @@
+include(ExternalProject)
+include(GNUInstallDirs)
+
+set(_elff_libxml2_cmake_args
+  -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DBUILD_SHARED_LIBS=ON
+  -DLIBXML2_WITH_DOCS=OFF
+  -DLIBXML2_WITH_PROGRAMS=OFF
+  -DLIBXML2_WITH_PYTHON=OFF
+  -DLIBXML2_WITH_TESTS=OFF
+  -DLIBXML2_WITH_VALID=ON
+)
+
+if (ELFF_USE_SUBMODULES)
+  ExternalProject_Add(libxml2_ep
+    UPDATE_COMMAND ""
+    SOURCE_DIR "${CMAKE_SOURCE_DIR}/third_party/libxml2/libxml2_submodule"
+    BINARY_DIR "${CMAKE_BINARY_DIR}/_deps/libxml2-build"
+    INSTALL_DIR "${ELFF_LIBXML2_PREFIX}"
+    CMAKE_ARGS ${_elff_libxml2_cmake_args}
+    UPDATE_DISCONNECTED 1
+    BUILD_ALWAYS OFF
+  )
+else()
+  ExternalProject_Add(libxml2_ep
+    GIT_REPOSITORY https://github.com/GNOME/libxml2.git
+    GIT_TAG v2.15.4
+
+    SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/libxml2-src"
+    BINARY_DIR "${CMAKE_BINARY_DIR}/_deps/libxml2-build"
+    INSTALL_DIR "${ELFF_LIBXML2_PREFIX}"
+    CMAKE_ARGS ${_elff_libxml2_cmake_args}
+    UPDATE_DISCONNECTED 1
+    BUILD_ALWAYS OFF
+  )
+endif()
+
+file(MAKE_DIRECTORY "${ELFF_LIBXML2_PREFIX}/include/libxml2")
+file(MAKE_DIRECTORY "${ELFF_LIBXML2_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+
+add_library(LibXml2::LibXml2 UNKNOWN IMPORTED GLOBAL)
+set_target_properties(LibXml2::LibXml2 PROPERTIES
+  IMPORTED_LOCATION
+    "${ELFF_LIBXML2_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}xml2${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  INTERFACE_INCLUDE_DIRECTORIES
+    "${ELFF_LIBXML2_PREFIX}/include/libxml2"
+)
+add_dependencies(LibXml2::LibXml2 libxml2_ep)
+
+list(PREPEND CMAKE_PREFIX_PATH "${ELFF_LIBXML2_PREFIX}")

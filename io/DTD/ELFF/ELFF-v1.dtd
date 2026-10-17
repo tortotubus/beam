@@ -1,0 +1,50 @@
+<!-- ELFF-owned portion of a version-1 simulation case. -->
+<!ELEMENT ELFF (Models)>
+<!ATTLIST ELFF
+  schemaVersion (1) #REQUIRED
+  dimensions (2|3) #REQUIRED
+  units (nondimensional|SI) #REQUIRED>
+
+<!ELEMENT Models (Model+)>
+<!ELEMENT Model (EulerBeamHuang)>
+<!ATTLIST Model id ID #REQUIRED>
+
+<!ELEMENT EulerBeamHuang
+  (Geometry, Material, InitialLine, BoundaryConditions, Loads?)>
+
+<!ELEMENT Geometry EMPTY>
+<!ATTLIST Geometry
+  length CDATA #REQUIRED
+  nodes CDATA #REQUIRED>
+
+<!ELEMENT Material EMPTY>
+<!ATTLIST Material
+  bendingRigidity CDATA #REQUIRED
+  linearDensity CDATA #REQUIRED>
+
+<!ELEMENT InitialLine (Anchor, Direction)>
+<!ATTLIST InitialLine anchorEnd (left|right) #REQUIRED>
+
+<!ELEMENT Anchor EMPTY>
+<!ATTLIST Anchor
+  x CDATA #REQUIRED
+  y CDATA #REQUIRED
+  z CDATA "0">
+
+<!ELEMENT Direction EMPTY>
+<!ATTLIST Direction
+  x CDATA #REQUIRED
+  y CDATA #REQUIRED
+  z CDATA "0">
+
+<!ELEMENT BoundaryConditions EMPTY>
+<!ATTLIST BoundaryConditions
+  left (free|simple|clamped) #REQUIRED
+  right (free|simple|clamped) #REQUIRED>
+
+<!ELEMENT Loads (UniformForceDensity)>
+<!ELEMENT UniformForceDensity EMPTY>
+<!ATTLIST UniformForceDensity
+  x CDATA #REQUIRED
+  y CDATA #REQUIRED
+  z CDATA "0">

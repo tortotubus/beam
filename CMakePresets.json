@@ -33,6 +33,7 @@
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install/release_vendored",
         "ELFF_USE_SUBMODULES": "On",
         "ELFF_BUILD_THIRD_PARTY_HDF5": "On",
+        "ELFF_BUILD_THIRD_PARTY_LIBXML2": "On",
         "ELFF_BUILD_THIRD_PARTY_BASILISK": "On",
         "ELFF_BUILD_THIRD_PARTY_EIGEN3": "On",
         "ELFF_BUILD_THIRD_PARTY_GTEST": "On"

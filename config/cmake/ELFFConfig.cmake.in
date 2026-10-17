@@ -13,6 +13,10 @@ if(@ELFF_USE_HDF5@)
   find_package(HDF5 COMPONENTS C HL REQUIRED)
 endif()
 
+if(@ELFF_USE_LIBXML2@)
+  find_dependency(LibXml2 2.14 REQUIRED)
+endif()
+
 if(@ELFF_USE_EIGEN3@)
   find_package(Eigen3 REQUIRED)
 endif()
