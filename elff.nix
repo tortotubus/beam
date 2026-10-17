@@ -9,6 +9,7 @@
   gtest,
   eigen,
   hdf5-mpi,
+  libxml2,
   pacific,
   criterion,
   gcovr,
@@ -37,6 +38,7 @@ stdenv.mkDerivation {
     gtest
     eigen
     (hdf5-mpi.override { mpi = openmpi; })
+    libxml2
     openmpi
   ];
 
@@ -44,6 +46,7 @@ stdenv.mkDerivation {
     gtest
     eigen
     (hdf5-mpi.override { mpi = openmpi; })
+    libxml2
     openmpi
   ];
 
