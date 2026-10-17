@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "EulerBeamDynamicInextensibleReferences.hpp"
 #include "EulerBeamGlowinskiCsv.hpp"
 #include "EulerBeamStaticInextensibleReferences.hpp"
 

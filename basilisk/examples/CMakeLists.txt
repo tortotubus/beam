@@ -12,3 +12,5 @@ elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/single_settling_fi
 
 elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/many_settling_fibres_serial.c")
 elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/many_settling_fibres_mpi.c")
+elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/isotropic_fibre_serial.c")
+elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/isotropic_fibre_mpi.c")

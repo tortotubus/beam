@@ -8,6 +8,18 @@ target_link_libraries(elff_benchmark_tests PRIVATE ELFF GTest::gtest_main)
 
 if(ELFF_BUILD_THIRD_PARTY_GTEST)
     add_test(
+        NAME BendingRodSegmentsImplicitBenchmark
+        COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsImplicitBenchmark.*
+    )
+    add_test(
+        NAME BendingRodSegmentsIMEXBenchmark
+        COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsIMEXBenchmark.*
+    )
+    add_test(
+        NAME BendingRodSegmentsBenchmark
+        COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsBenchmark.*
+    )
+    add_test(
         NAME EulerBeamDynamicInextensibleMoMSparseTest
         COMMAND elff_benchmark_tests --gtest_filter=EulerBeamDynamicInextensibleMoMSparseTest.*
     )
@@ -59,6 +71,16 @@ if(ELFF_BUILD_THIRD_PARTY_GTEST)
     add_test(
         NAME XMLCaseDocumentTest
         COMMAND elff_unit_tests --gtest_filter=XMLCaseDocument*.*
+        NAME BendingRodSegmentsImplicitTest
+        COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsImplicitTest.*
+    )
+    add_test(
+        NAME BendingRodSegmentsIMEXTest
+        COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsIMEXTest.*
+    )
+    add_test(
+        NAME BendingRodSegmentsTest
+        COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsTest.*
     )
     add_test(
         NAME vtkHDFPolyDataStaticWriterTest
