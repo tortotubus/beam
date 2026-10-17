@@ -6,6 +6,7 @@
   units (nondimensional|SI) #REQUIRED>
 
 <!ELEMENT Models (EulerBeamHuang+)>
+<!ATTLIST Models distribution (rank0|round-robin) "rank0">
 
 <!ELEMENT EulerBeamHuang
   (Geometry, Material, InitialLine, BoundaryConditions)>

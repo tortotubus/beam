@@ -1,8 +1,9 @@
+#pragma once
 
 
 #include "grid/mempool.h"
-#include "ibm/IBFields.h"
-#include "ibm/IBNodeList.h"
+#include "library/ibm_new/IBFields.h"
+#include "library/ibm_new/IBNodeList.h"
 
 // ============================================================================
 // Type definitions

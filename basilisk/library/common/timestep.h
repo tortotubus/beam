@@ -17,6 +17,9 @@ struct CheckpointSidecar {
 // ============================================================================
 
 static struct CheckpointSidecar cpsc = {-1, -1, 0., 0., 0.};
+// CFL growth history before dtnext() clips dt to scheduled output times.
+static double timestep_previous = 0.;
+static double checkpoint_previous = 0.;
 
 // ============================================================================
 // Function declarations
@@ -70,7 +73,10 @@ static int write_checkpoint_sidecar (const char* file,
     .iter = iter_, .inext = inext_, .time = time, .dt = dt_, .tnext = tnext_};
 
   int ok = fwrite (&s, sizeof (s), 1, fp) == 1 ? 0 : -1;
-  fclose (fp);
+  if (ok == 0 && fwrite (&timestep_previous, sizeof (double), 1, fp) != 1)
+    ok = -1;
+  if (fclose (fp) != 0)
+    ok = -1;
   return ok;
 }
 
@@ -81,6 +87,17 @@ static int read_checkpoint_sidecar (const char* file,
     return -1;
 
   int ok = fread (s, sizeof (*s), 1, fp) == 1 ? 0 : -1;
+  if (ok == 0) {
+    // Legacy sidecars end after the clock record. New files append the CFL
+    // history, which is generally larger than the output-aligned saved dt.
+    checkpoint_previous = s->dt;
+    double previous;
+    size_t n = fread (&previous, 1, sizeof (previous), fp);
+    if (n == sizeof (previous))
+      checkpoint_previous = previous;
+    else if (n != 0 || ferror (fp))
+      ok = -1;
+  }
   fclose (fp);
 
   return ok;
@@ -91,7 +108,13 @@ static int read_checkpoint_sidecar (const char* file,
  */
 static int timestep_checkpoint_dump (const char* path, void* ctx) {
   (void) ctx;
-  return write_checkpoint_sidecar (path, t, dt, 0, inext, tnext);
+  // All ranks share the same clock; only rank zero writes the shared sidecar.
+  int rc = pid () == 0 ?
+    write_checkpoint_sidecar (path, t, dt, iter, inext, tnext) : 0;
+#if _MPI
+  MPI_Bcast (&rc, 1, MPI_INT, 0, MPI_COMM_WORLD);
+#endif
+  return rc;
 }
 
 /**
@@ -106,22 +129,21 @@ static int timestep_checkpoint_restore (const char* path, void* ctx) {
  * @brief
  */
 double timestep (const face vector u, double dtmax) {
-  static double previous = 0.;
 
   if (cpsc.iter >= 0) {
-    previous = cpsc.dt;
+    timestep_previous = checkpoint_previous;
     dt = cpsc.dt;
     cpsc.iter = -1;
     return dt;
   }
 
 #if TIMESTEP_USE_DT_MAX
-  previous = dtmax;
+  timestep_previous = dtmax;
   return dtmax;
 #endif
 
   if (t == 0.)
-    previous = 0.;
+    timestep_previous = 0.;
   dtmax /= CFL;
 
   foreach_face (reduction (min : dtmax)) if (u.x[] != 0.) {
@@ -133,8 +155,8 @@ double timestep (const face vector u, double dtmax) {
   }
 
   dtmax *= CFL;
-  if (dtmax > previous)
-    dtmax = (previous + 0.1 * dtmax) / 1.1;
-  previous = dtmax;
+  if (dtmax > timestep_previous)
+    dtmax = (timestep_previous + 0.1 * dtmax) / 1.1;
+  timestep_previous = dtmax;
   return dtmax;
 }

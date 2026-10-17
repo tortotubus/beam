@@ -1,9 +1,11 @@
+#pragma once
 
 
-#include "ibm/IBNode.h"
-#include "ibm/IBMempool.h"
-#include "ibm/IBMesh.h"
-#include "ibm/IBMeshManagerMPI.h"
+#include "library/ibm_new/IBNode.h"
+#include "library/ibm_new/IBMempool.h"
+#include "library/ibm_new/IBMesh.h"
+#include "library/ibm_new/IBMeshModelPassive.h"
+#include "library/ibm_new/IBMeshManagerMPI.h"
 
 #ifndef MPI_AUTO_BOUNDARY
 #define MPI_AUTO_BOUNDARY 0
@@ -80,7 +82,9 @@ void ibmeshmanager_boundary (IBscalar* list = iball);
 // Macros
 // ============================================================================
 
+#ifndef IBMESHMANAGER_POOL_SIZE_BYTES
 #define IBMESHMANAGER_POOL_SIZE_BYTES (1 << 19)
+#endif
 
 /**
  * @def foreach_ibmesh
@@ -333,6 +337,12 @@ void ibmeshmanager_delete_all_nodes (int mesh_id) {
  * @brief Set the mesh model
  * @relates IBMeshManager
  */
+#if _MPI
+static IBscalar* ibmeshmanager_model_output_fields (IBMesh* mesh);
+static void ibmeshmanager_broadcast_fields_from_mesh_owner (IBMesh* mesh,
+                                                            IBscalar* fields);
+#endif
+
 static void ibmeshmanager_set_model_internal (int mesh_id,
                                               IBMeshModel model,
                                               int owner,
@@ -384,6 +394,14 @@ static void ibmeshmanager_set_model_internal (int mesh_id,
   mesh->pid = owner;
   mesh->gid = mesh_gid;
   mesh->nnode_global = node_count;
+#if _MPI
+  // Passive replicas need authoritative initial geometry before grid adaptation
+  // or the first ownership lookup. Registration is collective across ranks.
+  IBscalar* fields = ibmeshmanager_model_output_fields (mesh);
+  ibmeshmanager_broadcast_fields_from_mesh_owner (mesh, fields);
+  free (fields);
+  ibmm.dirty = true;
+#endif
 }
 
 void ibmeshmanager_set_model (int mesh_id, IBMeshModel model, int owner = 0) {
@@ -401,6 +419,26 @@ void ibmeshmanager_set_model_sparse (int mesh_id,
 #endif
 }
 
+/** Collective sparse registration. Only owner supplies an active model.
+ * Every rank supplies identical metadata; fields use the manager defaults.
+ * Ownership and mesh_gid remain fixed for the lifetime of this registration.
+ */
+void ibmeshmanager_set_model_sparse_descriptor (int mesh_id, int mesh_gid,
+                                                IBMeshModel model,
+                                                int model_type, int node_count,
+                                                int owner, int level) {
+  assert (owner >= 0 && owner < npe () && node_count > 0 && level >= 0);
+  ibmm.meshes[mesh_id].depth = level;
+  if (pid () != owner) {
+    assert (!model.ctx);
+    model = ibmeshmodel_passive_from (model_type, node_count, NULL, NULL);
+  }
+  else {
+    assert (model.ctx && model.type == model_type);
+  }
+  ibmeshmanager_set_model_sparse (mesh_id, mesh_gid, model, owner);
+}
+
 #if _MPI
 static IBscalar* ibmeshmanager_add_vector_fields (IBscalar* fields,
                                                   IBvector v) {
@@ -414,6 +452,9 @@ static IBscalar* ibmeshmanager_default_input_fields (int model_type) {
   switch (model_type) {
   case IB_MODEL_VELOCITY_COUPLED:
     fields = ibmeshmanager_add_vector_fields (fields, nvel);
+    fields = ibmeshmanager_add_vector_fields (fields, nforce);
+    break;
+  case IB_MODEL_FORCE_COUPLED:
     fields = ibmeshmanager_add_vector_fields (fields, nforce);
     break;
   default:
@@ -434,6 +475,7 @@ static IBscalar* ibmeshmanager_default_output_fields (int model_type) {
   case IB_MODEL_FORCE_COUPLED:
     fields = ibmeshmanager_add_vector_fields (fields, npos);
     fields = ibmeshmanager_add_vector_fields (fields, nvel);
+    fields = iblist_add (fields, nweight);
     break;
   default:
     break;
@@ -559,6 +601,10 @@ static void ibmeshmanager_reduce_fields_to_mesh_owner_sparse (IBMesh* mesh,
     IBNode* node = mesh->nodes.ptrs[ni];
     if (!node || node->node_lid < 0 || node->node_lid >= nn)
       continue;
+    // Force inputs are complete nodal values, also present on support replicas.
+    // Count only the center owner, matching the dense force-coupled contract.
+    if (mesh->model.type == IB_MODEL_FORCE_COUPLED && node->pid != pid ())
+      continue;
 
     int si = 0;
     foreach_ibscalar (fields)
@@ -575,9 +621,12 @@ static void ibmeshmanager_reduce_fields_to_mesh_owner_sparse (IBMesh* mesh,
               MPI_COMM_WORLD);
 
   if (owner == pid ()) {
-    IBVelocityCoupledModelOps* ops = mesh->model.velocity_ops;
-    bool handled_by_model =
-      mesh->model.type == IB_MODEL_VELOCITY_COUPLED && ops && ops->input_node;
+    int (*input_node) (void*, void*, int, void*) = NULL;
+    if (mesh->model.type == IB_MODEL_VELOCITY_COUPLED && mesh->model.velocity_ops)
+      input_node = mesh->model.velocity_ops->input_node;
+    else if (mesh->model.type == IB_MODEL_FORCE_COUPLED && mesh->model.force_ops)
+      input_node = mesh->model.force_ops->input_node;
+    bool handled_by_model = input_node != NULL;
 
     for (int node_lid = 0; node_lid < nn; node_lid++) {
       IBNode* node = handled_by_model ? ibmeshmanager_temp_node_alloc ()
@@ -595,7 +644,7 @@ static void ibmeshmanager_reduce_fields_to_mesh_owner_sparse (IBMesh* mesh,
           recv_values[(size_t) node_lid * (size_t) nscalars + (size_t) si++];
 
       if (handled_by_model) {
-        ops->input_node (mesh->model.ctx, mesh, node_lid, node);
+        input_node (mesh->model.ctx, mesh, node_lid, node);
         ibmeshmanager_temp_node_free (node);
       }
     }
@@ -648,9 +697,12 @@ static void ibmeshmanager_broadcast_fields_from_mesh_owner_sparse (
     depths[i] = mesh->depth;
 
   if (owner == pid ()) {
-    IBVelocityCoupledModelOps* ops = mesh->model.velocity_ops;
-    bool handled_by_model =
-      mesh->model.type == IB_MODEL_VELOCITY_COUPLED && ops && ops->sync_node;
+    int (*sync_node) (void*, void*, int, void*) = NULL;
+    if (mesh->model.type == IB_MODEL_VELOCITY_COUPLED && mesh->model.velocity_ops)
+      sync_node = mesh->model.velocity_ops->sync_node;
+    else if (mesh->model.type == IB_MODEL_FORCE_COUPLED && mesh->model.force_ops)
+      sync_node = mesh->model.force_ops->sync_node;
+    bool handled_by_model = sync_node != NULL;
 
     if (handled_by_model) {
       for (int node_lid = 0; node_lid < nn; node_lid++) {
@@ -659,7 +711,7 @@ static void ibmeshmanager_broadcast_fields_from_mesh_owner_sparse (
         node->node_lid = node_lid;
         node->depth = mesh->depth;
 
-        ops->sync_node (mesh->model.ctx, mesh, node_lid, node);
+        sync_node (mesh->model.ctx, mesh, node_lid, node);
 
         depths[node_lid] = node->depth;
         int si = 0;
@@ -1322,6 +1374,48 @@ trace void ibmeshmanager_boundary (IBscalar* slist = iball) {
 
   if (!nscalars)
     return;
+
+  // Sparse support replicas are not in the dense exchange lists. Publish
+  // complete nodal values from the Eulerian center owner by logical node id.
+  // In particular, replicas whose center is remote cannot gather a complete
+  // velocity/mobility locally and must receive it before force evaluation.
+  foreach_ibmesh () {
+    if (!mesh->sparse_managed || mesh->nnode_global <= 0)
+      continue;
+    size_t count = (size_t) mesh->nnode_global * nscalars;
+    double* values = (double*) calloc (count + mesh->nnode_global, sizeof (double));
+    assert (values);
+    for (size_t ni = 0; ni < mesh->nodes.size; ++ni) {
+      IBNode* node = mesh->nodes.ptrs[ni];
+      if (node->pid != pid ())
+        continue;
+      values[count + node->node_lid] += 1.;
+      int si = 0;
+      foreach_ibscalar (slist)
+        values[(size_t) node->node_lid * nscalars + si++] = ibval (s);
+    }
+    MPI_Allreduce (MPI_IN_PLACE, values, (int) (count + mesh->nnode_global), MPI_DOUBLE, MPI_SUM,
+                   MPI_COMM_WORLD);
+    // Every complete nodal value must have exactly one authoritative source.
+    // Otherwise zeros (or duplicate contributions) silently corrupt coupling.
+    for (int lid = 0; lid < mesh->nnode_global; ++lid)
+      if (values[count + lid] != 1.) {
+        if (pid () == 0)
+          fprintf (stderr,
+                   "ibmeshmanager_boundary(): sparse mesh %d node %d has %.0f "
+                   "fluid-center owners; expected exactly one. "
+                   "Check sparse placement after grid adaptation.\n",
+                   mesh->gid, lid, values[count + lid]);
+        MPI_Abort (MPI_COMM_WORLD, 1);
+      }
+    for (size_t ni = 0; ni < mesh->nodes.size; ++ni) {
+      IBNode* node = mesh->nodes.ptrs[ni];
+      int si = 0;
+      foreach_ibscalar (slist)
+        ibval (s) = values[(size_t) node->node_lid * nscalars + si++];
+    }
+    free (values);
+  }
 
   for (int peer = 0; peer < npe (); peer++) {
     if (peer != pid ()) {

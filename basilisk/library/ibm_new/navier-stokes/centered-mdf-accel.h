@@ -7,9 +7,9 @@
 #include "viscosity.h"
 #endif
 
-#include "ibm/IBMeshManager.h"
+#include "library/ibm_new/IBMeshManager.h"
 #if TREE
-#include "ibm/IBAdapt.h"
+#include "library/ibm_new/IBAdapt.h"
 #endif
 
 scalar p[];
@@ -245,7 +245,7 @@ event viscous_term (i++, last) {
   }
 }
 
-#include "ibm/IBKernels.h"
+#include "library/ibm_new/IBKernels.h"
 
 event advance_interface (i++) {
   foreach_ibnode () {

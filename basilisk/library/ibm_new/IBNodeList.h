@@ -1,6 +1,7 @@
+#pragma once
 
 
-#include "ibm/IBNode.h"
+#include "library/ibm_new/IBNode.h"
 
 /* Type Definitions */
 

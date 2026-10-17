@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Case formatVersion="1">
+  <!-- Banaei rp=30, r=0.1, Ga=40, gamma=0.01; explicit material and fluid coefficients below. -->
+  <ELFF schemaVersion="1" dimensions="3" units="nondimensional">
+    <Models>
+      <EulerBeamHuang>
+        <Geometry length="1" nodes="67"/>
+        <Material bendingRigidity="8.7266462599716483e-08" linearDensity="0.00095993108859688137"/>
+        <InitialLine anchorEnd="left">
+          <Anchor x="-1.5" y="0" z="-1"/>
+          <Direction x="1" y="0" z="0"/>
+        </InitialLine>
+        <BoundaryConditions left="free" right="free"/>
+      </EulerBeamHuang>
+      <EulerBeamHuang>
+        <Geometry length="1" nodes="67"/>
+        <Material bendingRigidity="8.7266462599716483e-08" linearDensity="0.00095993108859688137"/>
+        <InitialLine anchorEnd="left">
+          <Anchor x="0.5" y="0" z="-1"/>
+          <Direction x="1" y="0" z="0"/>
+        </InitialLine>
+        <BoundaryConditions left="free" right="free"/>
+      </EulerBeamHuang>
+      <EulerBeamHuang>
+        <Geometry length="1" nodes="67"/>
+        <Material bendingRigidity="8.7266462599716483e-08" linearDensity="0.00095993108859688137"/>
+        <InitialLine anchorEnd="left">
+          <Anchor x="-1.5" y="0" z="1"/>
+          <Direction x="1" y="0" z="0"/>
+        </InitialLine>
+        <BoundaryConditions left="free" right="free"/>
+      </EulerBeamHuang>
+      <EulerBeamHuang>
+        <Geometry length="1" nodes="67"/>
+        <Material bendingRigidity="8.7266462599716483e-08" linearDensity="0.00095993108859688137"/>
+        <InitialLine anchorEnd="left">
+          <Anchor x="0.5" y="0" z="1"/>
+          <Direction x="1" y="0" z="0"/>
+        </InitialLine>
+        <BoundaryConditions left="free" right="free"/>
+      </EulerBeamHuang>
+    </Models>
+  </ELFF>
+  <Basilisk schemaVersion="1" caseType="many_settling_fibres">
+    <Domain size="32" originX="-16" originY="-16" originZ="-16"/>
+    <Time step="0.001" end="10"/>
+    <Fluid density="1" dynamicViscosity="0.0079056941504209478">
+      <InletVelocity x="0" y="0" z="0"/>
+    </Fluid>
+    <Grid minLevel="4" maxLevel="12"/>
+    <ImmersedBoundary level="12">
+      <UniformForceDensity x="0" y="-8.7266462599716482e-05" z="0"/>
+    </ImmersedBoundary>
+    <Output directory="many_settling_fibres_output" interval="0.1"/>
+  </Basilisk>
+</Case>

@@ -90,7 +90,12 @@ u.t[bottom] = dirichlet(0.);
 p[bottom] = neumann(0.);
 pf[bottom] = neumann(0.);
 
+#include "settling_fibre_xml.h"
+
 int main(int argc, char **argv) {
+  if (settling_is_xml (argc, argv)) {
+    if (settling_load_xml (argv[1], true)) return 1;
+  } else {
   /* Here we register runtime options for the simulation */
   input_file_register_option("basilisk.fluid", L_fluid, PARAM_VALUE_DOUBLE);
   input_file_register_option("basilisk.fluid", dt_fluid, PARAM_VALUE_DOUBLE);
@@ -121,9 +126,15 @@ int main(int argc, char **argv) {
     input_file_apply_options();
   }
 
+  }
+
   /* Setting relevant parameters for basilisk */
   L0 = L_fluid;
-  origin(-L_fluid / 2., -L_fluid / 2., -L_fluid / 2.);
+  if (settling_xml)
+    origin(settling_configuration.origin[0], settling_configuration.origin[1],
+           settling_configuration.origin[2]);
+  else
+    origin(-L_fluid / 2., -L_fluid / 2., -L_fluid / 2.);
 #if TREE
   N = 1 << minlevel;
 #else
@@ -145,16 +156,25 @@ event logfile(i++) {
 
 /* Reynolds control */
 event properties(i++) {
-  foreach_face() muv.x[] = fm.x[] * fluid_dynamic_viscosity;
+  foreach_face() {
+    muv.x[] = fm.x[] * (settling_xml ? settling_configuration.dynamic_viscosity : fluid_dynamic_viscosity);
+    if (settling_xml) settling_alpha.x[] = fm.x[] / settling_configuration.fluid_density;
+  }
+  if (settling_xml)
+    foreach () settling_rho[] = cm[] * settling_configuration.fluid_density;
 }
 
 /* Beam setup */
 event init(i = 0) {
+  if (settling_xml) {
+    settling_register_xml_models ();
+  } else {
+
   ib_euler_beam_bcs_t b_bcs = elff_euler_beam_bcs_types(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
   int m_id = ibmeshmanager_add_mesh();
   IBMeshModel beam_model = elff_euler_beam_huang_new_theta(
     b_length, b_EI, b_mu, b_nodes, b_theta, b_bcs, b_s0);
-  ib_euler_beam_huang_set_implicit_bending((ib_euler_beam_huang_t) beam_model.ctx,
+  ib_euler_beam_huang_set_implicit_bending((ib_euler_beam_huang_t) elff_force_coupled_handle (beam_model),
                                            experiment_huang_implicit_bending);
   ibmeshmanager_set_model(m_id, beam_model);
 
@@ -163,6 +183,8 @@ event init(i = 0) {
     node->depth = ibmlevel;
     ibval(gravity.x) = 0.;
     ibval(gravity.y) = b_gravity;
+  }
+
   }
 
   if (!restore_handler(base_path)) {
@@ -177,6 +199,7 @@ event init(i = 0) {
 }
 
 event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
+  if (settling_xml) { settling_xml_stats (i, t); return 0; }
 
   coord pos_first;
   coord pos_last;
@@ -239,7 +262,7 @@ event marchetti_csv(i += experiment_stats_interval; t <= experiment_t_end) {
   }
 }
 
-event output(i += experiment_output_interval; t <= experiment_t_end) {
+event output(t += experiment_output_interval; t <= experiment_t_end) {
   scalar l2[], omega_z[];
   lambda2(u, l2);
   vorticity(u, omega_z);
@@ -267,4 +290,9 @@ event checkpoint_event(i++, last) {
 event elff_cleanup(i = end, last) {
   ibmeshmanager_free();
   elff_deinit();
+}
+
+event stop(t = experiment_t_end) {
+  if (pid () == 0) fprintf (stderr, "finished single-fibre settling at t=%g i=%d\n", t, i);
+  return 1;
 }

@@ -11,14 +11,10 @@
 #include <string.h>
 
 #ifdef ELFF_USE_LIBXML2
+#include "xmlCaseInternal.h"
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xmlerror.h>
-
-struct elff_xml_document_handle
-{
-  xmlDoc* document;
-};
 
 typedef struct
 {

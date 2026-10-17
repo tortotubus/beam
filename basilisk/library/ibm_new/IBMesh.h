@@ -1,9 +1,10 @@
+#pragma once
 
 
-#include "ibm/IBMempool.h"
-#include "ibm/IBNodeList.h"
-#include "ibm/IBNode.h"
-#include "ibm/IBMeshModel.h"
+#include "library/ibm_new/IBMempool.h"
+#include "library/ibm_new/IBNodeList.h"
+#include "library/ibm_new/IBNode.h"
+#include "library/ibm_new/IBMeshModel.h"
 
 /*
  * Type Definitions

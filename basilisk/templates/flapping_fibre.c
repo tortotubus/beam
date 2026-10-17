@@ -5,6 +5,7 @@
 #include "library/io/output-vtk.h"
 
 #include "flapping_fibre_parser.h"
+#include "fibre_case_runtime.h"
  
 /*
   The default simulation parameters correspond to Figure 13 of
@@ -39,21 +40,8 @@ pf[right] = dirichlet(0.);
 
 int main(int argc, char **argv) {
   const char *case_path = argc > 1 ? argv[1] : "flapping_fibre.xml";
-  elff_xml_error basilisk_error = {0};
-
-  if (flapping_fibre_case_load(case_path, &case_configuration,
-                               &basilisk_error) != ELFF_XML_OK) {
-    fprintf(stderr, "Basilisk case error: %s\n", basilisk_error.message);
+  if (fibre_case_init(case_path, &case_configuration) != 0)
     return 1;
-  }
-
-  ib_runtime_error runtime_error = {0};
-  if (elff_init(case_path, &runtime_error) != 0) {
-    fprintf(stderr, "ELFF model %zu (line %ld): %s\n",
-            runtime_error.model_index, runtime_error.line,
-            runtime_error.message);
-    return 1;
-  }
 
   /* Setting relevant parameters for basilisk */
   L0 = case_configuration.domain_size;
@@ -90,6 +78,15 @@ event properties(i++) {
     rhov[] = cm[] * fluid_density;
 }
 
+static bool recover_missing_ib_force = false;
+static int flapping_recover_missing_ib () {
+  if (!elff_checkpoint_restored) return -1;
+  recover_missing_ib_force = true;
+  if (pid () == 0)
+    fprintf (stderr, "Missing dump.ib: restored ELFF geometry; reconstructing coupling force from fluid state. This is an approximate restart.\n");
+  return 0;
+}
+
 /* Beam setup */
 event init(i = 0) {
   ib_model_view_array_t models = elff_models();
@@ -97,14 +94,13 @@ event init(i = 0) {
   for (size_t model_index = 0; model_index < models.count; ++model_index) {
     int mesh_index = ibmeshmanager_add_mesh();
     assert(mesh_index == (int)model_index);
-    IBMeshModel adapter = elff_model_from_view(models.data[model_index]);
-    assert(adapter.ctx);
-    ibmeshmanager_set_model(mesh_index, adapter);
+    int rc = elff_register_model(mesh_index, (int)model_index,
+                                 models.data[model_index], ibmlevel);
+    assert(rc == 0);
   }
 
   foreach_ibnode_per_ibmesh() {
-    mesh->depth = ibmlevel;
-    node->depth = ibmlevel;
+    node->depth = mesh->depth;
     if (case_configuration.has_uniform_force_density) {
       ibval(gravity.x) = case_configuration.uniform_force_density[0];
       ibval(gravity.y) = case_configuration.uniform_force_density[1];
@@ -114,6 +110,7 @@ event init(i = 0) {
     }
   }
 
+  ib_checkpoint_recover_missing = flapping_recover_missing_ib;
   if (!restore_handler(base_path)) {
     foreach ()
       u.x[] = U0;
@@ -122,6 +119,36 @@ event init(i = 0) {
 #endif
   } else {
   }
+}
+
+/* Sparse nodes may materialize after adaptation; refresh their body force
+   immediately before the solver consumes it. */
+event advance_interface(i++) {
+  if (recover_missing_ib_force) {
+    // Recover the missing nodal force without applying a second fluid impulse.
+    vector saved_u[], saved_ibmf[];
+    foreach ()
+      foreach_dimension () {
+        saved_u.x[] = u.x[];
+        saved_ibmf.x[] = ibmf.x[];
+      }
+    event ("interface_force_richardson");
+    foreach ()
+      foreach_dimension () {
+        u.x[] = saved_u.x[];
+        ibmf.x[] = saved_ibmf.x[];
+      }
+    boundary ((scalar*) {u, ibmf});
+    recover_missing_ib_force = false;
+  }
+  if (case_configuration.has_uniform_force_density)
+    foreach_ibnode () {
+      ibval(gravity.x) = case_configuration.uniform_force_density[0];
+      ibval(gravity.y) = case_configuration.uniform_force_density[1];
+#if dimension > 2
+      ibval(gravity.z) = case_configuration.uniform_force_density[2];
+#endif
+    }
 }
 
 event logfile(i++) {
@@ -133,9 +160,16 @@ event statsfile(i++) {
   double x_tip = 0.;
   double y_tip = 0.;
   {
-    IBNode *node = ibmm.pool.active.ptrs[0];
-    x_tip = ibval(npos.x);
-    y_tip = ibval(npos.y);
+    foreach_ibnode () {
+      if (node->mesh_gid == 0 && node->node_lid == 0 && node->pid == pid ()) {
+        x_tip = ibval(npos.x);
+        y_tip = ibval(npos.y);
+      }
+    }
+#if _MPI
+    MPI_Allreduce(MPI_IN_PLACE, &x_tip, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &y_tip, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+#endif
   }
 
   if (pid() == 0) {

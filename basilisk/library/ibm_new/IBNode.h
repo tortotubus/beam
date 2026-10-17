@@ -1,7 +1,8 @@
+#pragma once
 
 
-#include "ibm/IBConfig.h"
-#include "ibm/IBMacros.h"
+#include "library/ibm_new/IBConfig.h"
+#include "library/ibm_new/IBMacros.h"
 
 
 /**
@@ -20,7 +21,7 @@ typedef struct {
   int touched_epoch; /**< Sparse-node liveness marker. */
 } IBNode;
 
-#include "ibm/IBFields.h"
+#include "library/ibm_new/IBFields.h"
 
 // IBvector npos;
 // IBvector nvel;

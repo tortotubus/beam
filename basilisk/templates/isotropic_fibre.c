@@ -5,7 +5,9 @@
 #include "library/io/output-vtk.h"
 #include "library/io/params/params-cli.h"
 
+#if dimension == 3
 #include "lambda2.h"
+#endif
  
 
 double dt_fluid = 0.001;
@@ -84,7 +86,7 @@ static void add_isotropic_fibre(void) {
     initial_velocity[ni] = (vertex_t){velocity.x, velocity.y, velocity.z};
   }
 
-  ib_euler_beam_huang_set_initial_velocity((ib_euler_beam_huang_t)model.ctx,
+  ib_euler_beam_huang_set_initial_velocity((ib_euler_beam_huang_t) elff_force_coupled_handle (model),
                                            initial_velocity, b_nodes);
 
   const int mesh_id = ibmeshmanager_add_mesh();
@@ -266,12 +268,17 @@ event adapt(i++) {
 event output(i += 1; t <= experiment_t_end) {
   scalar omega_z[];
   vorticity(u, omega_z);
+#if dimension == 3
   scalar l2[];
   lambda2(u, l2);
-#if TREE
-  output_hdf_htg({l2, omega_z, p}, {u, ibmf}, base_path);
+  scalar* output_fields = {l2, omega_z, p};
 #else
-  output_hdf_imagedata({l2, omega_z, p}, {u, ibmf}, base_path);
+  scalar* output_fields = {omega_z, p};
+#endif
+#if TREE
+  output_hdf_htg(output_fields, {u, ibmf}, base_path);
+#else
+  output_hdf_imagedata(output_fields, {u, ibmf}, base_path);
 #endif
   output_hdf_pd(NULL, (IBvector[]){eulvel, nforce, nvel, {{-1}}}, base_path);
 }

@@ -1,6 +1,7 @@
-#include "ibm/IBConfig.h"
-#include "ibm/IBNode.h"
-#include "ibm/IBMacros.h"
+#pragma once
+#include "library/ibm_new/IBConfig.h"
+#include "library/ibm_new/IBNode.h"
+#include "library/ibm_new/IBMacros.h"
 
 static inline double roma_three_point_kernel_1d (double r) {
   double q = fabs (r);

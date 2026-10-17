@@ -239,14 +239,14 @@ static void add_settling_fibres(void) {
       elff_euler_beam_huang_new_direction(
         b_length, b_EI, b_mu, b_nodes, direction, b_bcs, start);
     ib_euler_beam_huang_set_implicit_bending(
-      (ib_euler_beam_huang_t)beam_model.ctx,
+      (ib_euler_beam_huang_t) elff_force_coupled_handle (beam_model),
       experiment_huang_implicit_bending);
 
     vertex_t initial_velocity[b_nodes];
     for (int ni = 0; ni < b_nodes; ++ni)
       initial_velocity[ni] = (vertex_t){0., 0., 0.};
     ib_euler_beam_huang_set_initial_velocity(
-      (ib_euler_beam_huang_t)beam_model.ctx,
+      (ib_euler_beam_huang_t) elff_force_coupled_handle (beam_model),
       initial_velocity, b_nodes);
 
     ibmeshmanager_set_model(mesh_id, beam_model);
@@ -402,7 +402,12 @@ static void write_settling_stats(int iter,
 
 /* Triply-periodic box; periodic faces are set after the domain origin. */
 
+#include "settling_fibre_xml.h"
+
 int main(int argc, char **argv) {
+  if (settling_is_xml (argc, argv)) {
+    if (settling_load_xml (argv[1], false)) return 1;
+  } else {
   input_file_register_option("basilisk.fluid", L_fluid, PARAM_VALUE_DOUBLE);
   input_file_register_option("basilisk.fluid", dt_fluid, PARAM_VALUE_DOUBLE);
   input_file_register_option("basilisk.fluid", minlevel, PARAM_VALUE_INT);
@@ -454,6 +459,8 @@ int main(int argc, char **argv) {
   input_file_print_options();
   input_file_apply_options();
 
+  }
+
   if (L_fluid <= 0. || dt_fluid <= 0. || experiment_t_end <= 0. ||
       experiment_output_interval <= 0.) {
     fprintf(stderr, "fluid scales and time controls must be positive\n");
@@ -481,7 +488,11 @@ int main(int argc, char **argv) {
   }
 
   L0 = L_fluid;
-  origin(-L_fluid / 2., -L_fluid / 2., -L_fluid / 2.);
+  if (settling_xml)
+    origin(settling_configuration.origin[0], settling_configuration.origin[1],
+           settling_configuration.origin[2]);
+  else
+    origin(-L_fluid / 2., -L_fluid / 2., -L_fluid / 2.);
   foreach_dimension()
     periodic(right);
 #if TREE
@@ -495,7 +506,7 @@ int main(int argc, char **argv) {
   ib_richardson_iters = experiment_ib_richardson_iters;
   display_control(banaei_Ga, 1, 1000);
 
-  if (pid() == 0)
+  if (pid() == 0 && !settling_xml)
     fprintf(stderr,
             "many-fibre settling: L0/L=%g Ga=%g gamma=%g r=%g rp=%g "
             "B=%g fibres=%d nodes=%d ds/dx=%g cloud_width/L=%g "
@@ -512,6 +523,7 @@ int main(int argc, char **argv) {
 }
 
 event logfile(i += experiment_stats_interval; t <= experiment_t_end) {
+  if (settling_xml) { settling_xml_stats (i, t); return 0; }
   double eulerian_ibm_force_y = 0.;
 
   foreach(reduction(+:eulerian_ibm_force_y))
@@ -522,11 +534,22 @@ event logfile(i += experiment_stats_interval; t <= experiment_t_end) {
 
 event properties(i++) {
   foreach_face()
-    muv.x[] = fm.x[] * fluid_dynamic_viscosity;
+    {
+    muv.x[] = fm.x[] * (settling_xml ? settling_configuration.dynamic_viscosity : fluid_dynamic_viscosity);
+    if (settling_xml) settling_alpha.x[] = fm.x[] / settling_configuration.fluid_density;
+  }
+  if (settling_xml)
+    foreach () settling_rho[] = cm[] * settling_configuration.fluid_density;
 }
 
 event init(i = 0) {
+  if (settling_xml) {
+    settling_register_xml_models ();
+  } else {
+
   add_settling_fibres();
+
+  }
 
   if (!restore_handler(base_path)) {
     foreach()
@@ -538,7 +561,7 @@ event init(i = 0) {
   }
 }
 
-event output(i += experiment_output_iters; t <= experiment_t_end) {
+event output(t += experiment_output_interval; t <= experiment_t_end) {
   scalar l2[], omega_z[];
   lambda2(u, l2);
   vorticity(u, omega_z);

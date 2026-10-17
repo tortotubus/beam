@@ -16,6 +16,7 @@
 // ============================================================================
 
 static ib_runtime_t elff_runtime = NULL;
+static bool elff_checkpoint_restored = false;
 static ib_model_view_array_t elff_model_views = {0};
 
 // ============================================================================
@@ -46,14 +47,24 @@ static inline void elff_runtime_free ();
 // Function definitions
 // ============================================================================
 
-/**
- * @brief
+/** Return a runtime configured before any manual model construction.
+ * This convenience path stops on setup failure rather than returning an
+ * unconfigured runtime to model constructors.
  */
 static inline ib_runtime_t elff_runtime_get () {
   if (!elff_runtime) {
     elff_runtime = ib_runtime_new ();
+    if (!elff_runtime) {
+      fprintf (stderr, "ELFF: unable to allocate the runtime.\n");
+      abort ();
+    }
 #if _MPI && defined(ELFF_USE_MPI)
-    ib_runtime_set_communicator (elff_runtime, MPI_COMM_WORLD);
+    if (ib_runtime_set_communicator (elff_runtime, MPI_COMM_WORLD) != 0) {
+      ib_runtime_delete (elff_runtime);
+      elff_runtime = NULL;
+      fprintf (stderr, "ELFF: unable to initialize the runtime communicator.\n");
+      abort ();
+    }
 #endif
     static bool registered = false;
     if (!registered) {
@@ -74,17 +85,20 @@ static inline ib_runtime_t elff_runtime_get () {
 }
 
 /** Create and seal the global runtime from the ordered <ELFF><Models> list. */
-static inline int elff_init (const char* case_path, ib_runtime_error* error) {
-  if (!case_path || elff_runtime)
-    return -1;
-  if (ib_runtime_create_from_case_file (case_path, &elff_runtime, error) != 0)
+static inline int elff_init_case (const char* case_path, elff_xml_document_t document,
+                                  ib_runtime_error* error) {
+  if ((!case_path && !document) || elff_runtime)
     return -1;
 #if _MPI && defined(ELFF_USE_MPI)
-  if (ib_runtime_set_communicator (elff_runtime, MPI_COMM_WORLD) != 0) {
-    ib_runtime_delete (elff_runtime);
-    elff_runtime = NULL;
+  if ((document ? ib_runtime_create_from_case_document_mpi (
+        document, MPI_COMM_WORLD, &elff_runtime, error) :
+        ib_runtime_create_from_case_file_mpi (
+        case_path, MPI_COMM_WORLD, &elff_runtime, error)) != 0)
     return -1;
-  }
+#else
+  if ((document ? ib_runtime_create_from_case_document (document, &elff_runtime, error) :
+        ib_runtime_create_from_case_file (case_path, &elff_runtime, error)) != 0)
+    return -1;
 #endif
   if (ib_runtime_get_model_views (elff_runtime, &elff_model_views) != 0) {
     ib_runtime_delete (elff_runtime);
@@ -105,6 +119,15 @@ static inline int elff_init (const char* case_path, ib_runtime_error* error) {
     registered = true;
   }
   return 0;
+}
+
+static inline int elff_init (const char* case_path, ib_runtime_error* error) {
+  return elff_init_case (case_path, NULL, error);
+}
+
+static inline int elff_init_document (elff_xml_document_t document,
+                                      ib_runtime_error* error) {
+  return elff_init_case (NULL, document, error);
 }
 
 /** Return the stable borrowed view array for the global sealed runtime. */
@@ -232,7 +255,19 @@ static inline int elff_restore (const char* fname) {
   if (!elff_runtime)
     return -1;
 
-  return ib_runtime_restore (elff_runtime_get (), fname);
+  int rc = ib_runtime_restore (elff_runtime_get (), fname);
+#if _MPI
+  int failed = rc != 0;
+  MPI_Allreduce (MPI_IN_PLACE, &failed, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  if (failed) return -1;
+#else
+  if (rc != 0) return rc;
+#endif
+  // Refresh the adapters' cached mesh, then rebuild sparse support on the
+  // restored fluid grid before the IB sidecar restores coupling fields.
+  ibmeshmanager_sync_model_outputs ();
+  elff_checkpoint_restored = true;
+  return 0;
 }
 
 /**

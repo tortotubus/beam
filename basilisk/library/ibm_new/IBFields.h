@@ -1,3 +1,4 @@
+#pragma once
 
 
 // ============================================================================
@@ -7,9 +8,7 @@
 /**
  * @struct IBscalar
  */
-typedef struct {
-  int i;
-} IBscalar;
+#include "IBScalar.h"
 
 /**
  * @struct IBvector

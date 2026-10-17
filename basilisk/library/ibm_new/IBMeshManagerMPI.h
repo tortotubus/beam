@@ -1,6 +1,7 @@
+#pragma once
 
 
-#include "ibm/IBNodeList.h"
+#include "library/ibm_new/IBNodeList.h"
 
 /**
  * @struct IBExchangeList

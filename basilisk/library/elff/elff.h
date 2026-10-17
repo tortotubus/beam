@@ -14,7 +14,8 @@
 #include "elff/c/models/ibm/IBVelocityCoupled.h"
 #include "elff/c/models/rigidbody/IBRigidBody.h"
 
-#include "library/ibm/IBMeshModel.h"
+#include "utils.h"
+#include "library/ibm/IBMeshManager.h"
 #include "library/elff/runtime.h"
 
 static inline ib_euler_beam_bcs_t elff_euler_beam_bcs_types (int left_type,
@@ -202,101 +203,144 @@ trace int elff_vc_advance (void* ctx, void* mesh, double dt) {
 // ELFF Force-Coupled Operations
 // ============================================================================
 
-int elff_fc_node_count (void* ctx);
-void elff_fc_sync (void* ctx, void* mesh);
-void elff_fc_advance (void* ctx, void* mesh, double dt);
+/** Adapter buffers are indexed by model node id, independent of local storage. */
+typedef struct {
+  ib_force_coupled_t model; /* Borrowed from IBRuntime. */
+  int count;
+  vertex_t* forces;
+  ib_mesh_t output;
+} ELFFForceAdapter;
 
-/**
- * @brief
- */
+/** Access the borrowed physical model before transferring the adapter to a manager. */
+static inline ib_force_coupled_t elff_force_coupled_handle (IBMeshModel model) {
+  assert (model.type == IB_MODEL_FORCE_COUPLED && model.ctx);
+  return ((ELFFForceAdapter*) model.ctx)->model;
+}
+
 int elff_fc_node_count (void* ctx) {
-  ib_force_coupled_t fc_ptr = (ib_force_coupled_t) ctx;
-  return ib_force_coupled_get_number_of_nodes (fc_ptr);
+  return ((ELFFForceAdapter*) ctx)->count;
 }
 
-/**
- * @brief
- */
-trace void elff_fc_sync (void* ctx, void* mesh) {
-
-  // Basilisk pointers
-  IBMesh* ib_mesh = (IBMesh*) mesh;
-  int ib_nodes_count = ib_mesh->nodes.size;
-  IBNode** ib_nodes = ib_mesh->nodes.ptrs;
-
-  // ELFF Pointers
-  ib_force_coupled_t fc_ptr = (ib_force_coupled_t) ctx;
-  ib_mesh_t elff_mesh = ib_force_coupled_get_current (fc_ptr);
-
-  for (int ni = 0; ni < ib_nodes_count; ni++) {
-    IBNode* node = ib_nodes[ni];
-    const double nodal_measure =
-      elff_mesh.measure ? elff_mesh.measure[ni] : 1.0;
-    foreach_dimension () {
-      ibval (npos.x) = elff_mesh.position[ni].x;
-      ibval (nvel.x) = elff_mesh.velocity[ni].x;
-    }
-    ibval (nweight) = nodal_measure;
+int elff_fc_sync_node (void* ctx, void* mesh, int node_lid, void* raw_node) {
+  ELFFForceAdapter* adapter = (ELFFForceAdapter*) ctx;
+  IBNode* node = (IBNode*) raw_node;
+  if (node_lid < 0 || node_lid >= adapter->output.n)
+    return -1;
+  foreach_dimension () {
+    ibval (npos.x) = adapter->output.position[node_lid].x;
+    ibval (nvel.x) = adapter->output.velocity[node_lid].x;
   }
-
-  ib_mesh_free (&elff_mesh);
+  ibval (nweight) = adapter->output.measure ? adapter->output.measure[node_lid] : 1.;
+  return 0;
 }
 
-/**
- * @brief
- */
-trace void elff_fc_advance (void* ctx, void* mesh, double dt) {
-  // Basilisk pointers
-  IBMesh* ib_mesh = (IBMesh*) mesh;
-  int ib_nodes_count = ib_mesh->nodes.size;
-  IBNode** ib_nodes = ib_mesh->nodes.ptrs;
+int elff_fc_input_node (void* ctx, void* mesh, int node_lid, void* raw_node) {
+  ELFFForceAdapter* adapter = (ELFFForceAdapter*) ctx;
+  IBNode* node = (IBNode*) raw_node;
+  if (node_lid < 0 || node_lid >= adapter->count)
+    return -1;
+  foreach_dimension ()
+    adapter->forces[node_lid].x = ibval (nforce.x);
+  return 0;
+}
 
-  // Pack nodal forces into vertex_t array
-  vertex_t* forces = calloc (ib_nodes_count, sizeof (vertex_t));
-  for (int ni = 0; ni < ib_nodes_count; ni++) {
-    IBNode* node = ib_nodes[ni];
-    foreach_dimension () {
-      forces[ni].x = ibval (nforce.x);
-    }
+static void elff_fc_publish_local (ELFFForceAdapter* adapter, IBMesh* mesh) {
+  for (size_t ni = 0; ni < mesh->nodes.size; ni++) {
+    IBNode* node = mesh->nodes.ptrs[ni];
+    int rc = elff_fc_sync_node (adapter, mesh, node->node_lid, node);
+    assert (rc == 0);
   }
+}
 
-  // ELFF Pointers
-  ib_force_coupled_t fc_ptr = (ib_force_coupled_t) ctx;
-  ib_mesh_t elff_mesh = ib_force_coupled_get_next (fc_ptr, forces, ib_nodes_count, dt);
+trace void elff_fc_sync (void* ctx, void* raw_mesh) {
+  ELFFForceAdapter* adapter = (ELFFForceAdapter*) ctx;
+  ib_mesh_free (&adapter->output);
+  adapter->output = ib_force_coupled_get_current (adapter->model);
+  assert (adapter->output.n == adapter->count);
+  elff_fc_publish_local (adapter, (IBMesh*) raw_mesh);
+}
 
-  for (int ni = 0; ni < ib_nodes_count; ni++) {
-    IBNode* node = ib_nodes[ni];
-    const double nodal_measure =
-      elff_mesh.measure ? elff_mesh.measure[ni] : 1.0;
-    foreach_dimension () {
-      ibval (npos.x) = elff_mesh.position[ni].x;
-      ibval (nvel.x) = elff_mesh.velocity[ni].x;
+trace void elff_fc_advance (void* ctx, void* raw_mesh, double dt) {
+  ELFFForceAdapter* adapter = (ELFFForceAdapter*) ctx;
+  IBMesh* mesh = (IBMesh*) raw_mesh;
+  /* Sparse inputs were already delivered for every logical node by the manager. */
+  if (!mesh->sparse_managed)
+    for (size_t ni = 0; ni < mesh->nodes.size; ni++) {
+      IBNode* node = mesh->nodes.ptrs[ni];
+      int rc = elff_fc_input_node (adapter, mesh, node->node_lid, node);
+      assert (rc == 0);
     }
-    ibval (nweight) = nodal_measure;
-  }
+  ib_mesh_free (&adapter->output);
+  adapter->output = ib_force_coupled_get_next (
+    adapter->model, adapter->forces, adapter->count, dt);
+  assert (adapter->output.n == adapter->count);
+  elff_fc_publish_local (adapter, mesh);
+}
 
-  free (forces);
-  ib_mesh_free (&elff_mesh);
+static void elff_fc_destroy (void* ctx) {
+  ELFFForceAdapter* adapter = (ELFFForceAdapter*) ctx;
+  if (!adapter)
+    return;
+  ib_mesh_free (&adapter->output);
+  free (adapter->forces);
+  free (adapter);
 }
 
 static inline IBMeshModel elff_force_coupled_model (void* ctx) {
+  ELFFForceAdapter* adapter = calloc (1, sizeof (ELFFForceAdapter));
+  assert (adapter);
+  adapter->model = (ib_force_coupled_t) ctx;
+  adapter->count = ib_force_coupled_get_number_of_nodes (adapter->model);
+  adapter->forces = calloc (adapter->count, sizeof (vertex_t));
+  assert (adapter->forces || adapter->count == 0);
   IBMeshModel model = ibmeshmodel_force_coupled_init ();
-  model.ctx = ctx;
+  model.ctx = adapter;
   model.force_ops->node_count = elff_fc_node_count;
   model.force_ops->sync = elff_fc_sync;
+  model.force_ops->sync_node = elff_fc_sync_node;
+  model.force_ops->input_node = elff_fc_input_node;
   model.force_ops->advance = elff_fc_advance;
-  model.force_ops->destroy = NULL;
+  model.force_ops->destroy = elff_fc_destroy;
   return model;
 }
 
 /** Install a non-owning Basilisk adapter for one runtime-owned view. */
 static inline IBMeshModel elff_model_from_view (ib_model_view_t view) {
+  if (!view.handle) {
+    IBMeshModel invalid = {0};
+    return invalid;
+  }
   if (view.kind == IB_MODEL_VIEW_FORCE_COUPLED)
     return elff_force_coupled_model (view.handle);
   if (view.kind == IB_MODEL_VIEW_VELOCITY_COUPLED)
     return elff_velocity_coupled_model (view.handle);
   IBMeshModel invalid = {0};
   return invalid;
+}
+
+/** Register an XML model using its borrowed descriptor handle.
+ * Call on every rank, in model order, with the same mesh_gid.
+ * The runtime must outlive the mesh manager. Legacy views use fallback_level.
+ */
+static inline int elff_register_model (int mesh_id, int mesh_gid,
+                                       ib_model_view_t view,
+                                       int fallback_level) {
+  ib_model_info_t info;
+  if (ib_model_descriptor_get_info (view.descriptor, &info) != 0)
+    return -1;
+  IBMeshModel model = elff_model_from_view (view);
+  if (info.sparse) {
+    int type = view.kind == IB_MODEL_VIEW_FORCE_COUPLED ?
+      IB_MODEL_FORCE_COUPLED : IB_MODEL_VELOCITY_COUPLED;
+    ibmeshmanager_set_model_sparse_descriptor (mesh_id, mesh_gid, model,
+      type, info.node_count, info.owner_rank,
+      info.level >= 0 ? info.level : fallback_level);
+  }
+  else {
+    ibmm.meshes[mesh_id].depth = fallback_level;
+    ibmeshmanager_set_model (mesh_id, model, info.owner_rank);
+  }
+  return 0;
 }
 
 // ============================================================================
@@ -463,15 +507,7 @@ IBMeshModel elff_euler_beam_new (double length,
   ib_euler_beam_t beam_ptr =
     ib_euler_beam_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -489,15 +525,7 @@ IBMeshModel elff_euler_beam_new_theta (double length,
   ib_euler_beam_t beam_ptr = ib_euler_beam_new_theta (
     elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -514,15 +542,7 @@ IBMeshModel elff_euler_beam_penalty_new (double length,
   ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new (
     elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -540,15 +560,7 @@ IBMeshModel elff_euler_beam_penalty_new_theta (double length,
   ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new_theta (
     elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -565,15 +577,7 @@ IBMeshModel elff_euler_beam_ggl_new (double length,
   ib_euler_beam_ggl_t beam_ptr =
     ib_euler_beam_ggl_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -591,15 +595,7 @@ IBMeshModel elff_euler_beam_ggl_new_theta (double length,
   ib_euler_beam_ggl_t beam_ptr = ib_euler_beam_ggl_new_theta (
     elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -616,15 +612,7 @@ IBMeshModel elff_euler_beam_addm_new (double length,
   ib_euler_beam_addm_t beam_ptr = ib_euler_beam_addm_new (
     elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -642,15 +630,7 @@ IBMeshModel elff_euler_beam_addm_new_theta (double length,
   ib_euler_beam_addm_t beam_ptr = ib_euler_beam_addm_new_theta (
     elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -666,15 +646,7 @@ IBMeshModel elff_euler_beam_huang_new (double length,
   ib_euler_beam_huang_t beam_ptr =
     ib_euler_beam_huang_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -691,15 +663,7 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
   ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_theta (
     elff_runtime_get (), v0, bcs, length, EI, mu, nodes, theta);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -718,15 +682,7 @@ IBMeshModel elff_euler_beam_huang_new_direction (
   ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_direction (
     elff_runtime_get (), v0, bcs, length, EI, mu, nodes, tangent);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = beam_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (beam_ptr);
 }
 
 /**
@@ -787,15 +743,7 @@ IBMeshModel elff_rigid_body_circle_new (double radius,
   ib_rigid_body_circle_t body_ptr = ib_rigid_body_circle_new (
     elff_runtime_get (), radius, point_count, density, x, v, angle, angular_velocity_z);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = body_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (body_ptr);
 }
 
 /**
@@ -820,15 +768,7 @@ IBMeshModel elff_rigid_body_fibre_new (double length,
   ib_rigid_body_fibre_t body_ptr = ib_rigid_body_fibre_new (
     elff_runtime_get (), length, diameter, nodes, linear_density, x, v, q, omega);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = body_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (body_ptr);
 }
 
 /**
@@ -843,15 +783,7 @@ IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
   ib_pinned_rigid_body_circle_t body_ptr =
     ib_pinned_rigid_body_circle_new (elff_runtime_get (), radius, point_count, density, x, angle);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = body_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (body_ptr);
 }
 
 /**
@@ -870,15 +802,7 @@ IBMeshModel elff_pinned_rigid_body_fibre_new (double length,
   ib_pinned_rigid_body_fibre_t body_ptr = ib_pinned_rigid_body_fibre_new (
     elff_runtime_get (), length, diameter, nodes, linear_density, x, q);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = body_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (body_ptr);
 }
 
 /**
@@ -902,15 +826,7 @@ IBMeshModel elff_rigid_body_sphere_new (double radius,
   ib_rigid_body_sphere_t body_ptr =
     ib_rigid_body_sphere_new (elff_runtime_get (), radius, point_count, density, x, v, q, omega);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = body_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (body_ptr);
 }
 
 /**
@@ -928,13 +844,5 @@ IBMeshModel elff_pinned_rigid_body_sphere_new (double radius,
   ib_pinned_rigid_body_sphere_t body_ptr =
     ib_pinned_rigid_body_sphere_new (elff_runtime_get (), radius, point_count, density, x, q);
 
-  IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
-
-  ib_model.ctx = body_ptr;
-  ib_model.force_ops->node_count = elff_fc_node_count;
-  ib_model.force_ops->sync = elff_fc_sync;
-  ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = NULL;
-
-  return ib_model;
+  return elff_force_coupled_model (body_ptr);
 }

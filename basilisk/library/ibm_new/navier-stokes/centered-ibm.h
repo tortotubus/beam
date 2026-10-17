@@ -1,5 +1,5 @@
 #include "run.h"
-#include "common/timestep.h"
+#include "library/timestep.h"
 #include "bcg.h"
 #if EMBED
 #include "viscosity-embed.h"
@@ -7,9 +7,9 @@
 #include "viscosity.h"
 #endif
 
-#include "ibm/IBMeshManager.h"
+#include "library/ibm_new/IBMeshManager.h"
 #if TREE
-#include "ibm/IBAdapt.h"
+#include "library/ibm_new/IBAdapt.h"
 #endif
 
 scalar p[];
@@ -229,7 +229,7 @@ event viscous_term (i++, last) {
   }
 }
 
-#include "ibm/IBKernels.h"
+#include "library/ibm_new/IBKernels.h"
 
 event interface_force_velocity_coupled (i++, last) {
   trash ({ibmf});

@@ -1,3 +1,4 @@
+#pragma once
 #include "library/common/DomainGeometry.h"
 #include "library/ibm/IBLocate.h"
 

@@ -9,10 +9,13 @@
 #include "elff/mpi/CommHandle.hpp"
 
 #include <cstdint>
+#include <climits>
+#include <algorithm>
 #include <cstdio>
 #include <limits>
 #include <memory>
 #include <string>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -63,6 +66,7 @@ public:
     std::unique_ptr<IBModel> model;
     IBModel* base_model;
     void* coupling_handle;
+    ib_model_info_t info = {0, 0, -1, 0};
   };
 
   IBRuntime() = default;
@@ -94,6 +98,26 @@ public:
     return result;
   }
 
+  int rank() const { return local_rank(); }
+  int ranks() const {
+    int count = 1;
+#ifdef ELFF_USE_MPI
+    if (communicator_)
+      MPI_Comm_size(communicator_.get(), &count);
+#endif
+    return count;
+  }
+
+  void add_remote_huang(ib_model_info_t info) {
+    if (sealed_) throw std::logic_error("Runtime is sealed");
+    entries_.push_back({IBRuntimeModelType::EulerBeamHuang, info.owner_rank,
+      IB_MODEL_VIEW_FORCE_COUPLED, nullptr, nullptr, nullptr, info});
+  }
+  void configure_last_model(ib_model_info_t info) {
+    entries_.back().info = info;
+    entries_.back().owner_pid = info.owner_rank;
+  }
+
   int seal()
   {
     if (sealed_)
@@ -102,7 +126,7 @@ public:
     views_.clear();
     views_.reserve(entries_.size());
     for (const auto& entry : entries_)
-      views_.push_back({entry.coupling_kind, entry.coupling_handle});
+      views_.push_back({entry.coupling_kind, entry.coupling_handle, &entry.info});
     sealed_ = true;
     return 0;
   }
@@ -121,6 +145,8 @@ public:
 #ifdef ELFF_USE_MPI
   void set_communicator(MPI_Comm comm)
   {
+    if (!entries_.empty())
+      throw std::logic_error("Set communicator before model construction");
     communicator_ =
       (comm != MPI_COMM_NULL) ? ELFF::MPI::CommHandle::duplicate(comm)
                               : ELFF::MPI::CommHandle();
@@ -130,11 +156,24 @@ public:
   int export_state(IBRuntimeState& state)
   {
     seal();
+    const bool distributed = checkpoint_owner_pid() < 0;
+    if (!distributed)
+      for (const auto& entry : entries_)
+        if (!entry.base_model) return -1;
     state.models.clear();
     state.models.resize(entries_.size());
     for (size_t i = 0; i < entries_.size(); ++i) {
       state.models[i].type = entries_[i].type;
-      entries_[i].base_model->pack_state(state.models[i].state);
+      auto& packed = state.models[i].state;
+      if (entries_[i].base_model)
+        entries_[i].base_model->pack_state(packed);
+#ifdef ELFF_USE_MPI
+      if (distributed) {
+        broadcast_vector(packed.ints, entries_[i].owner_pid);
+        broadcast_vector(packed.reals, entries_[i].owner_pid);
+        broadcast_vector(packed.bytes, entries_[i].owner_pid);
+      }
+#endif
     }
     return 0;
   }
@@ -152,7 +191,8 @@ public:
     }
 
     for (size_t i = 0; i < entries_.size(); ++i)
-      entries_[i].base_model->unpack_state(state.models[i].state);
+      if (entries_[i].base_model)
+        entries_[i].base_model->unpack_state(state.models[i].state);
     return 0;
   }
 
@@ -161,13 +201,14 @@ public:
     seal();
     std::vector<IO::CXX::vtkPolyData> datasets;
     for (const auto& entry : entries_)
-      entry.base_model->append_vtk_polydata(datasets);
+      if (entry.base_model) entry.base_model->append_vtk_polydata(datasets);
     return IO::CXX::vtkPolyData::append_many(datasets);
   }
 
   int write_polydata(const char* fname, bool overwrite = true)
   {
     seal();
+    if (checkpoint_owner_pid() < 0) return -1;
     if (!should_checkpoint_locally())
       return 0;
     if (!fname)
@@ -182,6 +223,19 @@ public:
   int write_checkpoint(const char* fname)
   {
     seal();
+#ifdef ELFF_USE_MPI
+    if (checkpoint_owner_pid() < 0) {
+      // All owners contribute; rank zero publishes the existing ordered format.
+      FILE* fp = local_rank() == 0 && fname ? std::fopen(fname, "wb") : nullptr;
+      int rc = local_rank() == 0 && !fp ? -1 : 0;
+      MPI_Bcast(&rc, 1, MPI_INT, 0, communicator_.get());
+      if (rc != 0) return rc;
+      rc = write_checkpoint(fp);
+      if (fp && std::fclose(fp) != 0) rc = -1;
+      MPI_Bcast(&rc, 1, MPI_INT, 0, communicator_.get());
+      return rc;
+    }
+#endif
     if (!should_checkpoint_locally())
       return 0;
     if (!fname)
@@ -199,7 +253,7 @@ public:
   int read_checkpoint(const char* fname)
   {
     seal();
-    if (!should_checkpoint_locally())
+    if (checkpoint_owner_pid() >= 0 && !should_checkpoint_locally())
       return 0;
     if (!fname)
       return -1;
@@ -215,13 +269,12 @@ public:
   int write_checkpoint(FILE* fp)
   {
     seal();
-    if (!should_checkpoint_locally())
-      return 0;
-    if (!fp)
-      return -1;
-
+    const bool distributed = checkpoint_owner_pid() < 0;
+    if (!distributed && !should_checkpoint_locally()) return 0;
     IBRuntimeState state;
-    export_state(state);
+    if (export_state(state) != 0) return -1;
+    if (distributed && local_rank() != 0) return 0;
+    if (!fp) return -1;
     const FileHeader header = {
       file_magic, file_version, static_cast<int64_t>(state.models.size())};
     if (std::fwrite(&header, sizeof(header), 1, fp) != 1)
@@ -257,7 +310,7 @@ public:
   int read_checkpoint(FILE* fp)
   {
     seal();
-    if (!should_checkpoint_locally())
+    if (checkpoint_owner_pid() >= 0 && !should_checkpoint_locally())
       return 0;
     if (!fp)
       return -1;
@@ -321,6 +374,24 @@ public:
   }
 
 private:
+#ifdef ELFF_USE_MPI
+  template<class T>
+  void broadcast_vector(std::vector<T>& values, int owner)
+  {
+    uint64_t size = values.size();
+    MPI_Bcast(&size, 1, MPI_UINT64_T, owner, communicator_.get());
+    values.resize(static_cast<size_t>(size));
+    size_t bytes = values.size()*sizeof(T);
+    char* data = reinterpret_cast<char*>(values.data());
+    while (bytes) {
+      int count = static_cast<int>(std::min(bytes, static_cast<size_t>(INT_MAX)));
+      MPI_Bcast(data, count, MPI_BYTE, owner, communicator_.get());
+      data += count;
+      bytes -= count;
+    }
+  }
+#endif
+
   struct FileHeader
   {
     uint64_t magic;
@@ -346,12 +417,13 @@ private:
 
   int checkpoint_owner_pid() const
   {
-    // Mixed ownership is intentionally unsupported in this version.
+    // Negative means model states must be collected from multiple owners.
+    const int owner = entries_.empty() ? 0 : entries_.front().owner_pid;
     for (const auto& entry : entries_) {
-      if (entry.owner_pid != 0)
+      if (entry.owner_pid != owner)
         return -1;
     }
-    return 0;
+    return owner;
   }
 
   bool should_checkpoint_locally() const

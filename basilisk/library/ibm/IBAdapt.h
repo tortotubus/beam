@@ -40,10 +40,11 @@ astats adapt_wavelet_ibm (
   // scalar ib_noise_1[]; int iblevel_1;
   // scalar ib_noise_2[]; int iblevel_2;
 
-  foreach_ibnode_per_ibmesh () {
-    if (mesh->depth > iblevel_0)
-      iblevel_0 = mesh->depth;
-  }
+  // Mesh metadata exists even on ranks with no sparse nodes. All ranks
+  // must choose the same number of collective adaptation iterations.
+  for (int m = 0; m < ibmm.nm; ++m)
+    if (ibmm.meshes[m].depth > iblevel_0)
+      iblevel_0 = ibmm.meshes[m].depth;
 
   scalar* slist_c = slist ? list_copy (slist) : NULL;
   slist_c = list_append (slist_c, ib_noise_0);
@@ -140,6 +141,15 @@ astats adapt_wavelet_ibm (
     scalar* adapt_list = list_is_all ? all : list;
     // astats st_i = adapt_wavelet2 (slist_c, max_c, maxlevel_c, minlevel, adapt_list);
     astats st_i = adapt_wavelet(slist_c, max_c, max_level_or_ibm, minlevel, adapt_list);
+
+#if _MPI
+    // Refinement can repartition cells onto ranks with no sparse nodes yet.
+    // Refresh geometry on the new partition before marking the next pass.
+    // Only initialization can republish model outputs without transferring
+    // the accumulated fluid-to-model coupling fields as well.
+    if (init)
+      ibmeshmanager_sync_model_outputs ();
+#endif
 
     st.nc += st_i.nc;
     st.nf += st_i.nf;

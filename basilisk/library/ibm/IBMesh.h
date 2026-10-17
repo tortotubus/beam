@@ -1,16 +1,20 @@
 #pragma once
 
-#include "library/ibm/IBMeshModel.h"
+
 #include "library/ibm/IBMempool.h"
 #include "library/ibm/IBNodeList.h"
 #include "library/ibm/IBNode.h"
+#include "library/ibm/IBMeshModel.h"
 
 /*
  * Type Definitions
  */
 typedef struct {
   int pid;
+  int gid;
   int depth;
+  int nnode_global;
+  bool sparse_managed;
   IBNodeList nodes;
   IBMeshModel model;
 } IBMesh;
@@ -23,6 +27,13 @@ void ibmesh_init (IBMesh* mesh);
 void ibmesh_free (IBMesh* mesh);
 void ibmesh_add_nodes (IBMesh* mesh, IBMempool* pool, int count);
 void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool);
+IBNode* ibmesh_find_node_by_lid (IBMesh* mesh, int node_lid);
+IBNode* ibmesh_get_or_create_node_by_lid (IBMesh* mesh,
+                                          IBMempool* pool,
+                                          int node_lid);
+void ibmesh_prune_untouched_nodes (IBMesh* mesh,
+                                   IBMempool* pool,
+                                   int epoch);
 
 /**
  * Functions Definitions
@@ -44,6 +55,10 @@ void ibmesh_init (IBMesh* mesh) {
     return;
 
   mesh->pid = 0;
+  mesh->gid = -1;
+  mesh->depth = 0;
+  mesh->nnode_global = 0;
+  mesh->sparse_managed = false;
   mesh->model = ibmeshmodel_init();
   ibnodelist_init (&mesh->nodes, 0);
 }
@@ -96,6 +111,9 @@ void ibmesh_add_nodes (IBMesh* mesh, IBMempool* pool, int count) {
       ibmempool_free_node_ptr (pool, node);
       continue;
     }
+    node->mesh_gid = mesh->gid;
+    node->node_lid = node_idx;
+    node->depth = mesh->depth;
     ibnodelist_push (&mesh->nodes, node);
   }
 }
@@ -124,6 +142,62 @@ void ibmesh_delete_all_nodes (IBMesh* mesh, IBMempool* pool) {
   }
 }
 
+IBNode* ibmesh_find_node_by_lid (IBMesh* mesh, int node_lid) {
+  if (!mesh || node_lid < 0)
+    return NULL;
+
+  for (size_t i = 0; i < mesh->nodes.size; i++) {
+    IBNode* node = mesh->nodes.ptrs[i];
+    if (node && node->node_lid == node_lid)
+      return node;
+  }
+  return NULL;
+}
+
+IBNode* ibmesh_get_or_create_node_by_lid (IBMesh* mesh,
+                                          IBMempool* pool,
+                                          int node_lid) {
+  if (!mesh || !pool || node_lid < 0)
+    return NULL;
+
+  IBNode* node = ibmesh_find_node_by_lid (mesh, node_lid);
+  if (node)
+    return node;
+
+  node = ibmempool_alloc_node (pool);
+  if (!node)
+    return NULL;
+  if (ibnode_init (node) != 0) {
+    ibmempool_free_node_ptr (pool, node);
+    return NULL;
+  }
+
+  node->mesh_gid = mesh->gid;
+  node->node_lid = node_lid;
+  node->depth = mesh->depth;
+  ibnodelist_push (&mesh->nodes, node);
+  return node;
+}
+
+void ibmesh_prune_untouched_nodes (IBMesh* mesh,
+                                   IBMempool* pool,
+                                   int epoch) {
+  if (!mesh || !pool || !mesh->sparse_managed)
+    return;
+
+  for (size_t i = 0; i < mesh->nodes.size;) {
+    IBNode* node = mesh->nodes.ptrs[i];
+    if (node && node->touched_epoch == epoch) {
+      i++;
+      continue;
+    }
+
+    IBNode* dead = ibnodelist_remove_swap (&mesh->nodes, i);
+    if (dead)
+      ibmempool_free_node_ptr (pool, dead);
+  }
+}
+
 /**
  * @brief Set the mesh model
  */
@@ -134,7 +208,9 @@ void ibmesh_set_model (IBMesh* mesh, IBMempool* pool, IBMeshModel model) {
     mesh->model = model;
     ibmesh_delete_all_nodes (mesh, pool);
     int node_count = mesh->model.velocity_ops->node_count (model.ctx);
-    ibmesh_add_nodes (mesh, pool, node_count);
+    mesh->nnode_global = node_count;
+    if (!mesh->sparse_managed)
+      ibmesh_add_nodes (mesh, pool, node_count);
     mesh->model.velocity_ops->sync (model.ctx, mesh);
     break;
   }
@@ -142,7 +218,9 @@ void ibmesh_set_model (IBMesh* mesh, IBMempool* pool, IBMeshModel model) {
     mesh->model = model;
     ibmesh_delete_all_nodes (mesh, pool);
     int node_count = mesh->model.force_ops->node_count (model.ctx);
-    ibmesh_add_nodes (mesh, pool, node_count);
+    mesh->nnode_global = node_count;
+    if (!mesh->sparse_managed)
+      ibmesh_add_nodes (mesh, pool, node_count);
     mesh->model.force_ops->sync (model.ctx, mesh);
     break;
   }

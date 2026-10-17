@@ -1,5 +1,6 @@
 #pragma once
 
+
 // ============================================================================
 // Type Definitions
 // ============================================================================
@@ -7,9 +8,7 @@
 /**
  * @struct IBscalar
  */
-typedef struct {
-  int i;
-} IBscalar;
+#include "IBScalar.h"
 
 /**
  * @struct IBvector
@@ -50,6 +49,7 @@ IBvector npos;
 IBvector nvel;
 IBvector nforce;
 IBscalar nweight;
+static bool _ibsolver_initialized = false;
 
 // ============================================================================
 // Function Declarations
@@ -164,6 +164,9 @@ macro foreach_ibvector (IBvector* list) {
  * @brief
  */
 void init_ibsolver () {
+  if (_ibsolver_initialized)
+    return;
+
   new_ibvector (nvel);
   new_ibvector (nforce);
   new_ibvector (npos);
@@ -177,6 +180,8 @@ void init_ibsolver () {
   for (int i = 0; i < n; i++)
     iball[i].i = i;
   iball[n].i = -1;
+
+  _ibsolver_initialized = true;
 }
 
 // ============================================================================

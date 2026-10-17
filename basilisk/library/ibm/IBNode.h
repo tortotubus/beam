@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include "library/ibm/IBConfig.h"
 #include "library/ibm/IBMacros.h"
 
@@ -15,6 +16,9 @@ typedef struct {
   // coord f;       /**< Lagrangian nodal force    */
   int depth; /**< Desired depth of the cell for TREE */
   int pid; /**< MPI rank that owns this node: -1 if unknown */
+  int mesh_gid; /**< Stable logical mesh identity. */
+  int node_lid; /**< Stable node id within the logical mesh. */
+  int touched_epoch; /**< Sparse-node liveness marker. */
 } IBNode;
 
 #include "library/ibm/IBFields.h"
@@ -66,6 +70,9 @@ int ibnode_init (IBNode* node) {
   }
  
   node->depth = 0; 
+  node->mesh_gid = -1;
+  node->node_lid = -1;
+  node->touched_epoch = 0;
 
 #if _MPI
   node->pid = -1;

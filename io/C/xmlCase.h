@@ -58,6 +58,31 @@ elff_xml_document_load_file(const char* path,
                             elff_xml_document_t* out_document,
                             elff_xml_error* error);
 
+/** Render numeric ${expression} attributes into an independent in-memory Case
+ * document. Bare names and parameters.NAME query parameters; coefficients.NAME
+ * queries output coefficients. Definitions are retained unchanged for provenance.
+ * A Parameters section is required when using expressions. Expressions
+ * must occupy the whole attribute (apart from whitespace). Source is unchanged.
+ * Legacy cases without definitions or expressions are copied unchanged.
+ * On failure *out_document is null; callers own successful documents. */
+elff_xml_status elff_xml_case_render(elff_xml_document_t source,
+                                    elff_xml_document_t* out_document,
+                                    elff_xml_error* error);
+
+/** Serialize a document; this is never used to feed downstream readers. */
+elff_xml_status elff_xml_document_write_file(elff_xml_document_t document,
+                                             const char* path,
+                                             elff_xml_error* error);
+
+/** Load then render in memory. If write_diagnostic is nonzero, also write
+ * NAME.rendered.xml beside NAME.xml (otherwise append .rendered.xml).
+ * Diagnostic write failures warn on stderr but do not fail this operation.
+ * MPI callers must enable diagnostics on only one rank. */
+elff_xml_status elff_xml_case_load_rendered_file(const char* path,
+                                                int write_diagnostic,
+                                                elff_xml_document_t* out_document,
+                                                elff_xml_error* error);
+
 void
 elff_xml_document_destroy(elff_xml_document_t document);
 

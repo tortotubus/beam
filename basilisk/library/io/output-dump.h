@@ -215,7 +215,11 @@ int checkpoint_handler (double sim_time_current = t,
 #endif
 
   if (should_dump) {
-    printf ("\nWriting dumpfile %s \n", fname);
+    if (pid () == 0) {
+      fprintf (stderr, "Writing checkpoint %s: i=%d t=%.17g\n",
+               fname, sim_iter_current, sim_time_current);
+      fflush (stderr);
+    }
     for (int ci = 0; ci < checkpointers.n; ci++) {
       Checkpointer* c = &checkpointers.items[ci];
       if (!c->dump || c->dump_phase != CKPT_PHASE_PRE_DUMP)
@@ -258,6 +262,12 @@ int checkpoint_handler (double sim_time_current = t,
     }
   }
 
+  if (should_dump && pid () == 0) {
+    fprintf (stderr, "Saved checkpoint %s: i=%d t=%.17g; next i=%d t=%.17g\n",
+             fname, sim_iter_current, sim_time_current, inext, tnext);
+    fflush (stderr);
+  }
+
   if (shutdown_sig) {
     if (pid () == 0)
       fprintf (stderr, "warning: Shutdown requested (signal %d)\n", shutdown_sig);
@@ -291,7 +301,10 @@ int restore_handler (const char* basepath = NULL, scalar* slist = all) {
   }
 
   if (file_exists (fname)) {
-    printf ("Resuming simulation from checkpoint file %s\n", fname);
+    if (pid () == 0) {
+      fprintf (stderr, "Resuming simulation from checkpoint file %s\n", fname);
+      fflush (stderr);
+    }
 
     for (int ci = 0; ci < checkpointers.n; ci++) {
       Checkpointer* c = &checkpointers.items[ci];
@@ -313,7 +326,10 @@ int restore_handler (const char* basepath = NULL, scalar* slist = all) {
       }
     }
 
-    restore (fname, slist, NULL);
+    if (!restore (fname, slist, NULL)) {
+      fprintf (ferr, "restore_handler(): failed to restore %s\n", fname);
+      exit (1);
+    }
 
     for (int ci = 0; ci < checkpointers.n; ci++) {
       Checkpointer* c = &checkpointers.items[ci];
@@ -333,6 +349,10 @@ int restore_handler (const char* basepath = NULL, scalar* slist = all) {
                  path);
         exit (1);
       }
+    }
+    if (pid () == 0) {
+      fprintf (stderr, "Restored checkpoint %s: i=%d t=%.17g\n", fname, iter, t);
+      fflush (stderr);
     }
     return 1;
   } else {
