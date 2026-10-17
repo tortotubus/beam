@@ -370,6 +370,135 @@ vtkHDFImageData vtk_HDF_imagedata_init_static (scalar* scalar_list,
       free (s_data);
     }
   }
+
+  {
+    for (vector v in vector_list) {
+      char *vector_name;
+      size_t trunc_len = (size_t)(strlen(v.x.name) - 2);
+      vector_name = malloc((trunc_len + 1) * sizeof(char));
+      strncpy(vector_name, v.x.name, trunc_len);
+      vector_name[trunc_len] = '\0';
+
+#if dimension == 1
+      const hsize_t global_nx = (hsize_t)((1 << depth()) * Dimensions.x);
+      const hsize_t local_nx = (hsize_t)(1 << depth());
+
+      const hsize_t global_dims[] = {global_nx, dimension};
+      const hsize_t local_dims[] = {local_nx, dimension};
+#if _MPI && !TREE
+      const hsize_t local_offset[] = {(hsize_t)mpi_coords[0] * local_nx, 0};
+#else
+      const hsize_t local_offset[] = {0, 0};
+#endif
+      const hsize_t max_dims[] = {global_nx, dimension};
+      const hsize_t chunk_dims[] = {local_nx, dimension};
+
+      const size_t local_n = (size_t)local_nx;
+      const int rank = 2;
+
+#elif dimension == 2
+      const hsize_t global_nx = (hsize_t)((1 << depth()) * Dimensions.x);
+      const hsize_t global_ny = (hsize_t)((1 << depth()) * Dimensions.y);
+
+      const hsize_t local_nx = (hsize_t)(1 << depth());
+      const hsize_t local_ny = (hsize_t)(1 << depth());
+
+      const hsize_t global_dims[] = {global_ny, global_nx, dimension};
+      const hsize_t local_dims[] = {local_ny, local_nx, dimension};
+#if _MPI && !TREE
+      const hsize_t local_offset[] = {(hsize_t)mpi_coords[1] * local_ny,
+                                      (hsize_t)mpi_coords[0] * local_nx, 0};
+#else
+      const hsize_t local_offset[] = {0, 0, 0};
+#endif
+      const hsize_t max_dims[] = {global_ny, global_nx, dimension};
+      const hsize_t chunk_dims[] = {local_ny, local_nx, dimension};
+
+      const size_t local_n = (size_t)(local_nx * local_ny);
+      const int rank = 3;
+
+#else
+      const hsize_t global_nx = (hsize_t)((1 << depth()) * Dimensions.x);
+      const hsize_t global_ny = (hsize_t)((1 << depth()) * Dimensions.y);
+      const hsize_t global_nz = (hsize_t)((1 << depth()) * Dimensions.z);
+
+      const hsize_t local_nx = (hsize_t)(1 << depth());
+      const hsize_t local_ny = (hsize_t)(1 << depth());
+      const hsize_t local_nz = (hsize_t)(1 << depth());
+
+      const hsize_t global_dims[] = {global_nz, global_ny, global_nx,
+                                     dimension};
+      const hsize_t local_dims[] = {local_nz, local_ny, local_nx, dimension};
+#if _MPI && !TREE
+      const hsize_t local_offset[] = {(hsize_t)mpi_coords[2] * local_nz,
+                                      (hsize_t)mpi_coords[1] * local_ny,
+                                      (hsize_t)mpi_coords[0] * local_nx, 0};
+#else
+      const hsize_t local_offset[] = {0, 0, 0, 0};
+#endif
+      const hsize_t max_dims[] = {global_nz, global_ny, global_nx, dimension};
+      const hsize_t chunk_dims[] = {local_nz, local_ny, local_nx, dimension};
+
+      const size_t local_n = (size_t)(local_nx * local_ny * local_nz);
+      const int rank = 4;
+#endif
+
+      float *v_data = malloc(local_n * (size_t)dimension * sizeof(float));
+      if (!v_data) {
+        perror("malloc(v_data)");
+        exit(1);
+      }
+
+      foreach (serial) {
+#if dimension == 1
+        int i = point.i - GHOSTS;
+        size_t vtk_idx = (size_t)i;
+        v_data[vtk_idx * dimension + 0] = (float)val(v.x);
+#elif dimension == 2
+        int i = point.i - GHOSTS;
+        int j = point.j - GHOSTS;
+        size_t vtk_idx = (size_t)i + (size_t)local_nx * (size_t)j;
+        v_data[vtk_idx * dimension + 0] = (float)val(v.x);
+        v_data[vtk_idx * dimension + 1] = (float)val(v.y);
+#else
+        int i = point.i - GHOSTS;
+        int j = point.j - GHOSTS;
+        int k = point.k - GHOSTS;
+        size_t vtk_idx =
+            (size_t)i +
+            (size_t)local_nx * ((size_t)j + (size_t)local_ny * (size_t)k);
+        v_data[vtk_idx * dimension + 0] = (float)val(v.x);
+        v_data[vtk_idx * dimension + 1] = (float)val(v.y);
+        v_data[vtk_idx * dimension + 2] = (float)val(v.z);
+#endif
+      }
+
+#if COMPRESSION && _MPI
+      vtk_HDF_collective_write_compressed_dataset(
+          vector_name, v_data, H5T_IEEE_F32LE,
+          vtk_hdf_imagedata.grp_celldata_id, rank, global_dims, max_dims,
+          chunk_dims, local_dims, local_offset, COMPRESSION_LEVEL,
+          &vtk_hdf_imagedata.vtk_hdf);
+#elif COMPRESSION && !_MPI
+      vtk_HDF_write_compressed_dataset(
+          vector_name, v_data, H5T_IEEE_F32LE,
+          vtk_hdf_imagedata.grp_celldata_id, rank, global_dims, max_dims,
+          chunk_dims, COMPRESSION_LEVEL, &vtk_hdf_imagedata.vtk_hdf);
+#elif !COMPRESSION && _MPI
+      vtk_HDF_collective_write_chunked_dataset(
+          vector_name, v_data, H5T_IEEE_F32LE,
+          vtk_hdf_imagedata.grp_celldata_id, rank, global_dims, max_dims,
+          chunk_dims, local_dims, local_offset, &vtk_hdf_imagedata.vtk_hdf);
+#else // !COMPRESSION && !_MPI
+      vtk_HDF_write_dataset(vector_name, v_data, H5T_IEEE_F32LE,
+                            vtk_hdf_imagedata.grp_celldata_id, rank, local_dims,
+                            &vtk_hdf_imagedata.vtk_hdf);
+#endif
+
+      free(v_data);
+      free(vector_name);
+    }
+  }
   // {
   //   // Create the new PointData group inside group VTKHDF
   //   vtk_hdf_imagedata.grp_pointdata_id =
