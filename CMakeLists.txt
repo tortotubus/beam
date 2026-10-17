@@ -115,7 +115,10 @@ set(ELFF_DIRS
 )
 
 foreach(DIR IN LISTS ELFF_DIRS)
-  file(GLOB ELFF_DIR_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${DIR}/*.cpp")
+  file(GLOB ELFF_DIR_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/${DIR}/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/${DIR}/*.cpp"
+  )
   list(SORT ELFF_DIR_SOURCES)
   list(APPEND ELFF_SOURCES ${ELFF_DIR_SOURCES})
 endforeach()
@@ -272,6 +275,19 @@ if (ELFF_USE_HDF5)
   endif()
 endif()
 
+#
+# libxml2
+#
+
+if (ELFF_USE_LIBXML2)
+  if (ELFF_BUILD_THIRD_PARTY_LIBXML2)
+    target_link_libraries(ELFF PUBLIC LibXml2::LibXml2)
+  else()
+    find_package(LibXml2 2.14 REQUIRED)
+    target_link_libraries(ELFF PUBLIC LibXml2::LibXml2)
+  endif()
+endif()
+
 
 #
 # Basilisk
@@ -330,6 +346,18 @@ install(DIRECTORY "${ELFF_BUILD_INCLUDE_DIR}/"
   FILES_MATCHING
     PATTERN "*.h"
     PATTERN "*.hpp"
+)
+
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/io/DTD/"
+  DESTINATION "${CMAKE_INSTALL_DATADIR}/elff/dtd"
+  COMPONENT ELFF_Runtime
+  FILES_MATCHING PATTERN "*.dtd"
+)
+
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/basilisk/examples/cases/flapping_fibre.xml"
+  DESTINATION "${CMAKE_INSTALL_DATADIR}/elff/examples"
+  COMPONENT ELFF_Runtime
 )
 
 
