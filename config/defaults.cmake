@@ -21,6 +21,9 @@ option(ELFF_USE_OPENMP "Enable the use of OpenMP" OFF)
 option(ELFF_USE_HDF5 "Enable the use of HDF5" ON)
 option(ELFF_BUILD_THIRD_PARTY_HDF5 "Build HDF5" OFF)
 
+option(ELFF_USE_LIBXML2 "Enable the use of libxml2" ON)
+option(ELFF_BUILD_THIRD_PARTY_LIBXML2 "Build libxml2" OFF)
+
 option(ELFF_USE_EIGEN3 "Enable the use of Eigen3" ON)
 option(ELFF_BUILD_THIRD_PARTY_EIGEN3 "Build Eigen" OFF)
 
