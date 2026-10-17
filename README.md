@@ -119,7 +119,8 @@ values in these examples are computed from the original Banaei parameters.
 `Models distribution="round-robin"` enables static model balancing; omission
 keeps all physical models on rank zero. Model geometry and material belong in
 `ELFF`; domain, fluid, time, grid, uniform force density and output settings
-belong in `Basilisk`. Both use the same Basilisk parser as flapping-fibre.
+belong in `Basilisk`. All three cases use the common settings reader in
+`basilisk/library/io/input-case.h`; their case parser headers are independent.
 
 The XML path uses runtime-owned sparse models and writes MPI-reduced positions
 and velocities to `fibre-centres.csv`. Output intervals are simulation-time
@@ -179,3 +180,94 @@ other document readers before releasing it. The runtime copies the information
 it needs during construction. The existing runtime file factories also render
 in memory before validating the ELFF subtree. Low-level XML loading remains a
 raw parse, and legacy numeric cases need no parameter sections.
+
+### Ownership of Basilisk case XML code
+
+`basilisk/library/io/input-case.h` is the reusable, header-only reader for
+common `<Basilisk>` settings. Its `BasiliskCaseConfiguration` and
+`basilisk_case_*` functions cover domain, time, fluid, grid, output, and optional
+immersed-boundary level/force settings. They do not interpret `caseType`,
+construct models, use simulation globals, or call MPI. A solver without any
+fibre or ELFF model can use the same reader.
+
+Each template has exactly one case-specific parser header:
+`flapping_fibre_parser.h`, `single_settling_fibre_parser.h`, or
+`many_settling_fibres_parser.h`. Types and functions use that case's name.
+Each case configuration contains a `BasiliskCaseConfiguration basilisk` member;
+this composition makes the shared settings explicit. These headers initialize
+the ELFF runtime and enforce the case's model-count requirements: flapping and
+many-settling require at least one model; single-settling requires exactly one.
+They are included after the template's Basilisk/ELFF runtime headers.
+
+`basilisk_case_read` borrows an already rendered document. `basilisk_case_load`
+loads and renders once, reads the common settings, and returns an owned document
+on success (null on failure). The case initializer agrees on parsing success
+across MPI ranks, passes that same document to ELFF, and then destroys it.
+Only the designated writer requests the optional `.rendered.xml` diagnostic.
+
+Fibre-specific registration, force-refresh events, and fibre CSV statistics
+belong to each `.c` template. The two settling templates intentionally keep
+local copies rather than depending on another case or adding fibre-specific
+helpers to the library. Generic expression evaluation and XML document ownership
+remain in ELFF's XML library. Case parser headers never include each other.
+
+### Model-local XML schemas
+
+`io/DTD/ELFF/ELFF-v1.dtd` is the authoritative root schema. It owns the ELFF
+and Models declarations and includes model-local fragments using standard DTD
+external parameter entities:
+
+```dtd
+<!ENTITY % EulerBeamHuang SYSTEM "../../../models/beam/EulerBeamHuang-v1.dtd">
+%EulerBeamHuang;
+
+<!ELEMENT Models (EulerBeamHuang)+>
+```
+
+The XML element is `<EulerBeamHuang>`, matching the numerical class.
+Its construction helper is `EulerBeamHuangBuilder.hpp`, the IB
+wrapper is `IBEulerBeamHuang`, and C/Basilisk constructors use
+`ib_euler_beam_huang_*` / `elff_euler_beam_huang_*`.
+Beam solver class names omit `Inextensible` consistently (for example,
+`EulerBeamHuang`, `EulerBeamGGL`, and `EulerBeamPenalty`). This naming change
+does not alter the models’ physical constraints.
+
+Edit `models/beam/EulerBeamHuang-v1.dtd` for Huang's XML contract. To add another
+supported model, add its include and update the Models alternatives in the root
+DTD. There are no per-model CMake registrations. Runtime readers and constructors
+still need to support those model tags. Huang's parser and semantic checks live
+in `models/beam/EulerBeamHuangXML.hpp/.cpp`, beside the model and its DTD.
+`parse_euler_beam_huang_xml` reads an already-rendered node and returns an owned
+`EulerBeamHuangDefinition`; it neither constructs models nor assigns MPI ranks.
+The definition remains valid after the XML document is destroyed.
+
+`io/CXX/xmlCase.hpp` provides a small C++ view over the C XML API: `XMLNode`
+borrows a node and provides typed attribute/child reads; `XMLError` preserves
+the C status and source diagnostic. The document must outlive its node views.
+The wrapper does not load, render, or own documents. Model-specific validation
+remains in each model parser. IBRuntime dispatches to these parsers, attaches
+the model index to errors, and retains ordering, ownership, and construction.
+
+At configure time, `config/scripts/bundle_dtd.py` expands the includes into
+`build/<configuration>/generated/ELFF-v1.dtd`. Python 3.7 or newer is required
+for building, with no third-party Python packages. CMake tracks every included
+file and the bundler itself, so editing a fragment regenerates the schema on the
+next build. The runtime embeds this flattened artifact; installation copies the
+same artifact to `share/elff/dtd/ELFF/ELFF-v1.dtd`. Neither runtime validation nor
+the installed DTD needs the original fragments or a runtime entity resolver.
+
+The bundler deliberately supports a subset of DTD composition: UTF-8 files,
+comments, complete ELEMENT/ATTLIST declarations, and local relative SYSTEM
+parameter-entity includes referenced between declarations. Nested includes are
+resolved relative to the file declaring each entity, with a maximum depth of 64.
+It rejects missing files, cycles, duplicate element/entity declarations,
+undefined entities, remote or absolute SYSTEM identifiers, PUBLIC identifiers,
+internal/general entities, conditional sections, and entity substitutions inside
+declarations. It is not a general DTD validator; XML validation tests exercise
+the resulting schema. Errors report source files and lines; boundary comments
+in the generated output identify the contributing files.
+
+DTD element names are global: shared contracts must be declared once, while
+incompatible model-specific contracts require distinct names. Current XML syntax
+and schema version are unchanged. Basilisk continues to be parsed without DTD
+validation.

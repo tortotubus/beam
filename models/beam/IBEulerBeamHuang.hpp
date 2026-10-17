@@ -1,6 +1,6 @@
 #pragma once
 
-#include "elff/models/beam/EulerBeamInextensibleHuang.hpp"
+#include "elff/models/beam/EulerBeamHuang.hpp"
 #include "elff/models/ibm/IBForceCoupled.hpp"
 
 namespace ELFF {
@@ -10,13 +10,13 @@ namespace Models {
  * @brief Immersed-boundary wrapper for the Huang inextensible Euler beam
  * prototype.
  *
- * This class couples @ref EulerBeamInextensibleHuang to the immersed-boundary
+ * This class couples @ref EulerBeamHuang to the immersed-boundary
  * mesh interface by mirroring beam centerline states onto IB points and by
  * exposing checkpointing through @ref IBModel.
  */
 class IBEulerBeamHuang
   : public IBForceCoupled
-  , public EulerBeamInextensibleHuang
+  , public EulerBeamHuang
 {
 private:
   void EBMeshToIBMeshNext();

@@ -6,7 +6,7 @@ namespace Models {
 void
 IBEulerBeamADDM::EBMeshToIBMeshNext()
 {
-  EulerBeamInextensibleADDM::update_mesh();
+  EulerBeamADDM::update_mesh();
   const size_t beam_nodes = EulerBeam::mesh.get_nodes();
 
   auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
@@ -29,7 +29,7 @@ IBEulerBeamADDM::EBMeshToIBMeshNext()
 void
 IBEulerBeamADDM::EBMeshToIBMeshCurrent()
 {
-  EulerBeamInextensibleADDM::update_mesh();
+  EulerBeamADDM::update_mesh();
   const size_t beam_nodes = EulerBeam::mesh.get_nodes();
 
   auto& ib_points = IBForceCoupled::mesh.GetPoints();
@@ -55,7 +55,7 @@ IBEulerBeamADDM::IBEulerBeamADDM(real_t length,
                                  size_t nodes,
                                  EulerBeamBCs bcs,
                                  real_t r_penalty)
-  : EulerBeamInextensibleADDM(length, EI, mu, nodes, bcs, r_penalty)
+  : EulerBeamADDM(length, EI, mu, nodes, bcs, r_penalty)
   , IBForceCoupled(nodes)
 {
   const size_t beam_nodes = EulerBeam::mesh.get_nodes();
@@ -73,7 +73,7 @@ IBEulerBeamADDM::IBEulerBeamADDM(real_t length,
 void
 IBEulerBeamADDM::apply_initial_condition(EulerBeamMesh& mesh)
 {
-  EulerBeamInextensibleADDM::apply_initial_condition(mesh);
+  EulerBeamADDM::apply_initial_condition(mesh);
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }
@@ -93,7 +93,7 @@ IBEulerBeamADDM::ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
     load[ni][2] = force[ni].z;
   }
 
-  EulerBeamInextensibleADDM::solve_averaged_load(dt, load);
+  EulerBeamADDM::solve_averaged_load(dt, load);
   EBMeshToIBMeshNext();
 }
 
@@ -224,7 +224,7 @@ IBEulerBeamADDM::unpack_state(const IBModelState& s)
   have_prev_uniform_load = (s.ints[5] != 0);
   have_prev_nodal_load = (s.ints[6] != 0);
 
-  EulerBeamInextensibleADDM::update_mesh();
+  EulerBeamADDM::update_mesh();
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }

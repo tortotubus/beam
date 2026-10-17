@@ -25,8 +25,8 @@ protected:
   void SetUp() override
   {
     elff_xml_error error = {};
-    ASSERT_EQ(elff_xml_document_load_file(
-                ELFF_FLAPPING_FIBRE_CASE_PATH, &document_, &error),
+    ASSERT_EQ(elff_xml_case_load_rendered_file(
+                ELFF_FLAPPING_FIBRE_CASE_PATH, 0, &document_, &error),
               ELFF_XML_OK)
       << error.message;
   }
@@ -80,43 +80,22 @@ TEST_F(XMLCaseDocumentTest, ReadsTypedValuesFromCanonicalCase)
   EXPECT_EQ(min_level, 6);
 }
 
-TEST_F(XMLCaseDocumentTest, ValidatesOwnedSectionsIndependently)
+TEST_F(XMLCaseDocumentTest, ValidatesElffSectionWithGeneratedSchema)
 {
-  const std::string elff_dtd = read_text_file(ELFF_CASE_DTD_PATH);
-  const std::string basilisk_dtd = read_text_file(ELFF_BASILISK_DTD_PATH);
+  const std::string dtd = read_text_file(ELFF_CASE_DTD_PATH);
   elff_xml_error error = {};
   elff_xml_node_t root = nullptr;
   elff_xml_node_t elff = nullptr;
-  elff_xml_node_t basilisk = nullptr;
   char diagnostic[512] = {};
 
-  ASSERT_FALSE(elff_dtd.empty());
-  ASSERT_FALSE(basilisk_dtd.empty());
+  ASSERT_FALSE(dtd.empty());
   ASSERT_EQ(elff_xml_document_root(document_, "Case", &root, &error),
-            ELFF_XML_OK)
-    << error.message;
+            ELFF_XML_OK) << error.message;
   ASSERT_EQ(elff_xml_node_unique_child(root, "ELFF", &elff, &error),
-            ELFF_XML_OK)
-    << error.message;
-  ASSERT_EQ(elff_xml_node_unique_child(
-              root, "Basilisk", &basilisk, &error),
-            ELFF_XML_OK)
-    << error.message;
-
-  EXPECT_EQ(elff_xml_dtd_validate_node(elff,
-                                        elff_dtd.data(),
-                                        elff_dtd.size(),
-                                        diagnostic,
-                                        sizeof(diagnostic)),
-            ELFF_XML_DTD_VALID)
-    << diagnostic;
-  EXPECT_EQ(elff_xml_dtd_validate_node(basilisk,
-                                        basilisk_dtd.data(),
-                                        basilisk_dtd.size(),
-                                        diagnostic,
-                                        sizeof(diagnostic)),
-            ELFF_XML_DTD_VALID)
-    << diagnostic;
+            ELFF_XML_OK) << error.message;
+  EXPECT_EQ(elff_xml_dtd_validate_node(elff, dtd.data(), dtd.size(),
+                                       diagnostic, sizeof(diagnostic)),
+            ELFF_XML_DTD_VALID) << diagnostic;
 }
 
 TEST_F(XMLCaseDocumentTest, ReportsRequiredStringCapacity)
@@ -180,26 +159,26 @@ TEST_F(XMLCaseDocumentTest, TraversesOrderedElementChildrenOnly)
 
 TEST_F(XMLCaseDocumentTest, LoadsAndValidatesOneOwnedSection)
 {
-  const std::string dtd = read_text_file(ELFF_BASILISK_DTD_PATH);
+  const std::string dtd = read_text_file(ELFF_CASE_DTD_PATH);
   elff_xml_document_t document = nullptr;
-  elff_xml_node_t basilisk = nullptr;
+  elff_xml_node_t elff = nullptr;
   elff_xml_error error = {};
   const char* name = nullptr;
 
   ASSERT_EQ(elff_xml_case_load_section_file(ELFF_FLAPPING_FIBRE_CASE_PATH,
                                              "Case",
-                                             "Basilisk",
+                                             "ELFF",
                                              dtd.data(),
                                              dtd.size(),
                                              &document,
-                                             &basilisk,
+                                             &elff,
                                              &error),
             ELFF_XML_OK)
     << error.message;
   ASSERT_NE(document, nullptr);
-  ASSERT_NE(basilisk, nullptr);
-  ASSERT_EQ(elff_xml_node_name(basilisk, &name, &error), ELFF_XML_OK);
-  EXPECT_STREQ(name, "Basilisk");
+  ASSERT_NE(elff, nullptr);
+  ASSERT_EQ(elff_xml_node_name(elff, &name, &error), ELFF_XML_OK);
+  EXPECT_STREQ(name, "ELFF");
 
   elff_xml_document_destroy(document);
 }

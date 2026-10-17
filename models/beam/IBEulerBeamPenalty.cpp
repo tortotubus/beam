@@ -6,7 +6,7 @@ namespace Models {
 void
 IBEulerBeamPenalty::EBMeshToIBMeshNext()
 {
-  EulerBeamInextensiblePenalty::update_mesh();
+  EulerBeamPenalty::update_mesh();
 
   auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
   auto& ib_velocity = IBForceCoupled::mesh_next.GetVelocity();
@@ -28,7 +28,7 @@ IBEulerBeamPenalty::EBMeshToIBMeshNext()
 void
 IBEulerBeamPenalty::EBMeshToIBMeshCurrent()
 {
-  EulerBeamInextensiblePenalty::update_mesh();
+  EulerBeamPenalty::update_mesh();
 
   auto& ib_points = IBForceCoupled::mesh.GetPoints();
   auto& ib_velocity = IBForceCoupled::mesh.GetVelocity();
@@ -53,7 +53,7 @@ IBEulerBeamPenalty::IBEulerBeamPenalty(real_t length,
                                        size_t nodes,
                                        EulerBeamBCs bcs,
                                        real_t r_penalty)
-  : EulerBeamInextensiblePenalty(length, EI, mu, nodes, bcs, r_penalty)
+  : EulerBeamPenalty(length, EI, mu, nodes, bcs, r_penalty)
   , IBForceCoupled(nodes)
 {
   const size_t beam_nodes = EulerBeam::mesh.get_nodes();
@@ -71,7 +71,7 @@ IBEulerBeamPenalty::IBEulerBeamPenalty(real_t length,
 void
 IBEulerBeamPenalty::apply_initial_condition(EulerBeamMesh& mesh)
 {
-  EulerBeamInextensiblePenalty::apply_initial_condition(mesh);
+  EulerBeamPenalty::apply_initial_condition(mesh);
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }
@@ -89,7 +89,7 @@ IBEulerBeamPenalty::ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
     load[ni][2] = force[ni].z;
   }
 
-  EulerBeamInextensiblePenalty::solve(dt, load);
+  EulerBeamPenalty::solve(dt, load);
   EBMeshToIBMeshNext();
 }
 
@@ -153,7 +153,7 @@ IBEulerBeamPenalty::unpack_state(const IBModelState& s)
   time_iter = static_cast<size_t>(s.ints[3]);
   u_prev = u;
 
-  EulerBeamInextensiblePenalty::update_mesh();
+  EulerBeamPenalty::update_mesh();
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }

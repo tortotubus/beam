@@ -1,6 +1,6 @@
 #pragma once
 
-#include "elff/models/beam/EulerBeamInextensibleADDM.hpp"
+#include "elff/models/beam/EulerBeamADDM.hpp"
 #include "elff/models/ibm/IBForceCoupled.hpp"
 
 namespace ELFF {
@@ -10,13 +10,13 @@ namespace Models {
  * @brief Immersed-boundary wrapper for the ADDM inextensible Euler beam
  * solver.
  *
- * This class couples @ref EulerBeamInextensibleADDM with the force-coupled IB
+ * This class couples @ref EulerBeamADDM with the force-coupled IB
  * interface by mirroring the Euler-beam centerline state onto IB meshes and by
  * exposing restart support through @ref IBModel.
  */
 class IBEulerBeamADDM
   : public IBForceCoupled
-  , public EulerBeamInextensibleADDM
+  , public EulerBeamADDM
 {
 private:
   void EBMeshToIBMeshNext();

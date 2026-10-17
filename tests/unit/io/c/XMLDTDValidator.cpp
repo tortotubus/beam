@@ -2,6 +2,7 @@
 
 #include <elff/config/_config.hpp>
 #include <elff/io/C/xmlCase.h>
+#include "embeddedELFFDtd.hpp"
 
 #include <cstring>
 #include <fstream>
@@ -45,6 +46,13 @@ protected:
       << "Could not read " << ELFF_CASE_DTD_PATH;
   }
 };
+
+TEST_F(ELFFCaseDTDTest, GeneratedArtifactMatchesEmbeddedSchema)
+{
+  EXPECT_EQ(elff_case_dtd(), std::string(
+    reinterpret_cast<const char*>(elff_embedded_elff_v1_dtd),
+    elff_embedded_elff_v1_dtd_size));
+}
 
 #ifdef ELFF_USE_LIBXML2
 

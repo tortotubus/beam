@@ -20,32 +20,32 @@ if(ELFF_BUILD_THIRD_PARTY_GTEST)
         COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsBenchmark.*
     )
     add_test(
-        NAME EulerBeamDynamicInextensibleMoMSparseTest
-        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamDynamicInextensibleMoMSparseTest.*
+        NAME EulerBeamDynamicMoMSparseTest
+        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamDynamicMoMSparseTest.*
     )
     add_test(
-        NAME EulerBeamDynamicInextensibleIndex1Test
-        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamDynamicInextensibleIndex1Test.*
+        NAME EulerBeamDynamicIndex1Test
+        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamDynamicIndex1Test.*
     )
     add_test(
-        NAME EulerBeamDynamicInextensibleGGLTest
-        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamDynamicInextensibleGGLTest.*
+        NAME EulerBeamDynamicGGLTest
+        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamDynamicGGLTest.*
     )
     add_test(
-        NAME EulerBeamInextensibleGGL2Test
-        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamInextensibleGGL2Test.*
+        NAME EulerBeamGGL2Test
+        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamGGL2Test.*
     )
     add_test(
         NAME EulerBeamHuangTest
         COMMAND elff_benchmark_tests --gtest_filter=EulerBeamHuangTest.*
     )
     add_test(
-        NAME EulerBeamInextensibleMoMTest
-        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamInextensibleMoMTest.*
+        NAME EulerBeamMoMTest
+        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamMoMTest.*
     )
     add_test(
-        NAME EulerBeamStaticInextensibleMoMSparseTest
-        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamStaticInextensibleMoMSparseTest.*
+        NAME EulerBeamStaticMoMSparseTest
+        COMMAND elff_benchmark_tests --gtest_filter=EulerBeamStaticMoMSparseTest.*
     )
 else()
     gtest_discover_tests(elff_benchmark_tests)
@@ -53,17 +53,23 @@ endif()
 
 file(GLOB_RECURSE UNIT_TEST_SOURCES CONFIGURE_DEPENDS unit/*.cpp unit/*.hpp)
 add_executable(elff_unit_tests ${UNIT_TEST_SOURCES})
-target_include_directories(elff_unit_tests PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(elff_unit_tests PRIVATE
+    ${CMAKE_SOURCE_DIR} "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(elff_unit_tests PRIVATE ELFF GTest::gtest_main)
 target_compile_definitions(
     elff_unit_tests
     PRIVATE
-        ELFF_CASE_DTD_PATH="${CMAKE_SOURCE_DIR}/io/DTD/ELFF/ELFF-v1.dtd"
-        ELFF_BASILISK_DTD_PATH="${CMAKE_SOURCE_DIR}/basilisk/templates/flapping_fibre-v1.dtd"
+        ELFF_CASE_DTD_PATH="${ELFF_V1_DTD_SOURCE}"
         ELFF_FLAPPING_FIBRE_CASE_PATH="${CMAKE_SOURCE_DIR}/basilisk/examples/cases/flapping_fibre.xml"
 )
 
 if(ELFF_BUILD_THIRD_PARTY_GTEST)
+    add_test(NAME XMLNodeTest COMMAND elff_unit_tests --gtest_filter=XMLNodeTest.*)
+    add_test(NAME EulerBeamHuangXMLTest COMMAND elff_unit_tests --gtest_filter=EulerBeamHuangXMLTest.*)
+    add_test(
+        NAME BasiliskCaseReaderTest
+        COMMAND elff_unit_tests --gtest_filter=BasiliskCaseReaderTest.*
+    )
     add_test(
         NAME ELFFCaseDTDTest
         COMMAND elff_unit_tests --gtest_filter=ELFFCaseDTDTest.*
@@ -89,8 +95,8 @@ if(ELFF_BUILD_THIRD_PARTY_GTEST)
         COMMAND elff_unit_tests --gtest_filter=vtkHDFPolyDataStaticWriterTest.*
     )
     add_test(
-        NAME EulerBeamDynamicInextensibleGGLUnitTest
-        COMMAND elff_unit_tests --gtest_filter=EulerBeamDynamicInextensibleGGLUnitTest.*
+        NAME EulerBeamDynamicGGLUnitTest
+        COMMAND elff_unit_tests --gtest_filter=EulerBeamDynamicGGLUnitTest.*
     )
 else()
     gtest_discover_tests(elff_unit_tests)
@@ -146,3 +152,8 @@ if(TARGET flapping_fibre_mpi AND MPIEXEC_EXECUTABLE)
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 endif()
+
+find_package(Python3 3.7 REQUIRED COMPONENTS Interpreter)
+add_test(NAME ModelDTDGeneration
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/python/test_bundle_dtd.py")

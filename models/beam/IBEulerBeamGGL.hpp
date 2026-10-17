@@ -1,6 +1,6 @@
 #pragma once
 
-#include "elff/models/beam/EulerBeamInextensibleGGL.hpp"
+#include "elff/models/beam/EulerBeamGGL.hpp"
 #include "elff/models/ibm/IBForceCoupled.hpp"
 
 namespace ELFF {
@@ -10,13 +10,13 @@ namespace Models {
  * @brief Immersed-boundary wrapper for the full GGL inextensible Euler beam
  * solver.
  *
- * This class couples @ref EulerBeamInextensibleGGL to the immersed-boundary
+ * This class couples @ref EulerBeamGGL to the immersed-boundary
  * force interface by translating between IB mesh data and the underlying beam
  * state while preserving restart support through @ref IBModel.
  */
 class IBEulerBeamGGL
   : public IBForceCoupled
-  , public EulerBeamInextensibleGGL
+  , public EulerBeamGGL
 {
 private:
   void EBMeshToIBMeshNext();

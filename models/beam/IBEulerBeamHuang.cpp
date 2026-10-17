@@ -5,7 +5,7 @@ namespace Models {
 
 namespace {
 void
-pack_matrix(IBModelState& s, const EulerBeamInextensibleHuang::MatX3& m)
+pack_matrix(IBModelState& s, const EulerBeamHuang::MatX3& m)
 {
   for (Eigen::Index i = 0; i < m.rows(); ++i) {
     for (Eigen::Index j = 0; j < m.cols(); ++j) {
@@ -17,7 +17,7 @@ pack_matrix(IBModelState& s, const EulerBeamInextensibleHuang::MatX3& m)
 void
 unpack_matrix(const IBModelState&                  s,
               size_t&                              k,
-              EulerBeamInextensibleHuang::MatX3&   m)
+              EulerBeamHuang::MatX3&   m)
 {
   for (Eigen::Index i = 0; i < m.rows(); ++i) {
     for (Eigen::Index j = 0; j < m.cols(); ++j) {
@@ -30,7 +30,7 @@ unpack_matrix(const IBModelState&                  s,
 void
 IBEulerBeamHuang::EBMeshToIBMeshNext()
 {
-  EulerBeamInextensibleHuang::update_mesh();
+  EulerBeamHuang::update_mesh();
 
   auto& ib_points = IBForceCoupled::mesh_next.GetPoints();
   auto& ib_velocity = IBForceCoupled::mesh_next.GetVelocity();
@@ -53,7 +53,7 @@ IBEulerBeamHuang::EBMeshToIBMeshNext()
 void
 IBEulerBeamHuang::EBMeshToIBMeshCurrent()
 {
-  EulerBeamInextensibleHuang::update_mesh();
+  EulerBeamHuang::update_mesh();
 
   auto& ib_points = IBForceCoupled::mesh.GetPoints();
   auto& ib_velocity = IBForceCoupled::mesh.GetVelocity();
@@ -78,7 +78,7 @@ IBEulerBeamHuang::IBEulerBeamHuang(real_t length,
                                    real_t mu,
                                    size_t nodes,
                                    EulerBeamBCs bcs)
-  : EulerBeamInextensibleHuang(length, EI, mu, nodes, bcs)
+  : EulerBeamHuang(length, EI, mu, nodes, bcs)
   , IBForceCoupled(nodes)
 {
   const size_t beam_nodes = EulerBeam::mesh.get_nodes();
@@ -96,7 +96,7 @@ IBEulerBeamHuang::IBEulerBeamHuang(real_t length,
 void
 IBEulerBeamHuang::apply_initial_condition(EulerBeamMesh& mesh)
 {
-  EulerBeamInextensibleHuang::apply_initial_condition(mesh);
+  EulerBeamHuang::apply_initial_condition(mesh);
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }
@@ -116,7 +116,7 @@ IBEulerBeamHuang::ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
     load[ni][2] = force[ni].z;
   }
 
-  EulerBeamInextensibleHuang::solve(dt, load);
+  EulerBeamHuang::solve(dt, load);
   EBMeshToIBMeshNext();
 }
 
@@ -182,7 +182,7 @@ IBEulerBeamHuang::unpack_state(const IBModelState& s)
   initial_velocity_pending = (s.ints[3] != 0);
   implicit_bending = (s.ints[4] != 0);
 
-  EulerBeamInextensibleHuang::update_mesh();
+  EulerBeamHuang::update_mesh();
   EBMeshToIBMeshCurrent();
   EBMeshToIBMeshNext();
 }

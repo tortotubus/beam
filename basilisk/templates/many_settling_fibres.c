@@ -402,11 +402,108 @@ static void write_settling_stats(int iter,
 
 /* Triply-periodic box; periodic faces are set after the domain origin. */
 
-#include "settling_fibre_xml.h"
+#include "many_settling_fibres_parser.h"
+
+static bool settling_xml = false;
+static ManySettlingFibresCase settling_configuration;
+face vector settling_alpha[];
+scalar settling_rho[];
+
+static bool many_settling_fibres_is_xml (int argc, char **argv) {
+  if (argc != 2) return false;
+  size_t n = strlen (argv[1]);
+  return n >= 4 && !strcmp (argv[1] + n - 4, ".xml");
+}
+
+static int many_settling_fibres_load_xml (const char *path) {
+  if (many_settling_fibres_case_init (path, &settling_configuration) != 0)
+    return 1;
+  settling_xml = true;
+  L_fluid = settling_configuration.basilisk.domain_size;
+  dt_fluid = settling_configuration.basilisk.time_step;
+  minlevel = settling_configuration.basilisk.min_level;
+  maxlevel = settling_configuration.basilisk.max_level;
+  ibmlevel = settling_configuration.basilisk.immersed_boundary_level;
+  base_path = settling_configuration.basilisk.output_directory;
+  experiment_t_end = settling_configuration.basilisk.end_time;
+  experiment_output_interval = settling_configuration.basilisk.output_interval;
+  alpha = settling_alpha;
+  rho = settling_rho;
+  return 0;
+}
+
+static void many_settling_fibres_register_xml_models () {
+  ib_model_view_array_t models = elff_models ();
+  for (size_t m = 0; m < models.count; ++m) {
+    int mesh_id = ibmeshmanager_add_mesh ();
+    if (models.data[m].handle)
+      ib_euler_beam_huang_set_implicit_bending (
+        (ib_euler_beam_huang_t) models.data[m].handle,
+        experiment_huang_implicit_bending);
+    if (elff_register_model (mesh_id, (int)m, models.data[m], ibmlevel) != 0) {
+      fprintf (stderr, "Cannot register XML fibre %zu.\n", m);
+      exit (1);
+    }
+  }
+}
+
+// Sparse nodes can appear after grid adaptation or model advancement.
+event advance_interface (i++) {
+  if (settling_xml)
+    foreach_ibnode () {
+      ibval (gravity.x) = settling_configuration.basilisk.uniform_force_density[0];
+      ibval (gravity.y) = settling_configuration.basilisk.uniform_force_density[1];
+#if dimension > 2
+      ibval (gravity.z) = settling_configuration.basilisk.uniform_force_density[2];
+#endif
+    }
+}
+
+static void many_settling_fibres_xml_stats (int iteration, double time) {
+  // Position and velocity sums are weighted by nodal measure, not replicas.
+  size_t count = (size_t) ibmm.nm * 7;
+  double *values = calloc (count, sizeof (double));
+  foreach_ibnode_per_ibmesh () {
+#if _MPI
+    if (node->pid != pid ()) continue;
+#endif
+    double *v = values + 7*mesh_id;
+    double w = ibval (nweight);
+    v[0] += w;
+    v[1] += w*ibval (npos.x); v[2] += w*ibval (npos.y);
+    v[4] += w*ibval (nvel.x); v[5] += w*ibval (nvel.y);
+#if dimension > 2
+    v[3] += w*ibval (npos.z); v[6] += w*ibval (nvel.z);
+#endif
+  }
+#if _MPI
+  MPI_Allreduce (MPI_IN_PLACE, values, (int)count, MPI_DOUBLE, MPI_SUM,
+                 MPI_COMM_WORLD);
+#endif
+  if (pid () == 0) {
+    create_path (base_path);
+    char filename[4096];
+    snprintf (filename, sizeof(filename), "%s/fibre-centres.csv", base_path);
+    FILE *fp = fopen (filename, iteration == 0 ? "w" : "a");
+    if (!fp) { perror (filename); exit (1); }
+    if (iteration == 0)
+      fprintf (fp, "i,t,fibre_id,center_x,center_y,center_z,velocity_x,velocity_y,velocity_z,measure\n");
+    for (int m = 0; m < ibmm.nm; ++m) {
+      double *v = values + 7*m;
+      double inv = v[0] > 0. ? 1./v[0] : 0.;
+      fprintf (fp, "%d,%.17g,%d,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n",
+               iteration, time, m, v[1]*inv, v[2]*inv, v[3]*inv,
+               v[4]*inv, v[5]*inv, v[6]*inv, v[0]);
+    }
+    fclose (fp);
+    fprintf (stderr, "settling i=%d t=%g fibres=%d\n", iteration, time, ibmm.nm);
+  }
+  free (values);
+}
 
 int main(int argc, char **argv) {
-  if (settling_is_xml (argc, argv)) {
-    if (settling_load_xml (argv[1], false)) return 1;
+  if (many_settling_fibres_is_xml (argc, argv)) {
+    if (many_settling_fibres_load_xml (argv[1])) return 1;
   } else {
   input_file_register_option("basilisk.fluid", L_fluid, PARAM_VALUE_DOUBLE);
   input_file_register_option("basilisk.fluid", dt_fluid, PARAM_VALUE_DOUBLE);
@@ -489,8 +586,8 @@ int main(int argc, char **argv) {
 
   L0 = L_fluid;
   if (settling_xml)
-    origin(settling_configuration.origin[0], settling_configuration.origin[1],
-           settling_configuration.origin[2]);
+    origin(settling_configuration.basilisk.origin[0], settling_configuration.basilisk.origin[1],
+           settling_configuration.basilisk.origin[2]);
   else
     origin(-L_fluid / 2., -L_fluid / 2., -L_fluid / 2.);
   foreach_dimension()
@@ -523,7 +620,7 @@ int main(int argc, char **argv) {
 }
 
 event logfile(i += experiment_stats_interval; t <= experiment_t_end) {
-  if (settling_xml) { settling_xml_stats (i, t); return 0; }
+  if (settling_xml) { many_settling_fibres_xml_stats (i, t); return 0; }
   double eulerian_ibm_force_y = 0.;
 
   foreach(reduction(+:eulerian_ibm_force_y))
@@ -535,16 +632,16 @@ event logfile(i += experiment_stats_interval; t <= experiment_t_end) {
 event properties(i++) {
   foreach_face()
     {
-    muv.x[] = fm.x[] * (settling_xml ? settling_configuration.dynamic_viscosity : fluid_dynamic_viscosity);
-    if (settling_xml) settling_alpha.x[] = fm.x[] / settling_configuration.fluid_density;
+    muv.x[] = fm.x[] * (settling_xml ? settling_configuration.basilisk.dynamic_viscosity : fluid_dynamic_viscosity);
+    if (settling_xml) settling_alpha.x[] = fm.x[] / settling_configuration.basilisk.fluid_density;
   }
   if (settling_xml)
-    foreach () settling_rho[] = cm[] * settling_configuration.fluid_density;
+    foreach () settling_rho[] = cm[] * settling_configuration.basilisk.fluid_density;
 }
 
 event init(i = 0) {
   if (settling_xml) {
-    settling_register_xml_models ();
+    many_settling_fibres_register_xml_models ();
   } else {
 
   add_settling_fibres();

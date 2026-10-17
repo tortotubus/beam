@@ -5,14 +5,13 @@
 #include "library/io/output-vtk.h"
 
 #include "flapping_fibre_parser.h"
-#include "fibre_case_runtime.h"
  
 /*
   The default simulation parameters correspond to Figure 13 of
   https://doi.org/10.1016/j.jcp.2007.07.002
 */
 
-static FlappingFibreConfiguration case_configuration = {0};
+static FlappingFibreCase case_configuration = {0};
 static char *base_path = NULL;
 static double U0 = 0.;
 static double fluid_density = 1.;
@@ -40,27 +39,27 @@ pf[right] = dirichlet(0.);
 
 int main(int argc, char **argv) {
   const char *case_path = argc > 1 ? argv[1] : "flapping_fibre.xml";
-  if (fibre_case_init(case_path, &case_configuration) != 0)
+  if (flapping_fibre_case_init(case_path, &case_configuration) != 0)
     return 1;
 
   /* Setting relevant parameters for basilisk */
-  L0 = case_configuration.domain_size;
-  origin(case_configuration.origin[0], case_configuration.origin[1]);
-  U0 = case_configuration.inlet_velocity[0];
-  fluid_density = case_configuration.fluid_density;
-  fluid_viscosity = case_configuration.dynamic_viscosity;
-  minlevel = case_configuration.min_level;
-  maxlevel = case_configuration.max_level;
-  ibmlevel = case_configuration.immersed_boundary_level;
-  base_path = case_configuration.output_directory;
-  output_interval = case_configuration.output_interval;
-  end_time = case_configuration.end_time;
+  L0 = case_configuration.basilisk.domain_size;
+  origin(case_configuration.basilisk.origin[0], case_configuration.basilisk.origin[1]);
+  U0 = case_configuration.basilisk.inlet_velocity[0];
+  fluid_density = case_configuration.basilisk.fluid_density;
+  fluid_viscosity = case_configuration.basilisk.dynamic_viscosity;
+  minlevel = case_configuration.basilisk.min_level;
+  maxlevel = case_configuration.basilisk.max_level;
+  ibmlevel = case_configuration.basilisk.immersed_boundary_level;
+  base_path = case_configuration.basilisk.output_directory;
+  output_interval = case_configuration.basilisk.output_interval;
+  end_time = case_configuration.basilisk.end_time;
 #if TREE
   N = 1 << minlevel;
 #else
   N = 1 << ibmlevel;
 #endif
-  DT = case_configuration.time_step;
+  DT = case_configuration.basilisk.time_step;
   mu = muv;
   alpha = alphav;
   rho = rhov;
@@ -101,11 +100,11 @@ event init(i = 0) {
 
   foreach_ibnode_per_ibmesh() {
     node->depth = mesh->depth;
-    if (case_configuration.has_uniform_force_density) {
-      ibval(gravity.x) = case_configuration.uniform_force_density[0];
-      ibval(gravity.y) = case_configuration.uniform_force_density[1];
+    if (case_configuration.basilisk.has_uniform_force_density) {
+      ibval(gravity.x) = case_configuration.basilisk.uniform_force_density[0];
+      ibval(gravity.y) = case_configuration.basilisk.uniform_force_density[1];
 #if dimension > 2
-      ibval(gravity.z) = case_configuration.uniform_force_density[2];
+      ibval(gravity.z) = case_configuration.basilisk.uniform_force_density[2];
 #endif
     }
   }
@@ -141,12 +140,12 @@ event advance_interface(i++) {
     boundary ((scalar*) {u, ibmf});
     recover_missing_ib_force = false;
   }
-  if (case_configuration.has_uniform_force_density)
+  if (case_configuration.basilisk.has_uniform_force_density)
     foreach_ibnode () {
-      ibval(gravity.x) = case_configuration.uniform_force_density[0];
-      ibval(gravity.y) = case_configuration.uniform_force_density[1];
+      ibval(gravity.x) = case_configuration.basilisk.uniform_force_density[0];
+      ibval(gravity.y) = case_configuration.basilisk.uniform_force_density[1];
 #if dimension > 2
-      ibval(gravity.z) = case_configuration.uniform_force_density[2];
+      ibval(gravity.z) = case_configuration.basilisk.uniform_force_density[2];
 #endif
     }
 }

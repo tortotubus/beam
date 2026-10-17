@@ -1,6 +1,6 @@
 #pragma once
 
-#include "elff/models/beam/EulerBeamInextensiblePenalty.hpp"
+#include "elff/models/beam/EulerBeamPenalty.hpp"
 #include "elff/models/ibm/IBForceCoupled.hpp"
 
 namespace ELFF {
@@ -10,13 +10,13 @@ namespace Models {
  * @brief Immersed-boundary wrapper for the penalty-based inextensible Euler
  * beam solver.
  *
- * This class combines @ref EulerBeamInextensiblePenalty with the
+ * This class combines @ref EulerBeamPenalty with the
  * force-coupled IB interface so the beam can advance from immersed-boundary
  * loads while keeping its solver state available for restart operations.
  */
 class IBEulerBeamPenalty
   : public IBForceCoupled
-  , public EulerBeamInextensiblePenalty
+  , public EulerBeamPenalty
 {
 private:
   void EBMeshToIBMeshNext();
