@@ -1,4 +1,4 @@
-#include "elff/io/C/xmlDTDValidator.h"
+#include "elff/io/C/xmlCase.h"
 
 #include "elff/config/_config.hpp"
 

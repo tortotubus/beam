@@ -34,7 +34,6 @@ double b_length = 1.;
 coord b_s0 = {-1. / 2., 0., 0.};
 int b_nodes = 67;
 double b_theta = 0.00;
-int b_pid = 0;
 
 /* Nonphysical experiment controls */
 double experiment_ib_force_relaxation = 0.8;
@@ -153,7 +152,8 @@ event properties(i++) {
 event init(i = 0) {
   ib_euler_beam_bcs_t b_bcs = elff_euler_beam_bcs_types(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
   int m_id = ibmeshmanager_add_mesh();
-  IBMeshModel beam_model = elff_euler_beam_huang_new_theta(b_length, b_EI, b_mu, b_nodes, b_theta, b_bcs, b_s0, b_pid);
+  IBMeshModel beam_model = elff_euler_beam_huang_new_theta(
+    b_length, b_EI, b_mu, b_nodes, b_theta, b_bcs, b_s0);
   ib_euler_beam_huang_set_implicit_bending((ib_euler_beam_huang_t) beam_model.ctx,
                                            experiment_huang_implicit_bending);
   ibmeshmanager_set_model(m_id, beam_model);
@@ -262,4 +262,9 @@ event adapt(i++) {
 
 event checkpoint_event(i++, last) {
   return checkpoint_handler(t, i, base_path);
+}
+
+event elff_cleanup(i = end, last) {
+  ibmeshmanager_free();
+  elff_deinit();
 }

@@ -1,7 +1,9 @@
 #pragma once
 
 #if _MPI
-#define ELFF_USE_MPI
+#ifndef ELFF_USE_MPI
+#define ELFF_USE_MPI 1
+#endif
 #endif
 
 #include "library/io/output-dump.h"
@@ -14,6 +16,7 @@
 // ============================================================================
 
 static ib_runtime_t elff_runtime = NULL;
+static ib_model_view_array_t elff_model_views = {0};
 
 // ============================================================================
 // Function declarations
@@ -21,7 +24,9 @@ static ib_runtime_t elff_runtime = NULL;
 
 static inline ib_runtime_t elff_runtime_get ();
 static inline void elff_runtime_init ();
-static inline int elff_runtime_register (ib_model_t model, int pid);
+static inline int elff_init (const char* case_path, ib_runtime_error* error);
+static inline ib_model_view_array_t elff_models ();
+static inline void elff_deinit ();
 static inline int elff_dump (const char* fname);
 static inline int elff_write_polydata (const char* fname, int overwrite);
 static inline int output_hdf_elff_pd_series (const char* basename,
@@ -68,6 +73,57 @@ static inline ib_runtime_t elff_runtime_get () {
   return elff_runtime;
 }
 
+/** Create and seal the global runtime from the ordered <ELFF><Models> list. */
+static inline int elff_init (const char* case_path, ib_runtime_error* error) {
+  if (!case_path || elff_runtime)
+    return -1;
+  if (ib_runtime_create_from_case_file (case_path, &elff_runtime, error) != 0)
+    return -1;
+#if _MPI && defined(ELFF_USE_MPI)
+  if (ib_runtime_set_communicator (elff_runtime, MPI_COMM_WORLD) != 0) {
+    ib_runtime_delete (elff_runtime);
+    elff_runtime = NULL;
+    return -1;
+  }
+#endif
+  if (ib_runtime_get_model_views (elff_runtime, &elff_model_views) != 0) {
+    ib_runtime_delete (elff_runtime);
+    elff_runtime = NULL;
+    elff_model_views = (ib_model_view_array_t) {0};
+    return -1;
+  }
+
+  static bool registered = false;
+  if (!registered) {
+    checkpointer_register (
+      (Checkpointer) {.filename = ".elff",
+                      .dump_phase = CKPT_PHASE_POST_DUMP,
+                      .dump = elff_checkpoint_dump,
+                      .restore_phase = CKPT_PHASE_POST_RESTORE,
+                      .restore = elff_checkpoint_restore,
+                      .ctx = NULL});
+    registered = true;
+  }
+  return 0;
+}
+
+/** Return the stable borrowed view array for the global sealed runtime. */
+static inline ib_model_view_array_t elff_models () {
+  ib_model_view_array_t views = {0};
+  if (elff_runtime &&
+      ib_runtime_get_model_views (elff_runtime, &views) == 0)
+    return views;
+  return views;
+}
+
+/** Destroy all runtime-owned models after Basilisk adapters have been freed. */
+static inline void elff_deinit () {
+  if (elff_runtime)
+    ib_runtime_delete (elff_runtime);
+  elff_runtime = NULL;
+  elff_model_views = (ib_model_view_array_t) {0};
+}
+
 /**
  * @brief
  */
@@ -78,21 +134,6 @@ static inline void elff_runtime_init () {
 /**
  * @brief
  */
-static inline int elff_runtime_register (ib_model_t model, int pid = 0) {
-  if (!model)
-    return -1;
-
-  ib_runtime_t runtime = elff_runtime_get ();
-  int id = ib_runtime_register (runtime, model);
-  if (id < 0)
-    return id;
-
-  if (ib_runtime_set_pid (runtime, model, pid) != 0)
-    return -1;
-
-  return id;
-}
-
 /**
  * @brief
  */
@@ -206,8 +247,5 @@ static inline int elff_checkpoint_restore (const char* path, void* ctx) {
  * @brief
  */
 static inline void elff_runtime_free () {
-  if (!elff_runtime)
-    return;
-  ib_runtime_delete (elff_runtime);
-  elff_runtime = NULL;
+  elff_deinit ();
 }

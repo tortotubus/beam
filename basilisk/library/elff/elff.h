@@ -1,3 +1,8 @@
+#if _MPI
+#ifndef ELFF_USE_MPI
+#define ELFF_USE_MPI 1
+#endif
+#endif
 
 #include "elff/c/models/beam/IBEulerBeam.h"
 #include "elff/c/models/beam/IBEulerBeamADDM.h"
@@ -47,7 +52,6 @@ int elff_vc_node_count (void* ctx);
 int elff_vc_sync (void* ctx, void* mesh);
 int elff_vc_midpoint (void* ctx, void* mesh, double dt);
 int elff_vc_advance (void* ctx, void* mesh, double dt);
-void elff_capsule_destroy (void* ctx);
 
 static inline vertex_t elff_vertex_from_coord (coord value) {
   vertex_t out = {0};
@@ -57,15 +61,14 @@ static inline vertex_t elff_vertex_from_coord (coord value) {
   return out;
 }
 
-static inline IBMeshModel elff_velocity_coupled_model (void* ctx,
-                                                       void (*destroy) (void*)) {
+static inline IBMeshModel elff_velocity_coupled_model (void* ctx) {
   IBMeshModel ib_model = ibmeshmodel_velocity_coupled_init ();
   ib_model.ctx = ctx;
   ib_model.velocity_ops->node_count = elff_vc_node_count;
   ib_model.velocity_ops->sync = elff_vc_sync;
   ib_model.velocity_ops->midpoint = elff_vc_midpoint;
   ib_model.velocity_ops->advance = elff_vc_advance;
-  ib_model.velocity_ops->destroy = destroy;
+  ib_model.velocity_ops->destroy = NULL;
   return ib_model;
 }
 
@@ -195,10 +198,6 @@ trace int elff_vc_advance (void* ctx, void* mesh, double dt) {
   return 0;
 }
 
-void elff_capsule_destroy (void* ctx) {
-  ib_capsule_destroy ((ib_capsule_t) ctx);
-}
-
 // ============================================================================
 // ELFF Force-Coupled Operations
 // ============================================================================
@@ -280,6 +279,26 @@ trace void elff_fc_advance (void* ctx, void* mesh, double dt) {
   ib_mesh_free (&elff_mesh);
 }
 
+static inline IBMeshModel elff_force_coupled_model (void* ctx) {
+  IBMeshModel model = ibmeshmodel_force_coupled_init ();
+  model.ctx = ctx;
+  model.force_ops->node_count = elff_fc_node_count;
+  model.force_ops->sync = elff_fc_sync;
+  model.force_ops->advance = elff_fc_advance;
+  model.force_ops->destroy = NULL;
+  return model;
+}
+
+/** Install a non-owning Basilisk adapter for one runtime-owned view. */
+static inline IBMeshModel elff_model_from_view (ib_model_view_t view) {
+  if (view.kind == IB_MODEL_VIEW_FORCE_COUPLED)
+    return elff_force_coupled_model (view.handle);
+  if (view.kind == IB_MODEL_VIEW_VELOCITY_COUPLED)
+    return elff_velocity_coupled_model (view.handle);
+  IBMeshModel invalid = {0};
+  return invalid;
+}
+
 // ============================================================================
 // ELFF EulerBernoulli Beam
 // ============================================================================
@@ -290,8 +309,7 @@ IBMeshModel elff_euler_beam_new (double length,
                                  int nodes,
                                  double r_penalty,
                                  ib_euler_beam_bcs_t bcs,
-                                 coord s0,
-                                 int pid);
+                                 coord s0);
 
 IBMeshModel elff_euler_beam_new_theta (double length,
                                        double EI,
@@ -300,10 +318,7 @@ IBMeshModel elff_euler_beam_new_theta (double length,
                                        double r_penalty,
                                        double theta,
                                        ib_euler_beam_bcs_t bcs,
-                                       coord s0,
-                                       int pid);
-
-void elff_euler_beam_destroy (void* ctx);
+                                       coord s0);
 
 IBMeshModel elff_euler_beam_penalty_new (double length,
                                          double EI,
@@ -311,8 +326,7 @@ IBMeshModel elff_euler_beam_penalty_new (double length,
                                          int nodes,
                                          double r_penalty,
                                          ib_euler_beam_bcs_t bcs,
-                                         coord s0,
-                                         int pid);
+                                         coord s0);
 IBMeshModel elff_euler_beam_penalty_new_theta (double length,
                                                double EI,
                                                double mu,
@@ -320,17 +334,14 @@ IBMeshModel elff_euler_beam_penalty_new_theta (double length,
                                                double r_penalty,
                                                double theta,
                                                ib_euler_beam_bcs_t bcs,
-                                               coord s0,
-                                               int pid);
-void elff_euler_beam_penalty_destroy (void* ctx);
+                                               coord s0);
 IBMeshModel elff_euler_beam_ggl_new (double length,
                                      double EI,
                                      double mu,
                                      int nodes,
                                      double r_penalty,
                                      ib_euler_beam_bcs_t bcs,
-                                     coord s0,
-                                     int pid);
+                                     coord s0);
 IBMeshModel elff_euler_beam_ggl_new_theta (double length,
                                            double EI,
                                            double mu,
@@ -338,17 +349,14 @@ IBMeshModel elff_euler_beam_ggl_new_theta (double length,
                                            double r_penalty,
                                            double theta,
                                            ib_euler_beam_bcs_t bcs,
-                                           coord s0,
-                                           int pid);
-void elff_euler_beam_ggl_destroy (void* ctx);
+                                           coord s0);
 IBMeshModel elff_euler_beam_addm_new (double length,
                                       double EI,
                                       double mu,
                                       int nodes,
                                       double r_penalty,
                                       ib_euler_beam_bcs_t bcs,
-                                      coord s0,
-                                      int pid);
+                                      coord s0);
 IBMeshModel elff_euler_beam_addm_new_theta (double length,
                                             double EI,
                                             double mu,
@@ -356,51 +364,42 @@ IBMeshModel elff_euler_beam_addm_new_theta (double length,
                                             double r_penalty,
                                             double theta,
                                             ib_euler_beam_bcs_t bcs,
-                                            coord s0,
-                                            int pid);
-void elff_euler_beam_addm_destroy (void* ctx);
+                                            coord s0);
 IBMeshModel elff_euler_beam_huang_new (double length,
                                        double EI,
                                        double mu,
                                        int nodes,
                                        ib_euler_beam_bcs_t bcs,
-                                       coord s0,
-                                       int pid);
+                                       coord s0);
 IBMeshModel elff_euler_beam_huang_new_theta (double length,
                                              double EI,
                                              double mu,
                                              int nodes,
                                              double theta,
                                              ib_euler_beam_bcs_t bcs,
-                                             coord s0,
-                                             int pid);
+                                             coord s0);
 IBMeshModel elff_euler_beam_huang_new_direction (double length,
                                                  double EI,
                                                  double mu,
                                                  int nodes,
                                                  coord direction,
                                                  ib_euler_beam_bcs_t bcs,
-                                                 coord s0,
-                                                 int pid);
-void elff_euler_beam_huang_destroy (void* ctx);
+                                                 coord s0);
 
 IBMeshModel elff_capsule_sphere_new (double radius,
                                      coord center,
                                      int refinements,
-                                     double elastic_modulus,
-                                     int pid);
+                                     double elastic_modulus);
 
 IBMeshModel elff_capsule_ellipsoid_new (coord radii,
                                         coord center,
                                         int refinements,
-                                        double elastic_modulus,
-                                        int pid);
+                                        double elastic_modulus);
 
 IBMeshModel elff_capsule_biconcave_new (double radius,
                                         coord center,
                                         int refinements,
-                                        double elastic_modulus,
-                                        int pid);
+                                        double elastic_modulus);
 
 IBMeshModel elff_rigid_body_circle_new (double radius,
                                         int point_count,
@@ -408,9 +407,7 @@ IBMeshModel elff_rigid_body_circle_new (double radius,
                                         coord center,
                                         coord velocity,
                                         double angle,
-                                        double angular_velocity_z,
-                                        int pid);
-void elff_rigid_body_circle_destroy (void* ctx);
+                                        double angular_velocity_z);
 
 IBMeshModel elff_rigid_body_fibre_new (double length,
                                        double diameter,
@@ -420,17 +417,13 @@ IBMeshModel elff_rigid_body_fibre_new (double length,
                                        coord velocity,
                                        double q_w,
                                        coord q_xyz,
-                                       coord angular_velocity_body,
-                                       int pid);
-void elff_rigid_body_fibre_destroy (void* ctx);
+                                       coord angular_velocity_body);
 
 IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
                                                int point_count,
                                                double density,
                                                coord center,
-                                               double angle,
-                                               int pid);
-void elff_pinned_rigid_body_circle_destroy (void* ctx);
+                                               double angle);
 
 IBMeshModel elff_pinned_rigid_body_fibre_new (double length,
                                               double diameter,
@@ -438,9 +431,7 @@ IBMeshModel elff_pinned_rigid_body_fibre_new (double length,
                                               double linear_density,
                                               coord center,
                                               double q_w,
-                                              coord q_xyz,
-                                              int pid);
-void elff_pinned_rigid_body_fibre_destroy (void* ctx);
+                                              coord q_xyz);
 
 IBMeshModel elff_rigid_body_sphere_new (double radius,
                                         int point_count,
@@ -449,18 +440,14 @@ IBMeshModel elff_rigid_body_sphere_new (double radius,
                                         coord velocity,
                                         double q_w,
                                         coord q_xyz,
-                                        coord angular_velocity_body,
-                                        int pid);
-void elff_rigid_body_sphere_destroy (void* ctx);
+                                        coord angular_velocity_body);
 
 IBMeshModel elff_pinned_rigid_body_sphere_new (double radius,
                                                int point_count,
                                                double density,
                                                coord center,
                                                double q_w,
-                                               coord q_xyz,
-                                               int pid);
-void elff_pinned_rigid_body_sphere_destroy (void* ctx);
+                                               coord q_xyz);
 
 /**
  * @brief
@@ -471,13 +458,10 @@ IBMeshModel elff_euler_beam_new (double length,
                                  int nodes,
                                  double r_penalty,
                                  ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                 coord s0 = {0},
-                                 int pid = 0) {
+                                 coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_t beam_ptr =
-    ib_euler_beam_new (v0, bcs, length, EI, mu, nodes, r_penalty);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    ib_euler_beam_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -485,7 +469,7 @@ IBMeshModel elff_euler_beam_new (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
 }
@@ -500,13 +484,10 @@ IBMeshModel elff_euler_beam_new_theta (double length,
                                        double r_penalty,
                                        double theta,
                                        ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                       coord s0 = {0},
-                                       int pid = 0) {
+                                       coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_t beam_ptr = ib_euler_beam_new_theta (
-    v0, bcs, length, EI, mu, nodes, r_penalty, theta);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -514,17 +495,9 @@ IBMeshModel elff_euler_beam_new_theta (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_euler_beam_destroy (void* ctx) {
-  ib_euler_beam_t handle = (ib_euler_beam_t) ctx;
-  ib_euler_beam_destroy (handle);
 }
 
 /**
@@ -536,13 +509,10 @@ IBMeshModel elff_euler_beam_penalty_new (double length,
                                          int nodes,
                                          double r_penalty,
                                          ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                         coord s0 = {0},
-                                         int pid = 0) {
+                                         coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new (
-    v0, bcs, length, EI, mu, nodes, r_penalty);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -550,7 +520,7 @@ IBMeshModel elff_euler_beam_penalty_new (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_penalty_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
 }
@@ -565,13 +535,10 @@ IBMeshModel elff_euler_beam_penalty_new_theta (double length,
                                                double r_penalty,
                                                double theta,
                                                ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                               coord s0 = {0},
-                                               int pid = 0) {
+                                               coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new_theta (
-    v0, bcs, length, EI, mu, nodes, r_penalty, theta);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -579,17 +546,9 @@ IBMeshModel elff_euler_beam_penalty_new_theta (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_penalty_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_euler_beam_penalty_destroy (void* ctx) {
-  ib_euler_beam_penalty_t handle = (ib_euler_beam_penalty_t) ctx;
-  ib_euler_beam_penalty_destroy (handle);
 }
 
 /**
@@ -601,13 +560,10 @@ IBMeshModel elff_euler_beam_ggl_new (double length,
                                      int nodes,
                                      double r_penalty,
                                      ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                     coord s0 = {0},
-                                     int pid = 0) {
+                                     coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_ggl_t beam_ptr =
-    ib_euler_beam_ggl_new (v0, bcs, length, EI, mu, nodes, r_penalty);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    ib_euler_beam_ggl_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -615,7 +571,7 @@ IBMeshModel elff_euler_beam_ggl_new (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_ggl_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
 }
@@ -630,13 +586,10 @@ IBMeshModel elff_euler_beam_ggl_new_theta (double length,
                                            double r_penalty,
                                            double theta,
                                            ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                           coord s0 = {0},
-                                           int pid = 0) {
+                                           coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_ggl_t beam_ptr = ib_euler_beam_ggl_new_theta (
-    v0, bcs, length, EI, mu, nodes, r_penalty, theta);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -644,14 +597,9 @@ IBMeshModel elff_euler_beam_ggl_new_theta (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_ggl_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-void elff_euler_beam_ggl_destroy (void* ctx) {
-  ib_euler_beam_ggl_t handle = (ib_euler_beam_ggl_t) ctx;
-  ib_euler_beam_ggl_destroy (handle);
 }
 
 /**
@@ -663,13 +611,10 @@ IBMeshModel elff_euler_beam_addm_new (double length,
                                       int nodes,
                                       double r_penalty,
                                       ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                      coord s0 = {0},
-                                      int pid = 0) {
+                                      coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_addm_t beam_ptr = ib_euler_beam_addm_new (
-    v0, bcs, length, EI, mu, nodes, r_penalty);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -677,7 +622,7 @@ IBMeshModel elff_euler_beam_addm_new (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_addm_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
 }
@@ -692,13 +637,10 @@ IBMeshModel elff_euler_beam_addm_new_theta (double length,
                                             double r_penalty,
                                             double theta,
                                             ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                            coord s0 = {0},
-                                            int pid = 0) {
+                                            coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_addm_t beam_ptr = ib_euler_beam_addm_new_theta (
-    v0, bcs, length, EI, mu, nodes, r_penalty, theta);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -706,17 +648,9 @@ IBMeshModel elff_euler_beam_addm_new_theta (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_addm_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_euler_beam_addm_destroy (void* ctx) {
-  ib_euler_beam_addm_t handle = (ib_euler_beam_addm_t) ctx;
-  ib_euler_beam_addm_destroy (handle);
 }
 
 /**
@@ -727,13 +661,10 @@ IBMeshModel elff_euler_beam_huang_new (double length,
                                        double mu,
                                        int nodes,
                                        ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                       coord s0 = {0},
-                                       int pid = 0) {
+                                       coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_huang_t beam_ptr =
-    ib_euler_beam_huang_new (v0, bcs, length, EI, mu, nodes);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    ib_euler_beam_huang_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -741,7 +672,7 @@ IBMeshModel elff_euler_beam_huang_new (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_huang_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
 }
@@ -755,13 +686,10 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
                                              int nodes,
                                              double theta,
                                              ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                             coord s0 = {0},
-                                             int pid = 0) {
+                                             coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_theta (
-    v0, bcs, length, EI, mu, nodes, theta);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, theta);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -769,7 +697,7 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_huang_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
 }
@@ -784,14 +712,11 @@ IBMeshModel elff_euler_beam_huang_new_direction (
   int nodes,
   coord direction,
   ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-  coord s0 = {0},
-  int pid = 0) {
+  coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   vertex_t tangent = {direction.x, direction.y, direction.z};
   ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_direction (
-    v0, bcs, length, EI, mu, nodes, tangent);
-
-  elff_runtime_register ((ib_model_t) beam_ptr, pid);
+    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, tangent);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -799,17 +724,9 @@ IBMeshModel elff_euler_beam_huang_new_direction (
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_euler_beam_huang_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_euler_beam_huang_destroy (void* ctx) {
-  ib_euler_beam_huang_t handle = (ib_euler_beam_huang_t) ctx;
-  ib_euler_beam_huang_destroy (handle);
 }
 
 /**
@@ -818,14 +735,11 @@ void elff_euler_beam_huang_destroy (void* ctx) {
 IBMeshModel elff_capsule_sphere_new (double radius,
                                      coord center = {0},
                                      int refinements = 0,
-                                     double elastic_modulus = 1.,
-                                     int pid = 0) {
+                                     double elastic_modulus = 1.) {
   ib_capsule_t capsule_ptr = ib_capsule_sphere_new (
-    radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
+    elff_runtime_get (), radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
 
-  elff_runtime_register ((ib_model_t) capsule_ptr, pid);
-
-  return elff_velocity_coupled_model (capsule_ptr, elff_capsule_destroy);
+  return elff_velocity_coupled_model (capsule_ptr);
 }
 
 /**
@@ -834,17 +748,15 @@ IBMeshModel elff_capsule_sphere_new (double radius,
 IBMeshModel elff_capsule_ellipsoid_new (coord radii,
                                         coord center = {0},
                                         int refinements = 0,
-                                        double elastic_modulus = 1.,
-                                        int pid = 0) {
+                                        double elastic_modulus = 1.) {
   ib_capsule_t capsule_ptr = ib_capsule_ellipsoid_new (
+    elff_runtime_get (),
     elff_vertex_from_coord (radii),
     elff_vertex_from_coord (center),
     refinements,
     elastic_modulus);
 
-  elff_runtime_register ((ib_model_t) capsule_ptr, pid);
-
-  return elff_velocity_coupled_model (capsule_ptr, elff_capsule_destroy);
+  return elff_velocity_coupled_model (capsule_ptr);
 }
 
 /**
@@ -853,14 +765,11 @@ IBMeshModel elff_capsule_ellipsoid_new (coord radii,
 IBMeshModel elff_capsule_biconcave_new (double radius,
                                         coord center = {0},
                                         int refinements = 0,
-                                        double elastic_modulus = 1.,
-                                        int pid = 0) {
+                                        double elastic_modulus = 1.) {
   ib_capsule_t capsule_ptr = ib_capsule_biconcave_new (
-    radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
+    elff_runtime_get (), radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
 
-  elff_runtime_register ((ib_model_t) capsule_ptr, pid);
-
-  return elff_velocity_coupled_model (capsule_ptr, elff_capsule_destroy);
+  return elff_velocity_coupled_model (capsule_ptr);
 }
 
 /**
@@ -872,14 +781,11 @@ IBMeshModel elff_rigid_body_circle_new (double radius,
                                         coord center = {0},
                                         coord velocity = {0},
                                         double angle = 0.,
-                                        double angular_velocity_z = 0.,
-                                        int pid = 0) {
+                                        double angular_velocity_z = 0.) {
   vertex_t x = {center.x, center.y, center.z};
   vertex_t v = {velocity.x, velocity.y, velocity.z};
   ib_rigid_body_circle_t body_ptr = ib_rigid_body_circle_new (
-    radius, point_count, density, x, v, angle, angular_velocity_z);
-
-  elff_runtime_register ((ib_model_t) body_ptr, pid);
+    elff_runtime_get (), radius, point_count, density, x, v, angle, angular_velocity_z);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -887,17 +793,9 @@ IBMeshModel elff_rigid_body_circle_new (double radius,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_rigid_body_circle_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_rigid_body_circle_destroy (void* ctx) {
-  ib_rigid_body_circle_t handle = (ib_rigid_body_circle_t) ctx;
-  ib_rigid_body_circle_destroy (handle);
 }
 
 /**
@@ -911,8 +809,7 @@ IBMeshModel elff_rigid_body_fibre_new (double length,
                                        coord velocity = {0},
                                        double q_w = 1.,
                                        coord q_xyz = {0},
-                                       coord angular_velocity_body = {0},
-                                       int pid = 0) {
+                                       coord angular_velocity_body = {0}) {
   vertex_t x = {center.x, center.y, center.z};
   vertex_t v = {velocity.x, velocity.y, velocity.z};
   quaternion_t q = {q_w, q_xyz.x, q_xyz.y, q_xyz.z};
@@ -921,9 +818,7 @@ IBMeshModel elff_rigid_body_fibre_new (double length,
                     angular_velocity_body.z};
 
   ib_rigid_body_fibre_t body_ptr = ib_rigid_body_fibre_new (
-    length, diameter, nodes, linear_density, x, v, q, omega);
-
-  elff_runtime_register ((ib_model_t) body_ptr, pid);
+    elff_runtime_get (), length, diameter, nodes, linear_density, x, v, q, omega);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -931,17 +826,9 @@ IBMeshModel elff_rigid_body_fibre_new (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_rigid_body_fibre_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_rigid_body_fibre_destroy (void* ctx) {
-  ib_rigid_body_fibre_t handle = (ib_rigid_body_fibre_t) ctx;
-  ib_rigid_body_fibre_destroy (handle);
 }
 
 /**
@@ -951,13 +838,10 @@ IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
                                                int point_count,
                                                double density,
                                                coord center = {0},
-                                               double angle = 0.,
-                                               int pid = 0) {
+                                               double angle = 0.) {
   vertex_t x = {center.x, center.y, center.z};
   ib_pinned_rigid_body_circle_t body_ptr =
-    ib_pinned_rigid_body_circle_new (radius, point_count, density, x, angle);
-
-  elff_runtime_register ((ib_model_t) body_ptr, pid);
+    ib_pinned_rigid_body_circle_new (elff_runtime_get (), radius, point_count, density, x, angle);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -965,17 +849,9 @@ IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_pinned_rigid_body_circle_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_pinned_rigid_body_circle_destroy (void* ctx) {
-  ib_pinned_rigid_body_circle_t handle = (ib_pinned_rigid_body_circle_t) ctx;
-  ib_pinned_rigid_body_circle_destroy (handle);
 }
 
 /**
@@ -987,15 +863,12 @@ IBMeshModel elff_pinned_rigid_body_fibre_new (double length,
                                               double linear_density,
                                               coord center = {0},
                                               double q_w = 1.,
-                                              coord q_xyz = {0},
-                                              int pid = 0) {
+                                              coord q_xyz = {0}) {
   vertex_t x = {center.x, center.y, center.z};
   quaternion_t q = {q_w, q_xyz.x, q_xyz.y, q_xyz.z};
 
   ib_pinned_rigid_body_fibre_t body_ptr = ib_pinned_rigid_body_fibre_new (
-    length, diameter, nodes, linear_density, x, q);
-
-  elff_runtime_register ((ib_model_t) body_ptr, pid);
+    elff_runtime_get (), length, diameter, nodes, linear_density, x, q);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -1003,17 +876,9 @@ IBMeshModel elff_pinned_rigid_body_fibre_new (double length,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_pinned_rigid_body_fibre_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_pinned_rigid_body_fibre_destroy (void* ctx) {
-  ib_pinned_rigid_body_fibre_t handle = (ib_pinned_rigid_body_fibre_t) ctx;
-  ib_pinned_rigid_body_fibre_destroy (handle);
 }
 
 /**
@@ -1026,8 +891,7 @@ IBMeshModel elff_rigid_body_sphere_new (double radius,
                                         coord velocity = {0},
                                         double q_w = 1.,
                                         coord q_xyz = {0},
-                                        coord angular_velocity_body = {0},
-                                        int pid = 0) {
+                                        coord angular_velocity_body = {0}) {
   vertex_t x = {center.x, center.y, center.z};
   vertex_t v = {velocity.x, velocity.y, velocity.z};
   quaternion_t q = {q_w, q_xyz.x, q_xyz.y, q_xyz.z};
@@ -1036,9 +900,7 @@ IBMeshModel elff_rigid_body_sphere_new (double radius,
                     angular_velocity_body.z};
 
   ib_rigid_body_sphere_t body_ptr =
-    ib_rigid_body_sphere_new (radius, point_count, density, x, v, q, omega);
-
-  elff_runtime_register ((ib_model_t) body_ptr, pid);
+    ib_rigid_body_sphere_new (elff_runtime_get (), radius, point_count, density, x, v, q, omega);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -1046,17 +908,9 @@ IBMeshModel elff_rigid_body_sphere_new (double radius,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_rigid_body_sphere_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_rigid_body_sphere_destroy (void* ctx) {
-  ib_rigid_body_sphere_t handle = (ib_rigid_body_sphere_t) ctx;
-  ib_rigid_body_sphere_destroy (handle);
 }
 
 /**
@@ -1067,15 +921,12 @@ IBMeshModel elff_pinned_rigid_body_sphere_new (double radius,
                                                double density,
                                                coord center = {0},
                                                double q_w = 1.,
-                                               coord q_xyz = {0},
-                                               int pid = 0) {
+                                               coord q_xyz = {0}) {
   vertex_t x = {center.x, center.y, center.z};
   quaternion_t q = {q_w, q_xyz.x, q_xyz.y, q_xyz.z};
 
   ib_pinned_rigid_body_sphere_t body_ptr =
-    ib_pinned_rigid_body_sphere_new (radius, point_count, density, x, q);
-
-  elff_runtime_register ((ib_model_t) body_ptr, pid);
+    ib_pinned_rigid_body_sphere_new (elff_runtime_get (), radius, point_count, density, x, q);
 
   IBMeshModel ib_model = ibmeshmodel_force_coupled_init ();
 
@@ -1083,16 +934,7 @@ IBMeshModel elff_pinned_rigid_body_sphere_new (double radius,
   ib_model.force_ops->node_count = elff_fc_node_count;
   ib_model.force_ops->sync = elff_fc_sync;
   ib_model.force_ops->advance = elff_fc_advance;
-  ib_model.force_ops->destroy = elff_pinned_rigid_body_sphere_destroy;
+  ib_model.force_ops->destroy = NULL;
 
   return ib_model;
-}
-
-/**
- * @brief
- */
-void elff_pinned_rigid_body_sphere_destroy (void* ctx) {
-  ib_pinned_rigid_body_sphere_t handle =
-    (ib_pinned_rigid_body_sphere_t) ctx;
-  ib_pinned_rigid_body_sphere_destroy (handle);
 }

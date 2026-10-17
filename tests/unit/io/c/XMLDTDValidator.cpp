@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <elff/config/_config.hpp>
-#include <elff/io/C/xmlDTDValidator.h>
+#include <elff/io/C/xmlCase.h>
 
 #include <cstring>
 #include <fstream>
@@ -13,17 +13,15 @@ namespace {
 constexpr char valid_elff_xml[] = R"XML(
 <ELFF schemaVersion="1" dimensions="2" units="nondimensional">
   <Models>
-    <Model id="fibre">
-      <EulerBeamHuang>
-        <Geometry length="1" nodes="65"/>
-        <Material bendingRigidity="0.001" linearDensity="1.5"/>
-        <InitialLine anchorEnd="right">
-          <Anchor x="0" y="0" z="0"/>
-          <Direction x="1" y="0" z="0"/>
-        </InitialLine>
-        <BoundaryConditions left="free" right="simple"/>
-      </EulerBeamHuang>
-    </Model>
+    <EulerBeamHuang>
+      <Geometry length="1" nodes="65"/>
+      <Material bendingRigidity="0.001" linearDensity="1.5"/>
+      <InitialLine anchorEnd="right">
+        <Anchor x="0" y="0" z="0"/>
+        <Direction x="1" y="0" z="0"/>
+      </InitialLine>
+      <BoundaryConditions left="free" right="simple"/>
+    </EulerBeamHuang>
   </Models>
 </ELFF>
 )XML";
@@ -86,11 +84,11 @@ TEST_F(ELFFCaseDTDTest, AcceptsVersionOneElffSection)
   EXPECT_STREQ(diagnostic, "");
 }
 
-TEST_F(ELFFCaseDTDTest, RejectsModelWithoutId)
+TEST_F(ELFFCaseDTDTest, RejectsLegacyNamedModelWrapper)
 {
   constexpr char xml[] = R"XML(
 <ELFF schemaVersion="1" dimensions="2" units="nondimensional">
-  <Models><Model><EulerBeamHuang/></Model></Models>
+  <Models><Model id="legacy"><EulerBeamHuang/></Model></Models>
 </ELFF>
 )XML";
   char diagnostic[256] = {};
@@ -118,7 +116,7 @@ TEST_F(ELFFCaseDTDTest, RejectsUnknownModelElement)
 {
   constexpr char xml[] = R"XML(
 <ELFF schemaVersion="1" dimensions="2" units="nondimensional">
-  <Models><Model id="fibre"><UnknownBeam/></Model></Models>
+  <Models><UnknownBeam/></Models>
 </ELFF>
 )XML";
 
@@ -171,16 +169,14 @@ TEST_F(ELFFCaseDTDTest, ValidatesOnlySelectedElffSubtree)
 <Case formatVersion="1">
   <ELFF schemaVersion="1" dimensions="2" units="nondimensional">
     <Models>
-      <Model id="fibre">
-        <EulerBeamHuang>
-          <Geometry length="1" nodes="65"/>
-          <Material bendingRigidity="0.001" linearDensity="1.5"/>
-          <InitialLine anchorEnd="right">
-            <Anchor x="0" y="0"/><Direction x="1" y="0"/>
-          </InitialLine>
-          <BoundaryConditions left="free" right="simple"/>
-        </EulerBeamHuang>
-      </Model>
+      <EulerBeamHuang>
+        <Geometry length="1" nodes="65"/>
+        <Material bendingRigidity="0.001" linearDensity="1.5"/>
+        <InitialLine anchorEnd="right">
+          <Anchor x="0" y="0"/><Direction x="1" y="0"/>
+        </InitialLine>
+        <BoundaryConditions left="free" right="simple"/>
+      </EulerBeamHuang>
     </Models>
   </ELFF>
   <Basilisk><CaseSpecificElement arbitrary="yes"/></Basilisk>

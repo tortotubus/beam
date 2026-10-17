@@ -3,8 +3,10 @@
 #include "elff/c/models/beam/IBEulerBeamBCs.hpp"
 #include "elff/config/config.hpp"
 #include "elff/models/beam/IBEulerBeam.hpp"
+#include "elff/models/ibm/IBRuntime.hpp"
 
 #include <cmath>
+#include <memory>
 
 using namespace ELFF::Models;
 using namespace ELFF;
@@ -12,7 +14,8 @@ using namespace ELFF;
 extern "C"
 {
 
-  ib_euler_beam_t ib_euler_beam_new(vertex_t s0,
+  ib_euler_beam_t ib_euler_beam_new(ib_runtime_t runtime,
+                        vertex_t s0,
                         ib_euler_beam_bcs_t bcs,
                         double length,
                         double EI,
@@ -20,6 +23,9 @@ extern "C"
                         int nodes,
                         double r_penalty)
   {
+    if (!runtime)
+      return nullptr;
+    try {
     EulerBeamMesh ic_mesh(nodes, length);
 
     std::vector<std::array<real_t, 3>>& ic_centerline =
@@ -38,19 +44,23 @@ extern "C"
 
     EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
 
-    IBEulerBeam* beam = new IBEulerBeam(static_cast<real_t>(length),
-                                        static_cast<real_t>(EI),
-                                        static_cast<real_t>(mu),
-                                        static_cast<size_t>(nodes),
-                                        boundary_conditions,
-                                        static_cast<real_t>(r_penalty));
+    auto beam = std::make_unique<IBEulerBeam>(static_cast<real_t>(length),
+                                              static_cast<real_t>(EI),
+                                              static_cast<real_t>(mu),
+                                              static_cast<size_t>(nodes),
+                                              boundary_conditions,
+                                              static_cast<real_t>(r_penalty));
 
     beam->apply_initial_condition(ic_mesh);
-
-    return beam;
+    return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+      IBRuntimeModelType::EulerBeam, std::move(beam));
+    } catch (...) {
+      return nullptr;
+    }
   }
 
-  ib_euler_beam_t ib_euler_beam_new_theta(vertex_t s0,
+  ib_euler_beam_t ib_euler_beam_new_theta(ib_runtime_t runtime,
+                              vertex_t s0,
                               ib_euler_beam_bcs_t bcs,
                               double length,
                               double EI,
@@ -59,6 +69,9 @@ extern "C"
                               double r_penalty,
                               double theta)
   {
+    if (!runtime)
+      return nullptr;
+    try {
 
     real_t x0 = s0.x, y0 = s0.y, z0 = s0.z;
 
@@ -90,19 +103,18 @@ extern "C"
 
     EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
 
-    IBEulerBeam* beam = new IBEulerBeam(static_cast<real_t>(length),
-                                        static_cast<real_t>(EI),
-                                        static_cast<real_t>(mu),
-                                        static_cast<size_t>(nodes),
-                                        boundary_conditions,
-                                        static_cast<real_t>(r_penalty));
+    auto beam = std::make_unique<IBEulerBeam>(static_cast<real_t>(length),
+                                              static_cast<real_t>(EI),
+                                              static_cast<real_t>(mu),
+                                              static_cast<size_t>(nodes),
+                                              boundary_conditions,
+                                              static_cast<real_t>(r_penalty));
 
     beam->apply_initial_condition(ic_mesh);
-    return beam;
-  }
-
-  void ib_euler_beam_destroy(ib_euler_beam_t handle)
-  {
-    delete reinterpret_cast<IBEulerBeam*>(handle);
+    return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+      IBRuntimeModelType::EulerBeam, std::move(beam));
+    } catch (...) {
+      return nullptr;
+    }
   }
 }

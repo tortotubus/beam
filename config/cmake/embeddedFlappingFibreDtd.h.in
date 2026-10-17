@@ -1,0 +1,10 @@
+#pragma once
+
+#include <stddef.h>
+
+/* Generated from basilisk/templates/flapping_fibre-v1.dtd. */
+static const unsigned char elff_embedded_flapping_fibre_v1_dtd[] = {
+  @ELFF_FLAPPING_FIBRE_V1_DTD_BYTES@ 0x00
+};
+static const size_t elff_embedded_flapping_fibre_v1_dtd_size =
+  sizeof(elff_embedded_flapping_fibre_v1_dtd) - 1;

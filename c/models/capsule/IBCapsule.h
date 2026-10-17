@@ -1,6 +1,7 @@
 #pragma once
 
 #include "elff/c/models/ibm/IBMesh.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 #include "elff/c/models/ibm/IBVelocityCoupled.h"
 
 #ifdef __cplusplus
@@ -10,17 +11,20 @@ extern "C"
 
   typedef void* ib_capsule_t;
 
-  ib_capsule_t ib_capsule_sphere_new(double radius,
+  ib_capsule_t ib_capsule_sphere_new(ib_runtime_t runtime,
+                                     double radius,
                                      vertex_t center,
                                      int refinements,
                                      double elastic_modulus);
 
-  ib_capsule_t ib_capsule_ellipsoid_new(vertex_t radii,
+  ib_capsule_t ib_capsule_ellipsoid_new(ib_runtime_t runtime,
+                                        vertex_t radii,
                                         vertex_t center,
                                         int refinements,
                                         double elastic_modulus);
 
-  ib_capsule_t ib_capsule_biconcave_new(double radius,
+  ib_capsule_t ib_capsule_biconcave_new(ib_runtime_t runtime,
+                                        double radius,
                                         vertex_t center,
                                         int refinements,
                                         double elastic_modulus);
@@ -51,8 +55,6 @@ extern "C"
                                         int node_ids[3]);
 
   ib_velocity_coupled_t ib_capsule_as_velocity_coupled(ib_capsule_t handle);
-
-  void ib_capsule_destroy(ib_capsule_t handle);
 
 #ifdef __cplusplus
 }

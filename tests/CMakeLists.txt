@@ -59,7 +59,7 @@ target_compile_definitions(
     elff_unit_tests
     PRIVATE
         ELFF_CASE_DTD_PATH="${CMAKE_SOURCE_DIR}/io/DTD/ELFF/ELFF-v1.dtd"
-        ELFF_BASILISK_DTD_PATH="${CMAKE_SOURCE_DIR}/io/DTD/Basilisk/flapping_fibre-v1.dtd"
+        ELFF_BASILISK_DTD_PATH="${CMAKE_SOURCE_DIR}/basilisk/templates/flapping_fibre-v1.dtd"
         ELFF_FLAPPING_FIBRE_CASE_PATH="${CMAKE_SOURCE_DIR}/basilisk/examples/cases/flapping_fibre.xml"
 )
 
@@ -71,6 +71,8 @@ if(ELFF_BUILD_THIRD_PARTY_GTEST)
     add_test(
         NAME XMLCaseDocumentTest
         COMMAND elff_unit_tests --gtest_filter=XMLCaseDocument*.*
+    )
+    add_test(
         NAME BendingRodSegmentsImplicitTest
         COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsImplicitTest.*
     )
@@ -102,6 +104,20 @@ if(TARGET periodic_fibre_serial)
     set_tests_properties(BasiliskPeriodicFibreSerial PROPERTIES TIMEOUT 60)
 endif()
 
+if(TARGET flapping_fibre_serial)
+    add_test(
+        NAME BasiliskFlappingFibreSerial
+        COMMAND $<TARGET_FILE:flapping_fibre_serial>
+                "${CMAKE_SOURCE_DIR}/tests/data/flapping_fibre_short.xml"
+    )
+    set_tests_properties(
+        BasiliskFlappingFibreSerial
+        PROPERTIES
+            TIMEOUT 60
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+endif()
+
 if(TARGET periodic_fibre_mpi AND MPIEXEC_EXECUTABLE)
     add_test(
         NAME BasiliskPeriodicFibreMPI
@@ -111,5 +127,22 @@ if(TARGET periodic_fibre_mpi AND MPIEXEC_EXECUTABLE)
     )
     set_tests_properties(
         BasiliskPeriodicFibreMPI PROPERTIES PROCESSORS 2 TIMEOUT 60
+    )
+endif()
+
+if(TARGET flapping_fibre_mpi AND MPIEXEC_EXECUTABLE)
+    add_test(
+        NAME BasiliskFlappingFibreMPI
+        COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+                ${MPIEXEC_PREFLAGS} $<TARGET_FILE:flapping_fibre_mpi>
+                "${CMAKE_SOURCE_DIR}/tests/data/flapping_fibre_short.xml"
+                ${MPIEXEC_POSTFLAGS}
+    )
+    set_tests_properties(
+        BasiliskFlappingFibreMPI
+        PROPERTIES
+            PROCESSORS 2
+            TIMEOUT 60
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 endif()

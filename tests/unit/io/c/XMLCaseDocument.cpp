@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <elff/config/_config.hpp>
-#include <elff/io/C/xmlCaseDocument.h>
-#include <elff/io/C/xmlDTDValidator.h>
+#include <elff/io/C/xmlCase.h>
 
 #include <fstream>
 #include <iterator>
@@ -154,6 +153,57 @@ TEST_F(XMLCaseDocumentTest, ReportsRequiredStringCapacity)
   EXPECT_STREQ(value.data(), "flapping_fibre_output");
 }
 
+TEST_F(XMLCaseDocumentTest, TraversesOrderedElementChildrenOnly)
+{
+  elff_xml_error error = {};
+  elff_xml_node_t root = nullptr, elff = nullptr, models = nullptr;
+  elff_xml_node_t model = nullptr;
+  size_t count = 0;
+  const char* name = nullptr;
+
+  ASSERT_EQ(elff_xml_document_root(document_, "Case", &root, &error),
+            ELFF_XML_OK);
+  ASSERT_EQ(elff_xml_node_unique_child(root, "ELFF", &elff, &error),
+            ELFF_XML_OK);
+  ASSERT_EQ(elff_xml_node_unique_child(elff, "Models", &models, &error),
+            ELFF_XML_OK);
+  ASSERT_EQ(elff_xml_node_element_child_count(models, &count, &error),
+            ELFF_XML_OK);
+  ASSERT_EQ(count, 1U);
+  ASSERT_EQ(elff_xml_node_element_child_at(models, 0, &model, &error),
+            ELFF_XML_OK);
+  ASSERT_EQ(elff_xml_node_name(model, &name, &error), ELFF_XML_OK);
+  EXPECT_STREQ(name, "EulerBeamHuang");
+  EXPECT_EQ(elff_xml_node_element_child_at(models, 1, &model, &error),
+            ELFF_XML_NOT_FOUND);
+}
+
+TEST_F(XMLCaseDocumentTest, LoadsAndValidatesOneOwnedSection)
+{
+  const std::string dtd = read_text_file(ELFF_BASILISK_DTD_PATH);
+  elff_xml_document_t document = nullptr;
+  elff_xml_node_t basilisk = nullptr;
+  elff_xml_error error = {};
+  const char* name = nullptr;
+
+  ASSERT_EQ(elff_xml_case_load_section_file(ELFF_FLAPPING_FIBRE_CASE_PATH,
+                                             "Case",
+                                             "Basilisk",
+                                             dtd.data(),
+                                             dtd.size(),
+                                             &document,
+                                             &basilisk,
+                                             &error),
+            ELFF_XML_OK)
+    << error.message;
+  ASSERT_NE(document, nullptr);
+  ASSERT_NE(basilisk, nullptr);
+  ASSERT_EQ(elff_xml_node_name(basilisk, &name, &error), ELFF_XML_OK);
+  EXPECT_STREQ(name, "Basilisk");
+
+  elff_xml_document_destroy(document);
+}
+
 TEST(XMLCaseDocumentStandaloneTest, ReportsMalformedDocuments)
 {
   constexpr char xml[] = "<Case><ELFF></Case>";
@@ -219,6 +269,33 @@ TEST(XMLCaseDocumentStandaloneTest, RejectsInvalidNumericAttributes)
   EXPECT_EQ(elff_xml_node_attribute_double(
               values, "real", &real_value, &error),
             ELFF_XML_INVALID_VALUE);
+
+  elff_xml_document_destroy(document);
+}
+
+TEST(XMLCaseDocumentStandaloneTest, ReadsXYZWithOptionalZDefault)
+{
+  constexpr char xml[] = "<Case><Point x=\"1.5\" y=\"-2\"/></Case>";
+  elff_xml_document_t document = nullptr;
+  elff_xml_node_t root = nullptr;
+  elff_xml_node_t point = nullptr;
+  elff_xml_error error = {};
+  double value[3] = {};
+
+  ASSERT_EQ(elff_xml_document_load_memory(
+              xml, sizeof(xml) - 1, &document, &error),
+            ELFF_XML_OK)
+    << error.message;
+  ASSERT_EQ(elff_xml_document_root(document, "Case", &root, &error),
+            ELFF_XML_OK);
+  ASSERT_EQ(elff_xml_node_unique_child(root, "Point", &point, &error),
+            ELFF_XML_OK);
+  ASSERT_EQ(elff_xml_node_attribute_xyz(point, 3.25, value, &error),
+            ELFF_XML_OK)
+    << error.message;
+  EXPECT_DOUBLE_EQ(value[0], 1.5);
+  EXPECT_DOUBLE_EQ(value[1], -2.0);
+  EXPECT_DOUBLE_EQ(value[2], 3.25);
 
   elff_xml_document_destroy(document);
 }

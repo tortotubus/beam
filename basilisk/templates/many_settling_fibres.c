@@ -43,7 +43,6 @@ double banaei_Ga = 40.;
 double b_length = 1.;
 int b_nodes = 67;
 double b_theta = 0.00;
-int b_pid = 0;
 
 /* Fibre cloud controls */
 int fibre_count = 1000;
@@ -238,7 +237,7 @@ static void add_settling_fibres(void) {
     int mesh_id = ibmeshmanager_add_mesh();
     IBMeshModel beam_model =
       elff_euler_beam_huang_new_direction(
-        b_length, b_EI, b_mu, b_nodes, direction, b_bcs, start, b_pid);
+        b_length, b_EI, b_mu, b_nodes, direction, b_bcs, start);
     ib_euler_beam_huang_set_implicit_bending(
       (ib_euler_beam_huang_t)beam_model.ctx,
       experiment_huang_implicit_bending);
@@ -568,4 +567,9 @@ event stop(t = experiment_t_end) {
   if (pid() == 0)
     fprintf(stderr, "finished many-fibre settling at t=%g i=%d\n", t, i);
   return 1;
+}
+
+event elff_cleanup(i = end, last) {
+  ibmeshmanager_free();
+  elff_deinit();
 }

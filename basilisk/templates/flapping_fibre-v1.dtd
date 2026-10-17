@@ -33,11 +33,16 @@
   minLevel CDATA #REQUIRED
   maxLevel CDATA #REQUIRED>
 
-<!ELEMENT ImmersedBoundary EMPTY>
+<!ELEMENT ImmersedBoundary (UniformForceDensity?)>
 <!ATTLIST ImmersedBoundary
-  model CDATA #REQUIRED
   level CDATA #REQUIRED
   ownerRank CDATA #REQUIRED>
+
+<!ELEMENT UniformForceDensity EMPTY>
+<!ATTLIST UniformForceDensity
+  x CDATA #REQUIRED
+  y CDATA #REQUIRED
+  z CDATA "0">
 
 <!ELEMENT Output EMPTY>
 <!ATTLIST Output

@@ -60,7 +60,7 @@ static void add_isotropic_fibre(void) {
   bcs.type[1] = IB_EULER_BEAM_BC_FREE;
 
   IBMeshModel model = elff_euler_beam_huang_new_direction(
-      b_length, b_EI, b_mu, b_nodes, direction, bcs, start, 0);
+      b_length, b_EI, b_mu, b_nodes, direction, bcs, start);
 
   /* Project out tangential strain from the initial nodal velocities. */
   const coord center_velocity = isotropic_base_velocity(center);
@@ -284,4 +284,9 @@ event stop(t = experiment_t_end) {
   if (pid() == 0)
     fprintf(stderr, "finished isotropic flow at t=%g i=%d\n", t, i);
   return 1;
+}
+
+event elff_cleanup(i = end, last) {
+  ibmeshmanager_free();
+  elff_deinit();
 }

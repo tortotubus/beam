@@ -1,6 +1,6 @@
 #pragma once
 
-#include "immersedboundary.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -27,7 +27,8 @@ extern "C"
    * @param center_y Circle center y-coordinate
    * @return Opaque spring-circle handle
    */
-  ib_spring_circle_t ib_spring_circle_create_circle(int npoints,
+  ib_spring_circle_t ib_spring_circle_create_circle(ib_runtime_t runtime,
+                                                    int npoints,
                                                     double K,
                                                     double radius,
                                                     double center_x,
@@ -44,7 +45,8 @@ extern "C"
    * @param center_y Ellipse center y-coordinate
    * @return Opaque spring-circle handle
    */
-  ib_spring_circle_t ib_spring_circle_create_ellipse(int npoints,
+  ib_spring_circle_t ib_spring_circle_create_ellipse(ib_runtime_t runtime,
+                                                     int npoints,
                                                      double K,
                                                      double radius_x,
                                                      double radius_y,
@@ -57,12 +59,6 @@ extern "C"
   // ib_structure_model_get_next(ib_spring_circle_t handle, vertex_t* velocity,
   // int n, double dt);
 
-  /**
-   * @brief Destroys a spring-circle model.
-   *
-   * @param handle Opaque spring-circle handle
-   */
-  void ib_spring_circle_destroy(ib_spring_circle_t handle);
   /** @} */
 
 #ifdef __cplusplus

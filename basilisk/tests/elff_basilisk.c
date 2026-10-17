@@ -2,12 +2,14 @@
 
 #include "elff/c/models/beam/IBEulerBeam.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 
 static ib_force_coupled_t beam;
 
 int
 main()
 {
+  ib_runtime_t runtime = ib_runtime_new();
   {
     const double L = 1.;
     const double EI = 1.;
@@ -15,8 +17,14 @@ main()
     const int Nb = 20;
     const double r_penalty = 1e4;
     const double theta = 0.;
-    beam = (ib_force_coupled_t)ib_beam_new_theta(
-      L, EI, mu, Nb, r_penalty, theta);
+    ib_euler_beam_bcs_t bcs = {0};
+    bcs.end[0] = IB_EULER_BEAM_BC_LEFT;
+    bcs.end[1] = IB_EULER_BEAM_BC_RIGHT;
+    bcs.type[0] = IB_EULER_BEAM_BC_FREE;
+    bcs.type[1] = IB_EULER_BEAM_BC_SIMPLE;
+    const vertex_t origin = {0};
+    beam = (ib_force_coupled_t)ib_euler_beam_new_theta(
+      runtime, origin, bcs, L, EI, mu, Nb, r_penalty, theta);
   }
 
   double dt = 0.01;
@@ -37,7 +45,7 @@ main()
     t += dt;
   }
 
-  ib_beam_destroy((ib_beam_t)beam);
+  ib_runtime_delete(runtime);
 
   return 0;
 }

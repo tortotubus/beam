@@ -1,4 +1,4 @@
-#include "elff/io/C/xmlCaseDocument.h"
+#include "elff/io/C/xmlCase.h"
 
 #include "elff/config/_config.hpp"
 
@@ -27,7 +27,7 @@ typedef struct
 } elff_xml_error_capture;
 #endif
 
-static void
+void
 elff_xml_error_clear(elff_xml_error* error)
 {
   if (error == NULL) {
@@ -39,7 +39,7 @@ elff_xml_error_clear(elff_xml_error* error)
   error->message[0] = '\0';
 }
 
-static void
+void
 elff_xml_error_set(elff_xml_error* error,
                    size_t line,
                    size_t column,
@@ -377,6 +377,125 @@ elff_xml_node_unique_child(elff_xml_node_t parent,
   }
 
   *out_child = elff_xml_node_to_handle(selected);
+  return ELFF_XML_OK;
+#endif
+}
+
+elff_xml_status
+elff_xml_node_element_child_count(elff_xml_node_t parent,
+                                  size_t* out_count,
+                                  elff_xml_error* error)
+{
+  elff_xml_error_clear(error);
+  if (out_count != NULL) {
+    *out_count = 0;
+  }
+  if (parent == NULL || out_count == NULL) {
+    elff_xml_error_set(error, 0, 0, "Invalid XML child-count argument.");
+    return ELFF_XML_INVALID_ARGUMENT;
+  }
+#ifndef ELFF_USE_LIBXML2
+  elff_xml_error_set(error, 0, 0, "ELFF was built without libxml2 support.");
+  return ELFF_XML_UNAVAILABLE;
+#else
+  const xmlNode* child;
+  for (child = elff_xml_node_from_handle(parent)->children; child != NULL;
+       child = child->next) {
+    if (child->type == XML_ELEMENT_NODE) {
+      ++*out_count;
+    }
+  }
+  return ELFF_XML_OK;
+#endif
+}
+
+elff_xml_status
+elff_xml_node_element_child_at(elff_xml_node_t parent,
+                               size_t index,
+                               elff_xml_node_t* out_child,
+                               elff_xml_error* error)
+{
+  elff_xml_error_clear(error);
+  if (out_child != NULL) {
+    *out_child = NULL;
+  }
+  if (parent == NULL || out_child == NULL) {
+    elff_xml_error_set(error, 0, 0, "Invalid XML child-index argument.");
+    return ELFF_XML_INVALID_ARGUMENT;
+  }
+#ifndef ELFF_USE_LIBXML2
+  (void)index;
+  elff_xml_error_set(error, 0, 0, "ELFF was built without libxml2 support.");
+  return ELFF_XML_UNAVAILABLE;
+#else
+  const xmlNode* parent_node = elff_xml_node_from_handle(parent);
+  const xmlNode* child;
+  size_t current = 0;
+  for (child = parent_node->children; child != NULL; child = child->next) {
+    if (child->type != XML_ELEMENT_NODE) {
+      continue;
+    }
+    if (current++ == index) {
+      *out_child = elff_xml_node_to_handle(child);
+      return ELFF_XML_OK;
+    }
+  }
+  elff_xml_error_set(error,
+                     elff_xml_node_line_number(parent_node),
+                     0,
+                     "The XML element-child index is out of range.");
+  return ELFF_XML_NOT_FOUND;
+#endif
+}
+
+elff_xml_status
+elff_xml_node_name(elff_xml_node_t node,
+                   const char** out_name,
+                   elff_xml_error* error)
+{
+  elff_xml_error_clear(error);
+  if (out_name != NULL) {
+    *out_name = NULL;
+  }
+  if (node == NULL || out_name == NULL) {
+    elff_xml_error_set(error, 0, 0, "Invalid XML node-name argument.");
+    return ELFF_XML_INVALID_ARGUMENT;
+  }
+#ifndef ELFF_USE_LIBXML2
+  elff_xml_error_set(error, 0, 0, "ELFF was built without libxml2 support.");
+  return ELFF_XML_UNAVAILABLE;
+#else
+  const xmlNode* element = elff_xml_node_from_handle(node);
+  if (element->type != XML_ELEMENT_NODE || element->ns != NULL) {
+    elff_xml_error_set(error,
+                       elff_xml_node_line_number(element),
+                       0,
+                       "The selected node is not an unqualified element.");
+    return ELFF_XML_INVALID_VALUE;
+  }
+  *out_name = (const char*)element->name;
+  return ELFF_XML_OK;
+#endif
+}
+
+elff_xml_status
+elff_xml_node_line(elff_xml_node_t node,
+                   size_t* out_line,
+                   elff_xml_error* error)
+{
+  elff_xml_error_clear(error);
+  if (out_line != NULL) {
+    *out_line = 0;
+  }
+  if (node == NULL || out_line == NULL) {
+    elff_xml_error_set(error, 0, 0, "Invalid XML node-line argument.");
+    return ELFF_XML_INVALID_ARGUMENT;
+  }
+#ifndef ELFF_USE_LIBXML2
+  elff_xml_error_set(error, 0, 0, "ELFF was built without libxml2 support.");
+  return ELFF_XML_UNAVAILABLE;
+#else
+  *out_line = elff_xml_node_line_number(elff_xml_node_from_handle(node));
   return ELFF_XML_OK;
 #endif
 }

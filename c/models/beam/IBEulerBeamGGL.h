@@ -1,6 +1,7 @@
 #pragma once
 
 #include "elff/c/models/beam/IBEulerBeamBCs.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -9,7 +10,8 @@ extern "C"
 
   typedef void* ib_euler_beam_ggl_t;
 
-  ib_euler_beam_ggl_t ib_euler_beam_ggl_new(vertex_t s0,
+  ib_euler_beam_ggl_t ib_euler_beam_ggl_new(ib_runtime_t runtime,
+                                            vertex_t s0,
                                             ib_euler_beam_bcs_t bcs,
                                             double length,
                                             double EI,
@@ -17,7 +19,8 @@ extern "C"
                                             int nodes,
                                             double r_penalty);
 
-  ib_euler_beam_ggl_t ib_euler_beam_ggl_new_theta(vertex_t s0,
+  ib_euler_beam_ggl_t ib_euler_beam_ggl_new_theta(ib_runtime_t runtime,
+                                                  vertex_t s0,
                                                   ib_euler_beam_bcs_t bcs,
                                                   double length,
                                                   double EI,
@@ -25,8 +28,6 @@ extern "C"
                                                   int nodes,
                                                   double r_penalty,
                                                   double theta);
-
-  void ib_euler_beam_ggl_destroy(ib_euler_beam_ggl_t handle);
 
 #ifdef __cplusplus
 }

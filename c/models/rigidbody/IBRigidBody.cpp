@@ -8,6 +8,9 @@
 #include "elff/models/rigidbody/IBRigidBodyCircle.hpp"
 #include "elff/models/rigidbody/IBRigidBodyFibre.hpp"
 #include "elff/models/rigidbody/IBRigidBodySphere.hpp"
+#include "elff/models/ibm/IBRuntime.hpp"
+
+#include <memory>
 
 using namespace ELFF;
 using namespace ELFF::Models;
@@ -35,7 +38,8 @@ extern "C"
 {
 
 ib_rigid_body_circle_t
-ib_rigid_body_circle_new(double radius,
+ib_rigid_body_circle_new(ib_runtime_t runtime,
+                         double radius,
                          int point_count,
                          double density,
                          vertex_t center,
@@ -43,11 +47,14 @@ ib_rigid_body_circle_new(double radius,
                          double angle,
                          double angular_velocity_z)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   ELFF_VERIFY(point_count > 0,
               "ib_rigid_body_circle_new(): point_count must be positive.\n");
 
-  auto* body =
-    new IBRigidBodyCircle(static_cast<real_t>(radius),
+  auto body =
+    std::make_unique<IBRigidBodyCircle>(static_cast<real_t>(radius),
                           static_cast<size_t>(point_count),
                           static_cast<real_t>(density),
                           to_vec3(center),
@@ -55,17 +62,16 @@ ib_rigid_body_circle_new(double radius,
                           static_cast<real_t>(angle),
                           static_cast<real_t>(angular_velocity_z));
 
-  return body;
-}
-
-void
-ib_rigid_body_circle_destroy(ib_rigid_body_circle_t handle)
-{
-  delete reinterpret_cast<IBRigidBodyCircle*>(handle);
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::RigidBodyCircle, std::move(body));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 ib_rigid_body_fibre_t
-ib_rigid_body_fibre_new(double length,
+ib_rigid_body_fibre_new(ib_runtime_t runtime,
+                        double length,
                         double diameter,
                         int nodes,
                         double linear_density,
@@ -74,11 +80,14 @@ ib_rigid_body_fibre_new(double length,
                         quaternion_t q_bw,
                         vertex_t angular_velocity_body)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   ELFF_VERIFY(nodes >= 2,
               "ib_rigid_body_fibre_new(): nodes must be at least 2.\n");
 
-  auto* body =
-    new IBRigidBodyFibre(static_cast<real_t>(length),
+  auto body =
+    std::make_unique<IBRigidBodyFibre>(static_cast<real_t>(length),
                          static_cast<real_t>(diameter),
                          static_cast<size_t>(nodes),
                          static_cast<real_t>(linear_density),
@@ -87,72 +96,75 @@ ib_rigid_body_fibre_new(double length,
                          to_quat(q_bw),
                          to_vec3(angular_velocity_body));
 
-  return body;
-}
-
-void
-ib_rigid_body_fibre_destroy(ib_rigid_body_fibre_t handle)
-{
-  delete reinterpret_cast<IBRigidBodyFibre*>(handle);
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::RigidBodyFibre, std::move(body));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 ib_pinned_rigid_body_circle_t
-ib_pinned_rigid_body_circle_new(double radius,
+ib_pinned_rigid_body_circle_new(ib_runtime_t runtime,
+                                double radius,
                                 int point_count,
                                 double density,
                                 vertex_t center,
                                 double angle)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   ELFF_VERIFY(point_count > 0,
               "ib_pinned_rigid_body_circle_new(): point_count must be "
               "positive.\n");
 
-  auto* body =
-    new IBPinnedRigidBodyCircle(static_cast<real_t>(radius),
+  auto body =
+    std::make_unique<IBPinnedRigidBodyCircle>(static_cast<real_t>(radius),
                                 static_cast<size_t>(point_count),
                                 static_cast<real_t>(density),
                                 to_vec3(center),
                                 static_cast<real_t>(angle));
 
-  return body;
-}
-
-void
-ib_pinned_rigid_body_circle_destroy(ib_pinned_rigid_body_circle_t handle)
-{
-  delete reinterpret_cast<IBPinnedRigidBodyCircle*>(handle);
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::PinnedRigidBodyCircle, std::move(body));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 ib_pinned_rigid_body_fibre_t
-ib_pinned_rigid_body_fibre_new(double length,
+ib_pinned_rigid_body_fibre_new(ib_runtime_t runtime,
+                               double length,
                                double diameter,
                                int nodes,
                                double linear_density,
                                vertex_t center,
                                quaternion_t q_bw)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   ELFF_VERIFY(nodes >= 2,
               "ib_pinned_rigid_body_fibre_new(): nodes must be at least 2.\n");
 
-  auto* body =
-    new IBPinnedRigidBodyFibre(static_cast<real_t>(length),
+  auto body =
+    std::make_unique<IBPinnedRigidBodyFibre>(static_cast<real_t>(length),
                                static_cast<real_t>(diameter),
                                static_cast<size_t>(nodes),
                                static_cast<real_t>(linear_density),
                                to_vec3(center),
                                to_quat(q_bw));
 
-  return body;
-}
-
-void
-ib_pinned_rigid_body_fibre_destroy(ib_pinned_rigid_body_fibre_t handle)
-{
-  delete reinterpret_cast<IBPinnedRigidBodyFibre*>(handle);
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::PinnedRigidBodyFibre, std::move(body));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 ib_rigid_body_sphere_t
-ib_rigid_body_sphere_new(double radius,
+ib_rigid_body_sphere_new(ib_runtime_t runtime,
+                         double radius,
                          int point_count,
                          double density,
                          vertex_t center,
@@ -160,11 +172,14 @@ ib_rigid_body_sphere_new(double radius,
                          quaternion_t q_bw,
                          vertex_t angular_velocity_body)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   ELFF_VERIFY(point_count > 0,
               "ib_rigid_body_sphere_new(): point_count must be positive.\n");
 
-  auto* body =
-    new IBRigidBodySphere(static_cast<real_t>(radius),
+  auto body =
+    std::make_unique<IBRigidBodySphere>(static_cast<real_t>(radius),
                           static_cast<size_t>(point_count),
                           static_cast<real_t>(density),
                           to_vec3(center),
@@ -172,40 +187,40 @@ ib_rigid_body_sphere_new(double radius,
                           to_quat(q_bw),
                           to_vec3(angular_velocity_body));
 
-  return body;
-}
-
-void
-ib_rigid_body_sphere_destroy(ib_rigid_body_sphere_t handle)
-{
-  delete reinterpret_cast<IBRigidBodySphere*>(handle);
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::RigidBodySphere, std::move(body));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 ib_pinned_rigid_body_sphere_t
-ib_pinned_rigid_body_sphere_new(double radius,
+ib_pinned_rigid_body_sphere_new(ib_runtime_t runtime,
+                                double radius,
                                 int point_count,
                                 double density,
                                 vertex_t center,
                                 quaternion_t q_bw)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   ELFF_VERIFY(point_count > 0,
               "ib_pinned_rigid_body_sphere_new(): point_count must be "
               "positive.\n");
 
-  auto* body =
-    new IBPinnedRigidBodySphere(static_cast<real_t>(radius),
+  auto body =
+    std::make_unique<IBPinnedRigidBodySphere>(static_cast<real_t>(radius),
                                 static_cast<size_t>(point_count),
                                 static_cast<real_t>(density),
                                 to_vec3(center),
                                 to_quat(q_bw));
 
-  return body;
-}
-
-void
-ib_pinned_rigid_body_sphere_destroy(ib_pinned_rigid_body_sphere_t handle)
-{
-  delete reinterpret_cast<IBPinnedRigidBodySphere*>(handle);
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::PinnedRigidBodySphere, std::move(body));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 } // extern "C"

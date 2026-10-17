@@ -1,4 +1,5 @@
 #include "elff/c/models/ibm/IBForceCoupled.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 #include "elff/c/models/rigidbody/IBRigidBody.h"
 
 #include <gtest/gtest.h>
@@ -10,6 +11,8 @@ namespace {
 
 TEST(IBRigidBodyCAPITest, CircleConstructsAndAdvancesThroughForceCoupledAPI)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const double R = 1.0;
   const int N = 96;
   const double density = 2.0;
@@ -17,7 +20,7 @@ TEST(IBRigidBodyCAPITest, CircleConstructsAndAdvancesThroughForceCoupledAPI)
   const vertex_t velocity = { 0.0, 0.0, 0.0 };
 
   ib_rigid_body_circle_t circle =
-    ib_rigid_body_circle_new(R, N, density, center, velocity, 0.0, 0.0);
+    ib_rigid_body_circle_new(runtime, R, N, density, center, velocity, 0.0, 0.0);
   ASSERT_NE(circle, nullptr);
 
   ib_force_coupled_t model = reinterpret_cast<ib_force_coupled_t>(circle);
@@ -48,11 +51,13 @@ TEST(IBRigidBodyCAPITest, CircleConstructsAndAdvancesThroughForceCoupledAPI)
   ib_mesh_free(&current);
   ib_mesh_free(&next);
   std::free(force);
-  ib_rigid_body_circle_destroy(circle);
+  ib_runtime_delete(runtime);
 }
 
 TEST(IBRigidBodyCAPITest, SphereConstructsAndAdvancesThroughForceCoupledAPI)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const double R = 0.75;
   const int N = 160;
   const double density = 1.5;
@@ -62,7 +67,7 @@ TEST(IBRigidBodyCAPITest, SphereConstructsAndAdvancesThroughForceCoupledAPI)
   const vertex_t omega = { 0.0, 0.0, 0.0 };
 
   ib_rigid_body_sphere_t sphere =
-    ib_rigid_body_sphere_new(R, N, density, center, velocity, q, omega);
+    ib_rigid_body_sphere_new(runtime, R, N, density, center, velocity, q, omega);
   ASSERT_NE(sphere, nullptr);
 
   ib_force_coupled_t model = reinterpret_cast<ib_force_coupled_t>(sphere);
@@ -91,11 +96,13 @@ TEST(IBRigidBodyCAPITest, SphereConstructsAndAdvancesThroughForceCoupledAPI)
   ib_mesh_free(&current);
   ib_mesh_free(&next);
   std::free(force);
-  ib_rigid_body_sphere_destroy(sphere);
+  ib_runtime_delete(runtime);
 }
 
 TEST(IBRigidBodyCAPITest, FibreConstructsAndAdvancesThroughForceCoupledAPI)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const double L = 1.5;
   const double d = 0.1;
   const int N = 9;
@@ -106,7 +113,7 @@ TEST(IBRigidBodyCAPITest, FibreConstructsAndAdvancesThroughForceCoupledAPI)
   const vertex_t omega = { 0.0, 0.0, 0.0 };
 
   ib_rigid_body_fibre_t fibre = ib_rigid_body_fibre_new(
-    L, d, N, linear_density, center, velocity, q, omega);
+    runtime, L, d, N, linear_density, center, velocity, q, omega);
   ASSERT_NE(fibre, nullptr);
 
   ib_force_coupled_t model = reinterpret_cast<ib_force_coupled_t>(fibre);
@@ -134,17 +141,19 @@ TEST(IBRigidBodyCAPITest, FibreConstructsAndAdvancesThroughForceCoupledAPI)
   ib_mesh_free(&current);
   ib_mesh_free(&next);
   std::free(force);
-  ib_rigid_body_fibre_destroy(fibre);
+  ib_runtime_delete(runtime);
 }
 
 TEST(IBRigidBodyCAPITest, PinnedCircleIgnoresForcesThroughForceCoupledAPI)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const double R = 1.0;
   const int N = 80;
   const vertex_t center = { 0.1, -0.2, 0.0 };
 
   ib_pinned_rigid_body_circle_t circle =
-    ib_pinned_rigid_body_circle_new(R, N, 1.0, center, 0.0);
+    ib_pinned_rigid_body_circle_new(runtime, R, N, 1.0, center, 0.0);
   ASSERT_NE(circle, nullptr);
 
   ib_force_coupled_t model = reinterpret_cast<ib_force_coupled_t>(circle);
@@ -173,11 +182,13 @@ TEST(IBRigidBodyCAPITest, PinnedCircleIgnoresForcesThroughForceCoupledAPI)
   ib_mesh_free(&current);
   ib_mesh_free(&next);
   std::free(force);
-  ib_pinned_rigid_body_circle_destroy(circle);
+  ib_runtime_delete(runtime);
 }
 
 TEST(IBRigidBodyCAPITest, PinnedFibreIgnoresForcesThroughForceCoupledAPI)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const double L = 1.0;
   const double d = 0.05;
   const int N = 7;
@@ -185,7 +196,7 @@ TEST(IBRigidBodyCAPITest, PinnedFibreIgnoresForcesThroughForceCoupledAPI)
   const quaternion_t q = { 1.0, 0.0, 0.0, 0.0 };
 
   ib_pinned_rigid_body_fibre_t fibre =
-    ib_pinned_rigid_body_fibre_new(L, d, N, 1.0, center, q);
+    ib_pinned_rigid_body_fibre_new(runtime, L, d, N, 1.0, center, q);
   ASSERT_NE(fibre, nullptr);
 
   ib_force_coupled_t model = reinterpret_cast<ib_force_coupled_t>(fibre);
@@ -215,18 +226,20 @@ TEST(IBRigidBodyCAPITest, PinnedFibreIgnoresForcesThroughForceCoupledAPI)
   ib_mesh_free(&current);
   ib_mesh_free(&next);
   std::free(force);
-  ib_pinned_rigid_body_fibre_destroy(fibre);
+  ib_runtime_delete(runtime);
 }
 
 TEST(IBRigidBodyCAPITest, PinnedSphereIgnoresForcesThroughForceCoupledAPI)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const double R = 0.5;
   const int N = 100;
   const vertex_t center = { 0.2, 0.1, -0.3 };
   const quaternion_t q = { 1.0, 0.0, 0.0, 0.0 };
 
   ib_pinned_rigid_body_sphere_t sphere =
-    ib_pinned_rigid_body_sphere_new(R, N, 1.0, center, q);
+    ib_pinned_rigid_body_sphere_new(runtime, R, N, 1.0, center, q);
   ASSERT_NE(sphere, nullptr);
 
   ib_force_coupled_t model = reinterpret_cast<ib_force_coupled_t>(sphere);
@@ -256,7 +269,7 @@ TEST(IBRigidBodyCAPITest, PinnedSphereIgnoresForcesThroughForceCoupledAPI)
   ib_mesh_free(&current);
   ib_mesh_free(&next);
   std::free(force);
-  ib_pinned_rigid_body_sphere_destroy(sphere);
+  ib_runtime_delete(runtime);
 }
 
 } // namespace

@@ -2,116 +2,49 @@
 
 #include "elff/c/models/beam/IBEulerBeamBCs.hpp"
 #include "elff/config/config.hpp"
-#include "elff/general/error.hpp"
-#include "elff/models/beam/IBEulerBeamHuang.hpp"
+#include "elff/models/beam/EulerBeamHuangBuilder.hpp"
+#include "elff/models/ibm/IBRuntime.hpp"
 
 #include <array>
 #include <cmath>
+#include <memory>
 
 using namespace ELFF::Models;
 using namespace ELFF;
-
-namespace {
-EulerBeamMesh make_direction_initial_mesh(vertex_t s0,
-                                          int nodes,
-                                          double length,
-                                          vertex_t direction);
-
-EulerBeamMesh
-make_offset_initial_mesh(vertex_t s0, int nodes, double length)
-{
-  EulerBeamMesh ic_mesh(nodes, length);
-  auto& ic_centerline = ic_mesh.get_centerline();
-  auto& ic_s = ic_mesh.get_curvilinear_axis();
-
-  for (size_t ni = 0; ni < static_cast<size_t>(nodes); ++ni) {
-    static_cast<void>(ic_s[ni]);
-    ic_centerline[ni][0] += s0.x;
-    ic_centerline[ni][1] += s0.y;
-    ic_centerline[ni][2] += s0.z;
-  }
-
-  return ic_mesh;
-}
-
-EulerBeamMesh
-make_theta_initial_mesh(vertex_t s0, int nodes, double length, double theta)
-{
-  const vertex_t direction = { std::cos(theta), std::sin(theta), 0.0 };
-  return make_direction_initial_mesh(s0, nodes, length, direction);
-}
-
-EulerBeamMesh
-make_direction_initial_mesh(vertex_t s0,
-                            int      nodes,
-                            double   length,
-                            vertex_t direction)
-{
-  const double direction_norm =
-    std::sqrt(direction.x * direction.x + direction.y * direction.y +
-              direction.z * direction.z);
-  ELFF_VERIFY(std::isfinite(direction_norm) && direction_norm > 0.0,
-              "make_direction_initial_mesh(): direction must be finite and "
-              "nonzero.\n");
-
-  const std::array<real_t, 3> tangent = {
-    static_cast<real_t>(direction.x / direction_norm),
-    static_cast<real_t>(direction.y / direction_norm),
-    static_cast<real_t>(direction.z / direction_norm)
-  };
-
-  EulerBeamMesh ic_mesh(nodes, length);
-  auto& ic_centerline = ic_mesh.get_centerline();
-  auto& ic_slope = ic_mesh.get_slope();
-  auto& ic_velocity = ic_mesh.get_centerline_velocity();
-  auto& ic_s = ic_mesh.get_curvilinear_axis();
-
-  for (size_t ni = 0; ni < static_cast<size_t>(nodes); ++ni) {
-    const real_t s = ic_s[ni];
-
-    ic_centerline[ni][0] = s0.x + (length - s) * tangent[0];
-    ic_centerline[ni][1] = s0.y + (length - s) * tangent[1];
-    ic_centerline[ni][2] = s0.z + (length - s) * tangent[2];
-
-    ic_slope[ni][0] = -tangent[0];
-    ic_slope[ni][1] = -tangent[1];
-    ic_slope[ni][2] = -tangent[2];
-
-    ic_velocity[ni][0] = 0.0;
-    ic_velocity[ni][1] = 0.0;
-    ic_velocity[ni][2] = 0.0;
-  }
-
-  return ic_mesh;
-}
-} // namespace
 
 extern "C"
 {
 
 ib_euler_beam_huang_t
-ib_euler_beam_huang_new(vertex_t s0,
+ib_euler_beam_huang_new(ib_runtime_t runtime,
+                        vertex_t s0,
                         ib_euler_beam_bcs_t bcs,
                         double   length,
                         double   EI,
                         double   mu,
                         int      nodes)
 {
-  EulerBeamMesh ic_mesh = make_offset_initial_mesh(s0, nodes, length);
+  if (!runtime)
+    return nullptr;
+  try {
+  const std::array<real_t, 3> anchor = {s0.x, s0.y, s0.z};
+  EulerBeamMesh ic_mesh = make_huang_offset_initial_mesh(
+    anchor, static_cast<size_t>(nodes), static_cast<real_t>(length));
   EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
 
-  auto* beam = new IBEulerBeamHuang(static_cast<real_t>(length),
-                                    static_cast<real_t>(EI),
-                                    static_cast<real_t>(mu),
-                                    static_cast<size_t>(nodes),
-                                    boundary_conditions);
-
-  beam->apply_initial_condition(ic_mesh);
-  return beam;
+  auto beam = build_euler_beam_huang(std::move(ic_mesh), length, EI, mu,
+                                     static_cast<size_t>(nodes),
+                                     boundary_conditions);
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::EulerBeamHuang, std::move(beam));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 ib_euler_beam_huang_t
-ib_euler_beam_huang_new_theta(vertex_t s0,
+ib_euler_beam_huang_new_theta(ib_runtime_t runtime,
+                              vertex_t s0,
                               ib_euler_beam_bcs_t bcs,
                               double   length,
                               double   EI,
@@ -119,21 +52,14 @@ ib_euler_beam_huang_new_theta(vertex_t s0,
                               int      nodes,
                               double   theta)
 {
-  EulerBeamMesh ic_mesh = make_theta_initial_mesh(s0, nodes, length, theta);
-  EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
-
-  auto* beam = new IBEulerBeamHuang(static_cast<real_t>(length),
-                                    static_cast<real_t>(EI),
-                                    static_cast<real_t>(mu),
-                                    static_cast<size_t>(nodes),
-                                    boundary_conditions);
-
-  beam->apply_initial_condition(ic_mesh);
-  return beam;
+  const vertex_t direction = {std::cos(theta), std::sin(theta), 0.0};
+  return ib_euler_beam_huang_new_direction(
+    runtime, s0, bcs, length, EI, mu, nodes, direction);
 }
 
 ib_euler_beam_huang_t
-ib_euler_beam_huang_new_direction(vertex_t s0,
+ib_euler_beam_huang_new_direction(ib_runtime_t runtime,
+                                  vertex_t s0,
                                   ib_euler_beam_bcs_t bcs,
                                   double   length,
                                   double   EI,
@@ -141,18 +67,24 @@ ib_euler_beam_huang_new_direction(vertex_t s0,
                                   int      nodes,
                                   vertex_t direction)
 {
-  EulerBeamMesh ic_mesh =
-    make_direction_initial_mesh(s0, nodes, length, direction);
+  if (!runtime)
+    return nullptr;
+  try {
+  const std::array<real_t, 3> anchor = {s0.x, s0.y, s0.z};
+  const std::array<real_t, 3> tangent = {
+    direction.x, direction.y, direction.z};
+  EulerBeamMesh ic_mesh = make_huang_direction_initial_mesh(
+    anchor, static_cast<size_t>(nodes), static_cast<real_t>(length), tangent);
   EulerBeam::EulerBeamBCs boundary_conditions = ELFF::C::to_cpp_beam_bcs(bcs);
 
-  auto* beam = new IBEulerBeamHuang(static_cast<real_t>(length),
-                                    static_cast<real_t>(EI),
-                                    static_cast<real_t>(mu),
-                                    static_cast<size_t>(nodes),
-                                    boundary_conditions);
-
-  beam->apply_initial_condition(ic_mesh);
-  return beam;
+  auto beam = build_euler_beam_huang(std::move(ic_mesh), length, EI, mu,
+                                     static_cast<size_t>(nodes),
+                                     boundary_conditions);
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::EulerBeamHuang, std::move(beam));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 void
@@ -184,12 +116,6 @@ ib_euler_beam_huang_set_implicit_bending(ib_euler_beam_huang_t handle,
                                          int                   enabled)
 {
   reinterpret_cast<IBEulerBeamHuang*>(handle)->set_implicit_bending(enabled != 0);
-}
-
-void
-ib_euler_beam_huang_destroy(ib_euler_beam_huang_t handle)
-{
-  delete reinterpret_cast<IBEulerBeamHuang*>(handle);
 }
 
 } // extern "C"

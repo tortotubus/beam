@@ -3,6 +3,7 @@
 #include "elff/config/config.hpp"
 #include "elff/general/error.hpp"
 #include "elff/models/capsule/IBMCapsule.hpp"
+#include "elff/models/ibm/IBRuntime.hpp"
 
 #include <memory>
 
@@ -43,11 +44,15 @@ extern "C"
 {
 
 ib_capsule_t
-ib_capsule_sphere_new(double radius,
+ib_capsule_sphere_new(ib_runtime_t runtime,
+                      double radius,
                       vertex_t center,
                       int refinements,
                       double elastic_modulus)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   verify_common_inputs(refinements, elastic_modulus);
   ELFF_VERIFY(radius > 0.0,
               "ib_capsule_sphere_new(): radius must be positive.\n");
@@ -57,34 +62,52 @@ ib_capsule_sphere_new(double radius,
   spec.center = to_vec3(center);
   spec.refinements = refinements;
 
-  return new IBMCapsule(
+  auto capsule = std::make_unique<IBMCapsule>(
       CapsuleMeshBuilder::sphere(spec),
       std::make_unique<CapsuleNeoHookeanLaw>(elastic_modulus));
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::Capsule, std::move(capsule));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 ib_capsule_t
-ib_capsule_ellipsoid_new(vertex_t radii,
+ib_capsule_ellipsoid_new(ib_runtime_t runtime,
+                         vertex_t radii,
                          vertex_t center,
                          int refinements,
                          double elastic_modulus)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   verify_common_inputs(refinements, elastic_modulus);
   CapsuleEllipsoidSpec spec;
   spec.radii = to_vec3(radii);
   spec.center = to_vec3(center);
   spec.refinements = refinements;
 
-  return new IBMCapsule(
+  auto capsule = std::make_unique<IBMCapsule>(
       CapsuleMeshBuilder::ellipsoid(spec),
       std::make_unique<CapsuleNeoHookeanLaw>(elastic_modulus));
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::Capsule, std::move(capsule));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 ib_capsule_t
-ib_capsule_biconcave_new(double radius,
+ib_capsule_biconcave_new(ib_runtime_t runtime,
+                         double radius,
                          vertex_t center,
                          int refinements,
                          double elastic_modulus)
 {
+  if (!runtime)
+    return nullptr;
+  try {
   verify_common_inputs(refinements, elastic_modulus);
   ELFF_VERIFY(radius > 0.0,
               "ib_capsule_biconcave_new(): radius must be positive.\n");
@@ -94,9 +117,14 @@ ib_capsule_biconcave_new(double radius,
   spec.center = to_vec3(center);
   spec.refinements = refinements;
 
-  return new IBMCapsule(
+  auto capsule = std::make_unique<IBMCapsule>(
       CapsuleMeshBuilder::biconcave(spec),
       std::make_unique<CapsuleNeoHookeanLaw>(elastic_modulus));
+  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
+    IBRuntimeModelType::Capsule, std::move(capsule));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 void
@@ -200,12 +228,6 @@ ib_velocity_coupled_t
 ib_capsule_as_velocity_coupled(ib_capsule_t handle)
 {
   return static_cast<IBVelocityCoupled*>(to_capsule(handle));
-}
-
-void
-ib_capsule_destroy(ib_capsule_t handle)
-{
-  delete to_capsule(handle);
 }
 
 } // extern "C"

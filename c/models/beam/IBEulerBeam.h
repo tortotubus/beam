@@ -1,6 +1,7 @@
 #pragma once
 
 #include "elff/c/models/beam/IBEulerBeamBCs.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -29,7 +30,8 @@ extern "C"
    * @param r_penalty Penalty parameter used in the inextensibility constraint
    * @return Opaque beam handle
    */
-  ib_euler_beam_t ib_euler_beam_new(vertex_t s0,
+  ib_euler_beam_t ib_euler_beam_new(ib_runtime_t runtime,
+                        vertex_t s0,
                         ib_euler_beam_bcs_t bcs,
                         double length,
                         double EI,
@@ -50,7 +52,8 @@ extern "C"
    * @param theta Initial angle parameter
    * @return Opaque beam handle
    */
-  ib_euler_beam_t ib_euler_beam_new_theta(vertex_t s0,
+  ib_euler_beam_t ib_euler_beam_new_theta(ib_runtime_t runtime,
+                              vertex_t s0,
                               ib_euler_beam_bcs_t bcs,
                               double length,
                               double EI,
@@ -59,12 +62,6 @@ extern "C"
                               double r_penalty,
                               double theta);
 
-  /**
-   * @brief Destroys a beam model created through the C API.
-   *
-   * @param handle Opaque beam handle
-   */
-  void ib_euler_beam_destroy(ib_euler_beam_t handle);
   /** @} */
 
 #ifdef __cplusplus

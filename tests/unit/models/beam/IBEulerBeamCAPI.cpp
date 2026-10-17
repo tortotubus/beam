@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include "elff/c/models/beam/IBEulerBeamADDM.h"
+#include "elff/c/models/beam/IBEulerBeam.h"
 #include "elff/c/models/beam/IBEulerBeamGGL.h"
 #include "elff/c/models/beam/IBEulerBeamHuang.h"
 #include "elff/c/models/beam/IBEulerBeamPenalty.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
+#include "elff/c/models/ibm/IBRuntime.h"
 
 #define protected public
 #include "elff/models/beam/IBEulerBeamADDM.hpp"
@@ -28,7 +30,6 @@ expect_addm_constructs(ib_euler_beam_addm_t handle)
 {
   ASSERT_NE(handle, nullptr);
   EXPECT_GT(ib_force_coupled_get_number_of_nodes(handle), 0);
-  ib_euler_beam_addm_destroy(handle);
 }
 
 void
@@ -36,7 +37,6 @@ expect_penalty_constructs(ib_euler_beam_penalty_t handle)
 {
   ASSERT_NE(handle, nullptr);
   EXPECT_GT(ib_force_coupled_get_number_of_nodes(handle), 0);
-  ib_euler_beam_penalty_destroy(handle);
 }
 
 void
@@ -44,7 +44,6 @@ expect_ggl_constructs(ib_euler_beam_ggl_t handle)
 {
   ASSERT_NE(handle, nullptr);
   EXPECT_GT(ib_force_coupled_get_number_of_nodes(handle), 0);
-  ib_euler_beam_ggl_destroy(handle);
 }
 
 void
@@ -52,13 +51,21 @@ expect_huang_constructs(ib_euler_beam_huang_t handle)
 {
   ASSERT_NE(handle, nullptr);
   EXPECT_GT(ib_force_coupled_get_number_of_nodes(handle), 0);
-  ib_euler_beam_huang_destroy(handle);
+}
+
+void
+expect_base_constructs(ib_euler_beam_t handle)
+{
+  ASSERT_NE(handle, nullptr);
+  EXPECT_GT(ib_force_coupled_get_number_of_nodes(handle), 0);
 }
 
 } // namespace
 
 TEST(IBEulerBeamCAPITest, ConstructsSolversWithFullBoundaryConditionStruct)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const vertex_t s0 = { 0.0, 0.0, 0.0 };
   const double length = 1.0;
   const double EI = 1.0;
@@ -79,37 +86,45 @@ TEST(IBEulerBeamCAPITest, ConstructsSolversWithFullBoundaryConditionStruct)
   clamped_free.vals[0].position = { 0.0, 0.0, 0.0 };
   clamped_free.vals[0].slope = { 1.0, 0.0, 0.0 };
 
+  expect_base_constructs(ib_euler_beam_new(
+    runtime, s0, free_simple, length, EI, mu, nodes, r_penalty));
+  expect_base_constructs(ib_euler_beam_new_theta(
+    runtime, s0, free_simple, length, EI, mu, nodes, r_penalty, 0.2));
+
   expect_addm_constructs(ib_euler_beam_addm_new(
-    s0, free_simple, length, EI, mu, nodes, r_penalty));
+    runtime, s0, free_simple, length, EI, mu, nodes, r_penalty));
   expect_addm_constructs(ib_euler_beam_addm_new(
-    s0, simple_simple, length, EI, mu, nodes, r_penalty));
+    runtime, s0, simple_simple, length, EI, mu, nodes, r_penalty));
   expect_addm_constructs(ib_euler_beam_addm_new(
-    s0, clamped_free, length, EI, mu, nodes, r_penalty));
+    runtime, s0, clamped_free, length, EI, mu, nodes, r_penalty));
 
   expect_penalty_constructs(ib_euler_beam_penalty_new(
-    s0, free_simple, length, EI, mu, nodes, r_penalty));
+    runtime, s0, free_simple, length, EI, mu, nodes, r_penalty));
   expect_penalty_constructs(ib_euler_beam_penalty_new(
-    s0, simple_simple, length, EI, mu, nodes, r_penalty));
+    runtime, s0, simple_simple, length, EI, mu, nodes, r_penalty));
   expect_penalty_constructs(ib_euler_beam_penalty_new(
-    s0, clamped_free, length, EI, mu, nodes, r_penalty));
+    runtime, s0, clamped_free, length, EI, mu, nodes, r_penalty));
 
   expect_ggl_constructs(ib_euler_beam_ggl_new(
-    s0, free_simple, length, EI, mu, nodes, r_penalty));
+    runtime, s0, free_simple, length, EI, mu, nodes, r_penalty));
   expect_ggl_constructs(ib_euler_beam_ggl_new(
-    s0, simple_simple, length, EI, mu, nodes, r_penalty));
+    runtime, s0, simple_simple, length, EI, mu, nodes, r_penalty));
   expect_ggl_constructs(ib_euler_beam_ggl_new(
-    s0, clamped_free, length, EI, mu, nodes, r_penalty));
+    runtime, s0, clamped_free, length, EI, mu, nodes, r_penalty));
 
   expect_huang_constructs(
-    ib_euler_beam_huang_new(s0, free_simple, length, EI, mu, nodes));
+    ib_euler_beam_huang_new(runtime, s0, free_simple, length, EI, mu, nodes));
   expect_huang_constructs(
-    ib_euler_beam_huang_new(s0, simple_simple, length, EI, mu, nodes));
+    ib_euler_beam_huang_new(runtime, s0, simple_simple, length, EI, mu, nodes));
   expect_huang_constructs(
-    ib_euler_beam_huang_new(s0, clamped_free, length, EI, mu, nodes));
+    ib_euler_beam_huang_new(runtime, s0, clamped_free, length, EI, mu, nodes));
+  ib_runtime_delete(runtime);
 }
 
 TEST(IBEulerBeamCAPITest, ThetaConstructorUsesSuppliedBoundaryConditions)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const vertex_t s0 = { 2.0, 3.0, 4.0 };
   ib_euler_beam_bcs_t bcs =
     make_bcs(IB_EULER_BEAM_BC_CLAMPED, IB_EULER_BEAM_BC_FREE);
@@ -118,7 +133,7 @@ TEST(IBEulerBeamCAPITest, ThetaConstructorUsesSuppliedBoundaryConditions)
   bcs.vals[1].force = { 7.0, 8.0, 9.0 };
 
   ib_euler_beam_addm_t handle =
-    ib_euler_beam_addm_new_theta(s0, bcs, 1.0, 1.0, 1.0, 8, 1.0, 0.3);
+    ib_euler_beam_addm_new_theta(runtime, s0, bcs, 1.0, 1.0, 1.0, 8, 1.0, 0.3);
   ASSERT_NE(handle, nullptr);
 
   auto* beam = reinterpret_cast<ELFF::Models::IBEulerBeamADDM*>(handle);
@@ -132,17 +147,19 @@ TEST(IBEulerBeamCAPITest, ThetaConstructorUsesSuppliedBoundaryConditions)
   EXPECT_DOUBLE_EQ(beam->boundary_conditions.vals[0].slope[0], 0.5);
   EXPECT_DOUBLE_EQ(beam->boundary_conditions.vals[1].force[2], 9.0);
 
-  ib_euler_beam_addm_destroy(handle);
+  ib_runtime_delete(runtime);
 }
 
 TEST(IBEulerBeamCAPITest, HuangAcceptsInitialVelocity)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const int nodes = 6;
   const vertex_t s0 = { -0.5, 0.0, 0.0 };
   ib_euler_beam_bcs_t bcs =
     make_bcs(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
   ib_euler_beam_huang_t handle =
-    ib_euler_beam_huang_new_theta(s0, bcs, 1.0, 0.01, 1.0, nodes, 0.0);
+    ib_euler_beam_huang_new_theta(runtime, s0, bcs, 1.0, 0.01, 1.0, nodes, 0.0);
   ASSERT_NE(handle, nullptr);
 
   vertex_t velocity[nodes] = {};
@@ -160,11 +177,13 @@ TEST(IBEulerBeamCAPITest, HuangAcceptsInitialVelocity)
   }
 
   ib_mesh_free(&mesh);
-  ib_euler_beam_huang_destroy(handle);
+  ib_runtime_delete(runtime);
 }
 
 TEST(IBEulerBeamCAPITest, HuangAcceptsThreeDimensionalDirection)
 {
+  ib_runtime_t runtime = ib_runtime_new();
+  ASSERT_NE(runtime, nullptr);
   const int nodes = 6;
   const double length = 2.0;
   const vertex_t s0 = { 1.0, 2.0, 3.0 };
@@ -172,7 +191,7 @@ TEST(IBEulerBeamCAPITest, HuangAcceptsThreeDimensionalDirection)
   ib_euler_beam_bcs_t bcs =
     make_bcs(IB_EULER_BEAM_BC_FREE, IB_EULER_BEAM_BC_FREE);
   ib_euler_beam_huang_t handle = ib_euler_beam_huang_new_direction(
-    s0, bcs, length, 0.01, 1.0, nodes, direction);
+    runtime, s0, bcs, length, 0.01, 1.0, nodes, direction);
   ASSERT_NE(handle, nullptr);
 
   ib_mesh_t mesh = ib_force_coupled_get_current(handle);
@@ -185,5 +204,5 @@ TEST(IBEulerBeamCAPITest, HuangAcceptsThreeDimensionalDirection)
   EXPECT_NEAR(mesh.position[nodes - 1].z, s0.z, 1e-14);
 
   ib_mesh_free(&mesh);
-  ib_euler_beam_huang_destroy(handle);
+  ib_runtime_delete(runtime);
 }
