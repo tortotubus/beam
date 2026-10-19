@@ -1,6 +1,5 @@
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
-#include <elff/models/articulated/BendingRodSegmentsIMEX.hpp>
-#include <elff/models/articulated/BendingRodSegmentsImplicit.hpp>
+#include <elff/models/articulated/IBBendingRodImplicit.hpp>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -46,8 +45,7 @@ double length_error(const IBMesh &mesh, double segment_length)
 
 } // namespace
 
-template <class Rod, class Config>
-void run_glowinski_straight(Config config, const std::string &output_name)
+void run_glowinski_straight(BendingRodImplicitConfig config, const std::string &output_name)
 {
   // Match the Glowinski beam benchmarks: 61 nodes, length 32.6, EI 700,
   // linear density 7.67 and gravity 9.81; run for ten seconds.
@@ -67,13 +65,13 @@ void run_glowinski_straight(Config config, const std::string &output_name)
   config.boundary = Boundary::Pinned;
   config.pin = Vec3::Zero();
   config.gravity = Vec3(0.0, -9.81, 0.0);
-  Rod rod(config);
+  IBBendingRodImplicit rod(config);
 
   // Start horizontal and at rest, rather than from the static sagged shape
   // used by the other Glowinski benchmarks.
-  const Eigen::VectorXd initial = rod.initialState({Vec3::UnitX()});
-  rod.setState(initial);
-  const Vec3 initial_tip = rod.nodes(initial).row(config.links).transpose();
+  BendingRodMesh initial(nodes, config.length);
+  rod.apply_initial_condition(initial);
+  const auto initial_tip = initial.get_centerline(nodes - 1);
   const double geometry_tolerance = std::max(1e-12, 20.0 * std::numeric_limits<real_t>::epsilon());
 
   // Gravity is already in the model; no additional IB traction is applied.
@@ -89,7 +87,8 @@ void run_glowinski_straight(Config config, const std::string &output_name)
     SCOPED_TRACE(::testing::Message() << "step=" << step);
     if (step > 0)
       coupled.GetNext(traction, dt);
-    ASSERT_TRUE(rod.state().allFinite());
+    for (const auto &point : rod.get_mesh().get_centerline())
+      for (auto value : point) ASSERT_TRUE(std::isfinite(value));
     if (step % output_stride != 0 && step != steps)
       continue;
 
@@ -105,7 +104,7 @@ void run_glowinski_straight(Config config, const std::string &output_name)
     const double error = length_error(mesh, config.length / config.links);
     ASSERT_LT(error, geometry_tolerance);
 
-    const double energy = rod.energy(rod.state());
+    const double energy = rod.energy();
     ASSERT_TRUE(std::isfinite(energy));
     const auto &tip = mesh.GetPoints().back();
     csv << step * dt << ',' << tip.x << ',' << tip.y << ',' << tip.z << ','
@@ -122,8 +121,11 @@ void run_glowinski_straight(Config config, const std::string &output_name)
   csv.flush();
   ASSERT_TRUE(csv.good());
 
-  const Vec3 final_tip = rod.nodes(rod.state()).row(config.links).transpose();
-  EXPECT_GT((final_tip - initial_tip).norm(), 0.05 * config.length);
+  const auto final_tip = rod.get_mesh().get_centerline(nodes - 1);
+  double displacement_squared = 0;
+  for (size_t d = 0; d < 3; ++d)
+    displacement_squared += std::pow(final_tip[d] - initial_tip[d], 2);
+  EXPECT_GT(std::sqrt(displacement_squared), 0.05 * config.length);
 
   const double elapsed = std::chrono::duration<double>(
       std::chrono::steady_clock::now() - start).count();
@@ -132,26 +134,11 @@ void run_glowinski_straight(Config config, const std::string &output_name)
                    << elapsed << " s";
 }
 
-TEST(BendingRodSegmentsBenchmark, GlowinskiStraightPinnedFree)
-{
-  BendingRodSegmentsConfig config;
-  config.integration_step = 0.01 / 8;
-  run_glowinski_straight<BendingRodSegments>(config,
-      "glowinski_bending_rod_segments_straight");
-}
-
-TEST(BendingRodSegmentsIMEXBenchmark, GlowinskiStraightPinnedFree)
-{
-  // One second-order IMEX update every 0.01 s; no adaptive step control.
-  run_glowinski_straight<BendingRodSegmentsIMEX>(BendingRodSegmentsIMEXConfig{},
-      "glowinski_bending_rod_segments_imex_straight");
-}
-
-TEST(BendingRodSegmentsImplicitBenchmark, GlowinskiStraightPinnedFree)
+TEST(BendingRodImplicitBenchmark, GlowinskiStraightPinnedFree)
 {
   // One fully implicit generalized-alpha step per output interval.
-  run_glowinski_straight<BendingRodSegmentsImplicit>(BendingRodSegmentsImplicitConfig{},
-      "glowinski_bending_rod_segments_implicit_straight");
+  run_glowinski_straight(BendingRodImplicitConfig{},
+      "glowinski_bending_rod_implicit_straight");
 }
 
 } // namespace ELFF

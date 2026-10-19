@@ -3,6 +3,7 @@
 #include "elff/io/C/xmlCase.h"
 #include "elff/io/CXX/xmlCase.hpp"
 #include "elff/models/beam/EulerBeamHuangXML.hpp"
+#include "elff/models/articulated/BendingRodImplicitBuilder.hpp"
 #include "elff/models/beam/EulerBeamHuangBuilder.hpp"
 #include "elff/models/ibm/IBRuntime.hpp"
 #include "embeddedELFFDtd.hpp"
@@ -21,7 +22,7 @@ using namespace ELFF;
 
 namespace {
 
-using IBRuntimeModelDefinition = std::variant<EulerBeamHuangDefinition>;
+using IBRuntimeModelDefinition = std::variant<EulerBeamHuangDefinition, BendingRodImplicitDefinition>;
 
 enum class ModelDistribution { Rank0, RoundRobin };
 
@@ -129,18 +130,22 @@ bool parse_runtime_definition(elff_xml_node_t elff,
         elff_xml_node_name(model, &name, &xml_error) != ELFF_XML_OK)
       return copy_xml_error(
         error, i, xml_error, "Unable to read an ordered model element.");
-    if (std::strcmp(name, "EulerBeamHuang") != 0) {
+    if (std::strcmp(name, "EulerBeamHuang") != 0 &&
+        std::strcmp(name, "BendingRodSegmentsImplicit") != 0) {
       size_t line = 0;
       elff_xml_node_line(model, &line, nullptr);
       set_error(error,
                 i,
                 static_cast<long>(line),
                 0,
-                "Only <EulerBeamHuang> is supported in schema v1.");
+                "Unsupported model in schema v1.");
       return false;
     }
     try {
-      definition.models.emplace_back(parse_euler_beam_huang_xml(model));
+      if (std::strcmp(name, "EulerBeamHuang") == 0)
+        definition.models.emplace_back(parse_euler_beam_huang_xml(model));
+      else
+        definition.models.emplace_back(parse_bending_rod_implicit_xml(model));
     } catch (const IO::CXX::XMLError& exception) {
       return copy_xml_error(error, i, exception.diagnostic(), exception.what());
     }
@@ -156,50 +161,42 @@ build_runtime(IBRuntime& runtime,
   for (size_t i = 0; i < definition.models.size(); ++i) {
     const auto* huang =
       std::get_if<EulerBeamHuangDefinition>(&definition.models[i]);
-    if (!huang) {
-      set_error(error, i, 0, 0, "Unsupported runtime model definition.");
-      return false;
-    }
+    const auto* rod = std::get_if<BendingRodImplicitDefinition>(&definition.models[i]);
+    const auto type = huang ? IBRuntimeModelType::EulerBeamHuang
+                           : IBRuntimeModelType::BendingRodImplicit;
+    const long source_line = huang ? huang->source_line : rod->source_line;
     ib_model_info_t info = {1, 0, -1, 0};
-    info.node_count = static_cast<int>(huang->nodes);
+    info.node_count = huang ? static_cast<int>(huang->nodes) : rod->config.links + 1;
     info.owner_rank = definition.distribution == ModelDistribution::RoundRobin
       ? static_cast<int>(i % static_cast<size_t>(runtime.ranks())) : 0;
     if (runtime.rank() != info.owner_rank) {
-      runtime.add_remote_huang(info);
+      runtime.add_remote_force_model(type, info);
       continue;
     }
     try {
-      EulerBeamMesh initial_mesh = make_huang_direction_initial_mesh(
-        huang->anchor,
-        huang->nodes,
-        huang->length,
-        huang->direction,
-        huang->anchor_at_right);
-      auto beam = build_euler_beam_huang(std::move(initial_mesh),
-                                         huang->length,
-                                         huang->bending_rigidity,
-                                         huang->linear_density,
-                                         huang->nodes,
-                                         huang->boundary_conditions);
-      if (!runtime.adopt_owned_model(IBRuntimeModelType::EulerBeamHuang,
-                                      std::move(beam))) {
-        set_error(error,
-                  i,
-                  huang->source_line,
-                  0,
-                  "Unable to adopt EulerBeamHuang model.");
+      std::unique_ptr<IBModel> model;
+      if (huang) {
+        EulerBeamMesh initial_mesh = make_huang_direction_initial_mesh(
+          huang->anchor, huang->nodes, huang->length, huang->direction, huang->anchor_at_right);
+        model = build_euler_beam_huang(std::move(initial_mesh), huang->length,
+          huang->bending_rigidity, huang->linear_density, huang->nodes, huang->boundary_conditions);
+      } else {
+        model = build_bending_rod_implicit(*rod);
+      }
+      if (!runtime.adopt_owned_model(type, std::move(model))) {
+        set_error(error, i, source_line, 0, "Unable to adopt model.");
         return false;
       }
       runtime.configure_last_model(info);
     } catch (const std::exception& exception) {
-      set_error(error, i, huang->source_line, 0, exception.what());
+      set_error(error, i, source_line, 0, exception.what());
       return false;
     } catch (...) {
       set_error(error,
                 i,
-                huang->source_line,
+                source_line,
                 0,
-                "Unknown error while constructing EulerBeamHuang model.");
+                "Unknown error while constructing model.");
       return false;
     }
   }

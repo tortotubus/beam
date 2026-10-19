@@ -8,16 +8,8 @@ target_link_libraries(elff_benchmark_tests PRIVATE ELFF GTest::gtest_main)
 
 if(ELFF_BUILD_THIRD_PARTY_GTEST)
     add_test(
-        NAME BendingRodSegmentsImplicitBenchmark
-        COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsImplicitBenchmark.*
-    )
-    add_test(
-        NAME BendingRodSegmentsIMEXBenchmark
-        COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsIMEXBenchmark.*
-    )
-    add_test(
-        NAME BendingRodSegmentsBenchmark
-        COMMAND elff_benchmark_tests --gtest_filter=BendingRodSegmentsBenchmark.*
+        NAME BendingRodImplicitBenchmark
+        COMMAND elff_benchmark_tests --gtest_filter=BendingRodImplicitBenchmark.*
     )
     add_test(
         NAME EulerBeamDynamicMoMSparseTest
@@ -65,6 +57,7 @@ target_compile_definitions(
 
 if(ELFF_BUILD_THIRD_PARTY_GTEST)
     add_test(NAME XMLNodeTest COMMAND elff_unit_tests --gtest_filter=XMLNodeTest.*)
+    add_test(NAME BendingRodImplicitXMLTest COMMAND elff_unit_tests --gtest_filter=BendingRodImplicitXMLTest.*)
     add_test(NAME EulerBeamHuangXMLTest COMMAND elff_unit_tests --gtest_filter=EulerBeamHuangXMLTest.*)
     add_test(
         NAME BasiliskCaseReaderTest
@@ -79,16 +72,8 @@ if(ELFF_BUILD_THIRD_PARTY_GTEST)
         COMMAND elff_unit_tests --gtest_filter=XMLCaseDocument*.*
     )
     add_test(
-        NAME BendingRodSegmentsImplicitTest
-        COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsImplicitTest.*
-    )
-    add_test(
-        NAME BendingRodSegmentsIMEXTest
-        COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsIMEXTest.*
-    )
-    add_test(
-        NAME BendingRodSegmentsTest
-        COMMAND elff_unit_tests --gtest_filter=BendingRodSegmentsTest.*
+        NAME BendingRodImplicitTest
+        COMMAND elff_unit_tests --gtest_filter=BendingRodImplicitTest.*
     )
     add_test(
         NAME vtkHDFPolyDataStaticWriterTest
@@ -157,3 +142,34 @@ find_package(Python3 3.7 REQUIRED COMPONENTS Interpreter)
 add_test(NAME ModelDTDGeneration
     COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/python/test_bundle_dtd.py")
+
+if(ELFF_USE_MPI AND ELFF_USE_LIBXML2)
+    add_executable(elff_runtime_implicit_rod_mpi mpi/IBRuntimeImplicitRod.cpp)
+    target_link_libraries(elff_runtime_implicit_rod_mpi PRIVATE ELFF MPI::MPI_CXX)
+    add_test(NAME IBRuntimeImplicitRodMPI
+        COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+                ${MPIEXEC_PREFLAGS} $<TARGET_FILE:elff_runtime_implicit_rod_mpi>
+                ${MPIEXEC_POSTFLAGS})
+    set_tests_properties(IBRuntimeImplicitRodMPI PROPERTIES PROCESSORS 2 TIMEOUT 60)
+endif()
+
+if(ELFF_USE_LIBXML2 AND TARGET flapping_fibre_serial)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/implicit_rod_serial")
+    configure_file("${CMAKE_SOURCE_DIR}/basilisk/examples/cases/implicit_rod.xml"
+        "${CMAKE_CURRENT_BINARY_DIR}/implicit_rod_serial/case.xml" COPYONLY)
+    add_test(NAME BasiliskImplicitRodSerial
+        COMMAND $<TARGET_FILE:flapping_fibre_serial> case.xml)
+    set_tests_properties(BasiliskImplicitRodSerial PROPERTIES TIMEOUT 60
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/implicit_rod_serial")
+endif()
+if(ELFF_USE_LIBXML2 AND TARGET flapping_fibre_mpi AND MPIEXEC_EXECUTABLE)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/implicit_rod_mpi")
+    configure_file("${CMAKE_SOURCE_DIR}/basilisk/examples/cases/implicit_rod.xml"
+        "${CMAKE_CURRENT_BINARY_DIR}/implicit_rod_mpi/case.xml" COPYONLY)
+    add_test(NAME BasiliskImplicitRodMPI
+        COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2
+                ${MPIEXEC_PREFLAGS} $<TARGET_FILE:flapping_fibre_mpi> case.xml
+                ${MPIEXEC_POSTFLAGS})
+    set_tests_properties(BasiliskImplicitRodMPI PROPERTIES PROCESSORS 2 TIMEOUT 60
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/implicit_rod_mpi")
+endif()

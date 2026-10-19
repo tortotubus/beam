@@ -1,6 +1,8 @@
 <!-- Model schemas are included using native DTD parameter entities. -->
 <!ENTITY % EulerBeamHuang SYSTEM "../../../models/beam/EulerBeamHuang-v1.dtd">
 %EulerBeamHuang;
+<!ENTITY % BendingRodSegmentsImplicit SYSTEM "../../../models/articulated/BendingRodSegmentsImplicit-v1.dtd">
+%BendingRodSegmentsImplicit;
 
 <!-- ELFF-owned portion of a version-1 simulation case. -->
 <!ELEMENT ELFF (Models)>
@@ -9,5 +11,5 @@
   dimensions (2|3) #REQUIRED
   units (nondimensional|SI) #REQUIRED>
 
-<!ELEMENT Models (EulerBeamHuang)+>
+<!ELEMENT Models (EulerBeamHuang|BendingRodSegmentsImplicit)+>
 <!ATTLIST Models distribution (rank0|round-robin) "rank0">

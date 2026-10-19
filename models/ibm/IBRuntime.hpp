@@ -39,7 +39,8 @@ enum class IBRuntimeModelType : int32_t
   PinnedRigidBodyCircle = 10,
   PinnedRigidBodyFibre = 11,
   PinnedRigidBodySphere = 12,
-  SpringCircle = 13
+  SpringCircle = 13,
+  BendingRodImplicit = 14
 };
 
 struct IBRuntimeModelState
@@ -108,10 +109,13 @@ public:
     return count;
   }
 
-  void add_remote_huang(ib_model_info_t info) {
+  void add_remote_force_model(IBRuntimeModelType type, ib_model_info_t info) {
     if (sealed_) throw std::logic_error("Runtime is sealed");
-    entries_.push_back({IBRuntimeModelType::EulerBeamHuang, info.owner_rank,
+    entries_.push_back({type, info.owner_rank,
       IB_MODEL_VIEW_FORCE_COUPLED, nullptr, nullptr, nullptr, info});
+  }
+  void add_remote_huang(ib_model_info_t info) {
+    add_remote_force_model(IBRuntimeModelType::EulerBeamHuang, info);
   }
   void configure_last_model(ib_model_info_t info) {
     entries_.back().info = info;

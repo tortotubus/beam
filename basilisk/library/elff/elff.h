@@ -271,8 +271,17 @@ trace void elff_fc_advance (void* ctx, void* raw_mesh, double dt) {
       assert (rc == 0);
     }
   ib_mesh_free (&adapter->output);
-  adapter->output = ib_force_coupled_get_next (
-    adapter->model, adapter->forces, adapter->count, dt);
+  char diagnostic[512];
+  int rc = ib_force_coupled_get_next_checked (
+    adapter->model, adapter->forces, adapter->count, dt,
+    &adapter->output, diagnostic, sizeof diagnostic);
+  if (rc != 0) {
+    fprintf (stderr, "ELFF force-coupled step failed: %s\n", diagnostic);
+#if _MPI
+    MPI_Abort (MPI_COMM_WORLD, EXIT_FAILURE);
+#endif
+    abort ();
+  }
   assert (adapter->output.n == adapter->count);
   elff_fc_publish_local (adapter, mesh);
 }

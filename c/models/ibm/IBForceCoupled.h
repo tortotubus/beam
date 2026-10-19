@@ -1,4 +1,5 @@
 #pragma once
+#include <stddef.h>
 
 #include "elff/c/models/ibm/IBMesh.h"
 
@@ -42,13 +43,21 @@ extern "C"
    * @param force Array of nodal forces
    * @param n Number of force entries
    * @param dt Time-step size
-   * @return Next mesh state
+   * @return Next mesh state, or an empty mesh on failure
    */
   ib_mesh_t ib_force_coupled_get_next(
     ib_force_coupled_t handle,
     vertex_t* force,
     int n,
     double dt);
+  /** Checked stepping. Returns zero on success and -1 on failure, with an
+   * empty output and an optional NUL-terminated diagnostic. The output must
+   * not own allocations on entry; release a successful result with ib_mesh_free.
+   * Forces are densities per unit length for rod/beam models.
+   */
+  int ib_force_coupled_get_next_checked(
+    ib_force_coupled_t handle, const vertex_t* force, int n, double dt,
+    ib_mesh_t* output, char* error, size_t error_capacity);
   /** @} */
 
 #ifdef __cplusplus
