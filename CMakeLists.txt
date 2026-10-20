@@ -114,6 +114,7 @@ configure_file(
 )
 
 set(ELFF_DIRS 
+  contact
   c/general
   c/models/beam
   c/models/capsule
@@ -147,6 +148,7 @@ file(GLOB_RECURSE ELFF_PUBLIC_HEADERS
   RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
   "${CMAKE_CURRENT_SOURCE_DIR}/c/*.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/c/*.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/contact/*.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/config/*.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/config/*.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/fem/*.h"
