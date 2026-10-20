@@ -26,15 +26,15 @@ struct BendingRodImplicitConfig {
   /**
    * @brief Total rod length \f(L>0\f).
    */
-  double length = 1.0;
+  real_t length = 1.0;
   /**
    * @brief Positive total mass \f(M\f) used when @ref masses is empty.
    */
-  double total_mass = 1.0;
+  real_t total_mass = 1.0;
   /**
    * @brief Nonnegative bending rigidity \f(EI\f), used for default joint stiffness.
    */
-  double ei = 0.0;
+  real_t ei = 0.0;
   /**
    * @brief Fix node zero for Pinned; allow center-of-mass translation for Free.
    */
@@ -51,25 +51,25 @@ struct BendingRodImplicitConfig {
   /**
    * @brief Positive link masses \f(m_i\f); defaults to \f(M/n\f) on each link.
    */
-  std::vector<double> masses;
+  std::vector<real_t> masses;
   /**
    * @brief Positive transverse inertias \f(I_i\f); defaults to \f(m_i h^2/12\f).
    */
-  std::vector<double> inertias;
+  std::vector<real_t> inertias;
   /**
    * @brief Nonnegative stiffnesses of the \f(n-1\f) joints; defaults to \f(EI/h\f).
    */
-  std::vector<double> bending_stiffness;
+  std::vector<real_t> bending_stiffness;
   /**
    * @brief Nonnegative rotational damping coefficients of the \f(n-1\f) joints; defaults to zero.
    */
-  std::vector<double> bending_damping;
+  std::vector<real_t> bending_damping;
 
   /**
    * @brief High-frequency spectral radius \f(\rho_\infty\in[0,1]\f).
    * Smaller values increase numerical damping of fast linear modes.
    */
-  double spectral_radius = 0.8;
+  real_t spectral_radius = 0.8;
   /**
    * @brief Positive nonlinear residual tolerance \f(\varepsilon\f).
    * The mass-scaled momentum residual is accepted when
@@ -77,7 +77,7 @@ struct BendingRodImplicitConfig {
    * (1+\|\mathbf{v}\|_\infty)\f), where \f(\mathbf{v}\f) is the
    * initial velocity in the step's local coordinates.
    */
-  double nonlinear_tolerance = 1e-9;
+  real_t nonlinear_tolerance = 1e-9;
   /**
    * @brief Positive maximum number of Newton updates per structural step.
    */
@@ -174,7 +174,7 @@ public:
    * @brief Return the current kinetic, bending and gravitational potential energy.
    * @return Mechanical energy; excludes external-load work and dissipated energy.
    */
-  double energy() const { return energy(state_); }
+  real_t energy() const { return energy(state_); }
 
 protected:
   /**
@@ -190,7 +190,7 @@ protected:
    * On success this method updates the mutable acceleration history and previous
    * timestep. On validation or convergence failure, that history is unchanged.
    */
-  Eigen::VectorXd integrateState(const Eigen::VectorXd &state, double dt,
+  Eigen::VectorXd integrateState(const Eigen::VectorXd &state, real_t dt,
                                 const std::vector<Vec3> &loads) const;
   /**
    * @brief Validate integrated nodal loads, advance the state and refresh the mesh.
@@ -198,7 +198,7 @@ protected:
    * @param nodal_forces Integrated forces on all \f(n+1\f) nodes; empty means zero.
    * The new state is committed after integrateState() succeeds.
    */
-  void advance(double dt, const std::vector<Vec3>& nodal_forces = {});
+  void advance(real_t dt, const std::vector<Vec3>& nodal_forces = {});
   /**
    * @brief Return the stored structural state without modifying its constraints or history.
    */
@@ -248,7 +248,7 @@ protected:
    * @return State derivative including gravity, bending and damping. For a free rod,
    * \f(\ddot{\mathbf{c}}=\mathbf{g}+M^{-1}\sum_j\mathbf{F}_j\f).
    */
-  Eigen::VectorXd rhs(double time, const Eigen::VectorXd &state,
+  Eigen::VectorXd rhs(real_t time, const Eigen::VectorXd &state,
                       const std::vector<Vec3> &nodal_forces = {}) const;
   /**
    * @brief Reconstruct node positions from the link tangents and boundary condition.
@@ -267,7 +267,7 @@ protected:
    *  U_g=-\sum_i m_i\mathbf{g}\cdot\mathbf{c}_i.
    * \f]
    */
-  double energy(const Eigen::VectorXd &state) const;
+  real_t energy(const Eigen::VectorXd &state) const;
   /**
    * @brief Enforce unit tangents and remove axial spin from a state in place.
    * @param[in,out] state Vector with the expected state size and nonzero finite tangents.
@@ -299,7 +299,7 @@ protected:
   /**
    * @brief Require a finite, nonnegative value, using the supplied name in diagnostics.
    */
-  static void validateNonnegative(double value, const char *name);
+  static void validateNonnegative(real_t value, const char *name);
   /**
    * @brief Expand an empty array to the fallback, broadcast one value, or accept exactly \f(n\f) values.
    */
@@ -351,15 +351,15 @@ protected:
   /**
    * @brief Total length \f(L\f).
    */
-  double length_;
+  real_t length_;
   /**
    * @brief Uniform link length \f(h=L/n\f).
    */
-  double h_ = 0.0;
+  real_t h_ = 0.0;
   /**
    * @brief Sum of the resolved link masses \f(M=\sum_i m_i\f).
    */
-  double total_mass_;
+  real_t total_mass_;
   /**
    * @brief Pinned or free translational boundary condition.
    */
@@ -375,19 +375,19 @@ protected:
   /**
    * @brief Resolved positive mass \f(m_i\f) of each link.
    */
-  std::vector<double> masses_;
+  std::vector<real_t> masses_;
   /**
    * @brief Resolved positive transverse inertia \f(I_i\f) of each link.
    */
-  std::vector<double> inertias_;
+  std::vector<real_t> inertias_;
   /**
    * @brief Resolved nonnegative stiffness \f(k_i\f) of each interior joint.
    */
-  std::vector<double> bending_stiffness_;
+  std::vector<real_t> bending_stiffness_;
   /**
    * @brief Resolved nonnegative damping coefficient of each interior joint.
    */
-  std::vector<double> bending_damping_;
+  std::vector<real_t> bending_damping_;
   /**
    * @brief Tangent weights locating the center of mass relative to node zero.
    * \f[ c_i=\frac{h}{M}\left(\frac{m_i}{2}+\sum_{j=i+1}^{n-1}m_j\right),
@@ -413,7 +413,7 @@ protected:
    * @brief Generalized-alpha spectral radius \f(\rho_\infty\f) and nonlinear
    * residual tolerance \f(\varepsilon\f), respectively.
    */
-  double spectral_radius_, tolerance_;
+  real_t spectral_radius_, tolerance_;
   /**
    * @brief Maximum number of Newton updates per structural step.
    */
@@ -429,7 +429,7 @@ protected:
    * @brief Timestep associated with @ref acceleration_; zero when history is absent.
    * A changed timestep causes the next step to initialize acceleration from rhs().
    */
-  mutable double previous_dt_ = 0.0;
+  mutable real_t previous_dt_ = 0.0;
 };
 
 } // namespace Models

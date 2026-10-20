@@ -11,15 +11,15 @@ namespace ELFF {
 namespace Models {
 namespace {
 using Vec2 = Eigen::Vector2d;
-using Vec5 = Eigen::Matrix<double, 5, 1>;
-using Vec6 = Eigen::Matrix<double, 6, 1>;
+using Vec5 = Eigen::Matrix<real_t, 5, 1>;
+using Vec6 = Eigen::Matrix<real_t, 6, 1>;
 using Mat3 = Eigen::Matrix3d;
-using Mat5 = Eigen::Matrix<double, 5, 5>;
-using Mat6 = Eigen::Matrix<double, 6, 6>;
-using Mat62 = Eigen::Matrix<double, 6, 2>;
-using Mat65 = Eigen::Matrix<double, 6, 5>;
+using Mat5 = Eigen::Matrix<real_t, 5, 5>;
+using Mat6 = Eigen::Matrix<real_t, 6, 6>;
+using Mat62 = Eigen::Matrix<real_t, 6, 2>;
+using Mat65 = Eigen::Matrix<real_t, 6, 5>;
 using Mat2 = Eigen::Matrix2d;
-using Mat32 = Eigen::Matrix<double, 3, 2>;
+using Mat32 = Eigen::Matrix<real_t, 3, 2>;
 
 Mat3 crossMatrix(const Vec3 &value) {
   Mat3 result;
@@ -41,7 +41,7 @@ std::vector<Value> configuredValues(const std::vector<Value> &supplied,
   return supplied;
 }
 
-using Basis = Eigen::Matrix<double, 3, 2>;
+using Basis = Eigen::Matrix<real_t, 3, 2>;
 size_t checkedNodeCount(const BendingRodImplicitConfig &config) {
   if (config.links < 1 || config.links > INT_MAX / 6 - 1 ||
       (config.boundary != Boundary::Pinned &&
@@ -102,7 +102,7 @@ Chart<T> chart(const Vec3 &origin, const Basis &b, const Vector2<T> &u,
 template <typename T>
 Vector3<T> jointTorque(const Vector3<T> &a, const Vector3<T> &b,
                        const Vector3<T> &wa, const Vector3<T> &wb,
-                       double stiffness, double damping) {
+                       real_t stiffness, real_t damping) {
   using std::atan2;
   using std::sqrt;
   const Vector3<T> cross = a.cross(b);
@@ -149,11 +149,11 @@ BendingRodImplicit::BendingRodImplicit(const BendingRodImplicitConfig &config)
     ELFF_ABORT(
         "beam parameters must be finite and nonnegative");
   }
-  h_ = length_ / static_cast<double>(n_);
+  h_ = length_ / static_cast<real_t>(n_);
 
   masses_ = configuredValues(config.masses, n_, total_mass_ / n_, "masses");
   total_mass_ = 0.0;
-  for (double mass : masses_) {
+  for (real_t mass : masses_) {
     if (!std::isfinite(mass) || mass <= 0.0) {
       ELFF_ABORT("masses must be finite and positive");
     }
@@ -168,7 +168,7 @@ BendingRodImplicit::BendingRodImplicit(const BendingRodImplicitConfig &config)
   } else {
     inertias_ = configuredValues(config.inertias, n_, 0.0, "inertias");
   }
-  for (double inertia : inertias_) {
+  for (real_t inertia : inertias_) {
     if (!std::isfinite(inertia) || inertia <= 0.0) {
       ELFF_ABORT(
           "transverse inertias must be finite and positive");
@@ -186,7 +186,7 @@ BendingRodImplicit::BendingRodImplicit(const BendingRodImplicitConfig &config)
   }
 
   com_weights_.resize(n_);
-  double downstream_mass = 0.0;
+  real_t downstream_mass = 0.0;
   for (int i = n_ - 1; i >= 0; --i) {
     downstream_mass += masses_[i];
     com_weights_[i] = h_ * (downstream_mass - 0.5 * masses_[i]) / total_mass_;
@@ -215,7 +215,7 @@ void BendingRodImplicit::setState(const Eigen::VectorXd &state) {
 }
 
 Eigen::VectorXd
-BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
+BendingRodImplicit::integrateState(const Eigen::VectorXd &state, real_t dt,
                                    const std::vector<Vec3> &loads) const {
   if (!std::isfinite(dt) || dt <= 0)
     ELFF_ABORT(
@@ -248,10 +248,10 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
     old_acceleration.segment<2>(shift + 2 * i) = basis[i].transpose() * ambient;
   }
 
-  const double am = (2.0 - spectral_radius_) / (1.0 + spectral_radius_);
-  const double af = 1.0 / (1.0 + spectral_radius_);
-  const double gamma = 0.5 + am - af;
-  const double beta = 0.25 * std::pow(1.0 + am - af, 2);
+  const real_t am = (2.0 - spectral_radius_) / (1.0 + spectral_radius_);
+  const real_t af = 1.0 / (1.0 + spectral_radius_);
+  const real_t gamma = 0.5 + am - af;
+  const real_t beta = 0.25 * std::pow(1.0 + am - af, 2);
   const Eigen::VectorXd predictor =
       dt * velocity + dt * dt * (0.5 - beta) * old_acceleration;
   const Eigen::VectorXd velocity_predictor =
@@ -264,7 +264,7 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
       result.segment<3>(velocityOffset()) = v.head<3>();
     }
     for (int i = 0; i < n_; ++i) {
-      const auto c = chart<double>(parts.tangents[i], basis[i],
+      const auto c = chart<real_t>(parts.tangents[i], basis[i],
                                    q.segment<2>(shift + 2 * i),
                                    v.segment<2>(shift + 2 * i));
       result.segment<3>(tangentOffset() + 3 * i) = c.tangent;
@@ -293,11 +293,11 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
         (1.0 - af) * velocity + af * (velocity_predictor + gamma / dt * x);
     const Eigen::VectorXd weighted =
         am * x + (1.0 - am) * dt * dt * old_acceleration;
-    std::vector<Chart<double>> charts(n_);
+    std::vector<Chart<real_t>> charts(n_);
     std::vector<Vec3> tangents(n_), omega(n_);
     Eigen::MatrixXd ambient(n_, 3);
     for (int i = 0; i < n_; ++i) {
-      charts[i] = chart<double>(parts.tangents[i], basis[i],
+      charts[i] = chart<real_t>(parts.tangents[i], basis[i],
                                 q.segment<2>(shift + 2 * i),
                                 v.segment<2>(shift + 2 * i));
       const auto &c = charts[i];
@@ -309,7 +309,7 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
     }
     std::vector<Vec3> torque(n_, Vec3::Zero());
     for (int i = 1; i < n_; ++i) {
-      const Vec3 joint = jointTorque<double>(
+      const Vec3 joint = jointTorque<real_t>(
           tangents[i - 1], tangents[i], omega[i - 1], omega[i],
           bending_stiffness_[i - 1], bending_damping_[i - 1]);
       torque[i] += joint;
@@ -333,7 +333,7 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
 
   Eigen::VectorXd x = -(0.5 - beta) / beta * dt * dt * old_acceleration;
   Eigen::VectorXd r = residual(x);
-  const double threshold =
+  const real_t threshold =
       tolerance_ * dt * (1.0 + velocity.lpNorm<Eigen::Infinity>());
   bool converged = false;
   for (int iteration = 0; iteration <= max_iterations_; ++iteration) {
@@ -345,7 +345,7 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
     }
     if (iteration == max_iterations_)
       break;
-    using AD = Eigen::AutoDiffScalar<Eigen::Matrix<double, 4, 1>>;
+    using AD = Eigen::AutoDiffScalar<Eigen::Matrix<real_t, 4, 1>>;
     std::vector<Chart<AD>> left(n_), right(n_);
     std::vector<Vector3<AD>> ambient(n_), omega_left(n_), omega_right(n_);
     for (int i = 0; i < n_; ++i) {
@@ -410,7 +410,7 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
     if (!delta.allFinite())
       break;
     bool accepted = false;
-    for (double scale = 1.0; scale >= 1.0 / 1024; scale *= 0.5) {
+    for (real_t scale = 1.0; scale >= 1.0 / 1024; scale *= 0.5) {
       const Eigen::VectorXd candidate = x + scale * delta;
       const Eigen::VectorXd next = residual(candidate);
       if (next.allFinite() && next.norm() < r.norm()) {
@@ -437,7 +437,7 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
     next_acceleration.head<3>() = x.head<3>() / (dt * dt);
   for (int i = 0; i < n_; ++i) {
     const auto c =
-        chart<double>(parts.tangents[i], basis[i], q.segment<2>(shift + 2 * i),
+        chart<real_t>(parts.tangents[i], basis[i], q.segment<2>(shift + 2 * i),
                       v.segment<2>(shift + 2 * i));
     next_acceleration.segment<3>(shift + 3 * i) =
         c.jacobian * (x.segment<2>(shift + 2 * i) / (dt * dt)) + c.curvature;
@@ -449,7 +449,7 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, double dt,
   return result;
 }
 
-void BendingRodImplicit::advance(double dt, const std::vector<Vec3> &loads) {
+void BendingRodImplicit::advance(real_t dt, const std::vector<Vec3> &loads) {
   if (!std::isfinite(dt) || dt < 0 ||
       (!loads.empty() && loads.size() != static_cast<size_t>(n_) + 1))
     ELFF_ABORT("invalid timestep or endpoint force count");
@@ -500,7 +500,7 @@ void BendingRodImplicit::unpack_state(const IBModelState &s) {
   for (auto value : s.reals)
     if (!std::isfinite(value))
       ELFF_ABORT("non-finite generalized-alpha checkpoint");
-  const double dt = s.reals[prefix + stateSize()];
+  const real_t dt = s.reals[prefix + stateSize()];
   if ((count && dt <= 0) || (!count && dt != 0))
     ELFF_ABORT("invalid generalized-alpha checkpoint history");
   Eigen::VectorXd restored(stateSize()), acceleration(count);
@@ -555,7 +555,7 @@ BendingRodImplicit::initialState(const std::vector<Vec3> &tangents,
 }
 
 Eigen::VectorXd
-BendingRodImplicit::rhs(double /*time*/, const Eigen::VectorXd &state,
+BendingRodImplicit::rhs(real_t /*time*/, const Eigen::VectorXd &state,
                         const std::vector<Vec3> &nodal_forces) const {
   if (!nodal_forces.empty() &&
       nodal_forces.size() != static_cast<std::size_t>(n_) + 1) {
@@ -602,7 +602,7 @@ Eigen::MatrixXd BendingRodImplicit::nodes(const Eigen::VectorXd &state) const {
   return positions;
 }
 
-double BendingRodImplicit::energy(const Eigen::VectorXd &state) const {
+real_t BendingRodImplicit::energy(const Eigen::VectorXd &state) const {
   const StateParts parts = unpack(state);
   std::vector<Vec3> center_velocity(static_cast<std::size_t>(n_));
   Vec3 endpoint_velocity = Vec3::Zero();
@@ -621,23 +621,23 @@ double BendingRodImplicit::energy(const Eigen::VectorXd &state) const {
     }
   }
 
-  double kinetic = 0.0;
+  real_t kinetic = 0.0;
   for (int i = 0; i < n_; ++i) {
     kinetic += 0.5 * masses_[i] * center_velocity[i].squaredNorm();
     kinetic += 0.5 * inertias_[i] * parts.omega[i].squaredNorm();
   }
 
-  double elastic = 0.0;
+  real_t elastic = 0.0;
   for (int i = 1; i < n_; ++i) {
-    const double cosine =
+    const real_t cosine =
         std::clamp(parts.tangents[i - 1].dot(parts.tangents[i]), -1.0, 1.0);
-    const double sine = parts.tangents[i - 1].cross(parts.tangents[i]).norm();
-    const double angle = std::atan2(sine, cosine);
+    const real_t sine = parts.tangents[i - 1].cross(parts.tangents[i]).norm();
+    const real_t angle = std::atan2(sine, cosine);
     elastic += 0.5 * bending_stiffness_[i - 1] * angle * angle;
   }
 
   const Eigen::MatrixXd positions = nodes(state);
-  double potential = 0.0;
+  real_t potential = 0.0;
   for (int i = 0; i < n_; ++i) {
     const Vec3 center =
         0.5 * (positions.row(i) + positions.row(i + 1)).transpose();
@@ -652,7 +652,7 @@ void BendingRodImplicit::normalizeState(Eigen::VectorXd &state) const {
   }
   for (int i = 0; i < n_; ++i) {
     Vec3 tangent = state.segment<3>(tangentOffset() + 3 * i);
-    const double norm = tangent.norm();
+    const real_t norm = tangent.norm();
     if (!(norm > 0.0) || !std::isfinite(norm)) {
       ELFF_ABORT("invalid tangent during integration");
     }
@@ -664,7 +664,7 @@ void BendingRodImplicit::normalizeState(Eigen::VectorXd &state) const {
   }
 }
 
-void BendingRodImplicit::validateNonnegative(double value, const char *name) {
+void BendingRodImplicit::validateNonnegative(real_t value, const char *name) {
   if (!std::isfinite(value) || value < 0.0) {
     ELFF_ABORT(name << " must be finite and nonnegative");
   }
@@ -709,7 +709,7 @@ BendingRodImplicit::unpack(const Eigen::VectorXd &state) const {
   }
   for (int i = 0; i < n_; ++i) {
     Vec3 tangent = state.segment<3>(tangentOffset() + 3 * i);
-    const double norm = tangent.norm();
+    const real_t norm = tangent.norm();
     if (!(norm > 0.0)) {
       ELFF_ABORT("state contains a zero tangent");
     }
@@ -727,8 +727,8 @@ BendingRodImplicit::jointTorques(const std::vector<Vec3> &tangents,
   std::vector<Vec3> torque(static_cast<std::size_t>(n_), Vec3::Zero());
   for (int i = 1; i < n_; ++i) {
     const Vec3 cross = tangents[i - 1].cross(tangents[i]);
-    const double sine = cross.norm();
-    const double cosine =
+    const real_t sine = cross.norm();
+    const real_t cosine =
         std::clamp(tangents[i - 1].dot(tangents[i]), -1.0, 1.0);
     Vec3 child_torque = Vec3::Zero();
     if (sine > 1e-12) {
@@ -887,7 +887,7 @@ void BendingRodImplicit::solve(real_t dt, const std::vector<Vector> &density) {
         "force density count must match rod mesh nodes");
   std::vector<Vec3> forces(density.size());
   for (size_t i = 0; i < density.size(); ++i) {
-    const double weight = (i == 0 || i + 1 == density.size()) ? h_ / 2 : h_;
+    const real_t weight = (i == 0 || i + 1 == density.size()) ? h_ / 2 : h_;
     forces[i] = weight * Vec3(density[i][0], density[i][1], density[i][2]);
   }
   advance(dt, forces);
@@ -903,7 +903,7 @@ void BendingRodImplicit::apply_initial_condition(
         "initial rod mesh discretization does not match solver");
   std::vector<Vec3> positions(n_ + 1), velocity(n_ + 1), tangents(n_),
       omega(n_);
-  double position_scale = length_, velocity_scale = 1;
+  real_t position_scale = length_, velocity_scale = 1;
   for (int i = 0; i <= n_; ++i) {
     const auto &x = initial.get_centerline(i);
     const auto &v = initial.get_centerline_velocity(i);
@@ -916,14 +916,14 @@ void BendingRodImplicit::apply_initial_condition(
     velocity_scale =
         std::max(velocity_scale, velocity[i].cwiseAbs().maxCoeff());
   }
-  const double tolerance = 64 * std::numeric_limits<real_t>::epsilon();
+  const real_t tolerance = 64 * std::numeric_limits<real_t>::epsilon();
   if (!isFree() && ((positions[0] - pin_).norm() > tolerance * position_scale ||
                     velocity[0].norm() > tolerance * velocity_scale))
     ELFF_ABORT("initial rod mesh must respect the fixed pin");
   Vec3 center = Vec3::Zero(), center_velocity = Vec3::Zero();
   for (int i = 0; i < n_; ++i) {
     const Vec3 edge = positions[i + 1] - positions[i];
-    const double length = edge.norm();
+    const real_t length = edge.norm();
     if (!std::isfinite(length) || length <= 0 ||
         std::abs(length - h_) > tolerance * position_scale)
       ELFF_ABORT(
