@@ -77,7 +77,7 @@ IBRigidBodySphere::RigidBodyToIBMeshes()
 }
 
 void
-IBRigidBodySphere::pack_state(IBModelState& s) const
+IBRigidBodySphere::pack_state(ModelState& s) const
 {
   s.ints.clear();
   s.reals.clear();
@@ -112,7 +112,7 @@ IBRigidBodySphere::pack_state(IBModelState& s) const
 }
 
 void
-IBRigidBodySphere::unpack_state(const IBModelState& s)
+IBRigidBodySphere::unpack_state(const ModelState& s)
 {
   ELFF_ASSERT(s.ints.size() == 3,
               "IBRigidBodySphere::unpack_state(): invalid integer metadata.\n");

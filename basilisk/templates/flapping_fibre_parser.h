@@ -32,7 +32,7 @@ static int flapping_fibre_case_init (const char *path, FlappingFibreCase *config
   }
   // Both readers consume this same document; runtime construction copies
   // what it needs, so no borrowed node survives document destruction.
-  ib_runtime_error runtime_error = {0};
+  model_runtime_error runtime_error = {0};
   int rc = elff_init_document (document, &runtime_error);
   elff_xml_document_destroy (document);
   if (rc != 0) {

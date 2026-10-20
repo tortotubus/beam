@@ -1,7 +1,7 @@
 #pragma once
 
 #include "elff/c/models/beam/IBEulerBeamBCs.h"
-#include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ibm/IBCoupling.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -10,7 +10,7 @@ extern "C"
 
   typedef void* ib_euler_beam_huang_t;
 
-  ib_euler_beam_huang_t ib_euler_beam_huang_new(ib_runtime_t runtime,
+  ib_euler_beam_huang_t ib_euler_beam_huang_new(ib_coupling_t runtime,
                                                 vertex_t s0,
                                                 ib_euler_beam_bcs_t bcs,
                                                 double length,
@@ -18,7 +18,7 @@ extern "C"
                                                 double mu,
                                                 int nodes);
 
-  ib_euler_beam_huang_t ib_euler_beam_huang_new_theta(ib_runtime_t runtime,
+  ib_euler_beam_huang_t ib_euler_beam_huang_new_theta(ib_coupling_t runtime,
                                                       vertex_t s0,
                                                       ib_euler_beam_bcs_t bcs,
                                                       double length,
@@ -28,7 +28,7 @@ extern "C"
                                                       double theta);
 
   ib_euler_beam_huang_t ib_euler_beam_huang_new_direction(
-    ib_runtime_t runtime,
+    ib_coupling_t runtime,
     vertex_t s0,
     ib_euler_beam_bcs_t bcs,
     double length,

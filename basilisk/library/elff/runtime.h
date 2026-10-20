@@ -8,14 +8,16 @@
 
 #include "library/io/output-dump.h"
 #include "library/io/vtk/vtkTimeSeries.h"
-#include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ModelRuntime.h"
+#include "elff/c/models/ibm/IBCoupling.h"
 #include "elff/c/general/output.h"
 
 // ============================================================================
 // Globals
 // ============================================================================
 
-static ib_runtime_t elff_runtime = NULL;
+static model_runtime_t elff_runtime = NULL;
+static ib_coupling_t elff_ib_coupling = NULL;
 static bool elff_checkpoint_restored = false;
 static ib_model_view_array_t elff_model_views = {0};
 
@@ -23,9 +25,10 @@ static ib_model_view_array_t elff_model_views = {0};
 // Function declarations
 // ============================================================================
 
-static inline ib_runtime_t elff_runtime_get ();
+static inline model_runtime_t elff_runtime_get ();
+static inline ib_coupling_t elff_ib_coupling_get ();
 static inline void elff_runtime_init ();
-static inline int elff_init (const char* case_path, ib_runtime_error* error);
+static inline int elff_init (const char* case_path, model_runtime_error* error);
 static inline ib_model_view_array_t elff_models ();
 static inline void elff_deinit ();
 static inline int elff_dump (const char* fname);
@@ -51,16 +54,16 @@ static inline void elff_runtime_free ();
  * This convenience path stops on setup failure rather than returning an
  * unconfigured runtime to model constructors.
  */
-static inline ib_runtime_t elff_runtime_get () {
+static inline model_runtime_t elff_runtime_get () {
   if (!elff_runtime) {
-    elff_runtime = ib_runtime_new ();
+    elff_runtime = model_runtime_new ();
     if (!elff_runtime) {
       fprintf (stderr, "ELFF: unable to allocate the runtime.\n");
       abort ();
     }
 #if _MPI && defined(ELFF_USE_MPI)
-    if (ib_runtime_set_communicator (elff_runtime, MPI_COMM_WORLD) != 0) {
-      ib_runtime_delete (elff_runtime);
+    if (model_runtime_set_communicator (elff_runtime, MPI_COMM_WORLD) != 0) {
+      model_runtime_delete (elff_runtime);
       elff_runtime = NULL;
       fprintf (stderr, "ELFF: unable to initialize the runtime communicator.\n");
       abort ();
@@ -84,25 +87,38 @@ static inline ib_runtime_t elff_runtime_get () {
   return elff_runtime;
 }
 
+/** Return the runtime-owned IB component for manual model construction. */
+static inline ib_coupling_t elff_ib_coupling_get () {
+  if (!elff_ib_coupling)
+    elff_ib_coupling = ib_coupling_attach (elff_runtime_get ());
+  if (!elff_ib_coupling) {
+    fprintf (stderr, "ELFF: unable to attach IB coupling.\n");
+    abort ();
+  }
+  return elff_ib_coupling;
+}
+
 /** Create and seal the global runtime from the ordered <ELFF><Models> list. */
 static inline int elff_init_case (const char* case_path, elff_xml_document_t document,
-                                  ib_runtime_error* error) {
+                                  model_runtime_error* error) {
   if ((!case_path && !document) || elff_runtime)
     return -1;
 #if _MPI && defined(ELFF_USE_MPI)
-  if ((document ? ib_runtime_create_from_case_document_mpi (
+  if ((document ? model_runtime_create_from_case_document_mpi (
         document, MPI_COMM_WORLD, &elff_runtime, error) :
-        ib_runtime_create_from_case_file_mpi (
+        model_runtime_create_from_case_file_mpi (
         case_path, MPI_COMM_WORLD, &elff_runtime, error)) != 0)
     return -1;
 #else
-  if ((document ? ib_runtime_create_from_case_document (document, &elff_runtime, error) :
-        ib_runtime_create_from_case_file (case_path, &elff_runtime, error)) != 0)
+  if ((document ? model_runtime_create_from_case_document (document, &elff_runtime, error) :
+        model_runtime_create_from_case_file (case_path, &elff_runtime, error)) != 0)
     return -1;
 #endif
-  if (ib_runtime_get_model_views (elff_runtime, &elff_model_views) != 0) {
-    ib_runtime_delete (elff_runtime);
+  elff_ib_coupling = ib_coupling_get (elff_runtime);
+  if (ib_coupling_get_model_views (elff_ib_coupling, &elff_model_views) != 0) {
+    model_runtime_delete (elff_runtime);
     elff_runtime = NULL;
+    elff_ib_coupling = NULL;
     elff_model_views = (ib_model_view_array_t) {0};
     return -1;
   }
@@ -121,12 +137,12 @@ static inline int elff_init_case (const char* case_path, elff_xml_document_t doc
   return 0;
 }
 
-static inline int elff_init (const char* case_path, ib_runtime_error* error) {
+static inline int elff_init (const char* case_path, model_runtime_error* error) {
   return elff_init_case (case_path, NULL, error);
 }
 
 static inline int elff_init_document (elff_xml_document_t document,
-                                      ib_runtime_error* error) {
+                                      model_runtime_error* error) {
   return elff_init_case (NULL, document, error);
 }
 
@@ -134,7 +150,7 @@ static inline int elff_init_document (elff_xml_document_t document,
 static inline ib_model_view_array_t elff_models () {
   ib_model_view_array_t views = {0};
   if (elff_runtime &&
-      ib_runtime_get_model_views (elff_runtime, &views) == 0)
+      ib_coupling_get_model_views (elff_ib_coupling_get (), &views) == 0)
     return views;
   return views;
 }
@@ -142,8 +158,9 @@ static inline ib_model_view_array_t elff_models () {
 /** Destroy all runtime-owned models after Basilisk adapters have been freed. */
 static inline void elff_deinit () {
   if (elff_runtime)
-    ib_runtime_delete (elff_runtime);
+    model_runtime_delete (elff_runtime);
   elff_runtime = NULL;
+  elff_ib_coupling = NULL;
   elff_model_views = (ib_model_view_array_t) {0};
 }
 
@@ -166,7 +183,7 @@ static inline int elff_dump (const char* fname) {
   if (!elff_runtime)
     return -1;
 
-  return ib_runtime_checkpoint (elff_runtime_get (), fname);
+  return model_runtime_checkpoint (elff_runtime_get (), fname);
 }
 
 /**
@@ -178,7 +195,7 @@ static inline int elff_write_polydata (const char* fname, int overwrite = 1) {
   if (!elff_runtime)
     return -1;
 
-  return ib_runtime_write_polydata (elff_runtime_get (), fname, overwrite);
+  return model_runtime_write_polydata (elff_runtime_get (), fname, overwrite);
 }
 
 /**
@@ -255,7 +272,7 @@ static inline int elff_restore (const char* fname) {
   if (!elff_runtime)
     return -1;
 
-  int rc = ib_runtime_restore (elff_runtime_get (), fname);
+  int rc = model_runtime_restore (elff_runtime_get (), fname);
 #if _MPI
   int failed = rc != 0;
   MPI_Allreduce (MPI_IN_PLACE, &failed, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);

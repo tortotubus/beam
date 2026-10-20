@@ -90,7 +90,7 @@ TEST(IBRigidBodyCircleTest, PackUnpackRestoresDynamicStateAndIBMesh)
   std::vector<IBMesh::IBVertex> force(N, { 0.5, 0.25, 0.0 });
   body.GetNext(force, 0.05);
 
-  IBModelState state;
+  ModelState state;
   body.pack_state(state);
 
   IBRigidBodyCircle restored(R, N, density);

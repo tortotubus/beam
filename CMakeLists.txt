@@ -116,6 +116,7 @@ configure_file(
 set(ELFF_DIRS 
   contact
   c/general
+  c/models
   c/models/beam
   c/models/capsule
   c/models/ibm
@@ -125,6 +126,7 @@ set(ELFF_DIRS
   general 
   io/C
   io/CXX 
+  models
   models/articulated
   models/beam
   models/ibm 

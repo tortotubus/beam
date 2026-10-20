@@ -62,7 +62,7 @@ void IBBendingRodImplicit::solve(real_t dt, const std::vector<Vector>& density)
   syncMeshes();
 }
 
-void IBBendingRodImplicit::pack_state(IBModelState &s) const
+void IBBendingRodImplicit::pack_state(ModelState &s) const
 {
   BendingRodImplicit::pack_state(s);
   s.ints.push_back(1); // IB adapter payload version.
@@ -73,14 +73,14 @@ void IBBendingRodImplicit::pack_state(IBModelState &s) const
   }
 }
 
-void IBBendingRodImplicit::unpack_state(const IBModelState &s)
+void IBBendingRodImplicit::unpack_state(const ModelState &s)
 {
   const size_t count = 3 * mesh.GetNumberOfPoints();
   if (s.ints.size() != 6 || s.ints.back() != 1 || s.reals.size() < count)
     ELFF_ABORT("incompatible implicit rod IB checkpoint");
   for (auto value : s.reals)
     if (!std::isfinite(value)) ELFF_ABORT("non-finite implicit rod IB checkpoint");
-  IBModelState structural = s;
+  ModelState structural = s;
   structural.ints.pop_back();
   structural.reals.resize(s.reals.size() - count);
   BendingRodImplicit::unpack_state(structural);

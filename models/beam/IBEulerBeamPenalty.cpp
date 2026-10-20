@@ -94,7 +94,7 @@ IBEulerBeamPenalty::ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
 }
 
 void
-IBEulerBeamPenalty::pack_state(IBModelState& s) const
+IBEulerBeamPenalty::pack_state(ModelState& s) const
 {
   static constexpr int64_t state_version = 1;
 
@@ -121,7 +121,7 @@ IBEulerBeamPenalty::pack_state(IBModelState& s) const
 }
 
 void
-IBEulerBeamPenalty::unpack_state(const IBModelState& s)
+IBEulerBeamPenalty::unpack_state(const ModelState& s)
 {
   static constexpr int64_t state_version = 1;
 

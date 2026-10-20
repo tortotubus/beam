@@ -94,7 +94,7 @@ IBEulerBeamGGL::ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
 }
 
 void
-IBEulerBeamGGL::pack_state(IBModelState& s) const
+IBEulerBeamGGL::pack_state(ModelState& s) const
 {
   static constexpr int64_t state_version = 1;
 
@@ -124,7 +124,7 @@ IBEulerBeamGGL::pack_state(IBModelState& s) const
 }
 
 void
-IBEulerBeamGGL::unpack_state(const IBModelState& s)
+IBEulerBeamGGL::unpack_state(const ModelState& s)
 {
   static constexpr int64_t state_version = 1;
 

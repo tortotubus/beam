@@ -3,7 +3,7 @@
 #include "elff/c/models/beam/IBEulerBeamBCs.hpp"
 #include "elff/config/config.hpp"
 #include "elff/models/beam/EulerBeamHuangBuilder.hpp"
-#include "elff/models/ibm/IBRuntime.hpp"
+#include "elff/models/ibm/IBCoupling.hpp"
 
 #include <array>
 #include <cmath>
@@ -16,7 +16,7 @@ extern "C"
 {
 
 ib_euler_beam_huang_t
-ib_euler_beam_huang_new(ib_runtime_t runtime,
+ib_euler_beam_huang_new(ib_coupling_t runtime,
                         vertex_t s0,
                         ib_euler_beam_bcs_t bcs,
                         double   length,
@@ -35,15 +35,15 @@ ib_euler_beam_huang_new(ib_runtime_t runtime,
   auto beam = build_euler_beam_huang(std::move(ic_mesh), length, EI, mu,
                                      static_cast<size_t>(nodes),
                                      boundary_conditions);
-  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-    IBRuntimeModelType::EulerBeamHuang, std::move(beam));
+  return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+    ModelType::EulerBeamHuang, std::move(beam));
   } catch (...) {
     return nullptr;
   }
 }
 
 ib_euler_beam_huang_t
-ib_euler_beam_huang_new_theta(ib_runtime_t runtime,
+ib_euler_beam_huang_new_theta(ib_coupling_t runtime,
                               vertex_t s0,
                               ib_euler_beam_bcs_t bcs,
                               double   length,
@@ -58,7 +58,7 @@ ib_euler_beam_huang_new_theta(ib_runtime_t runtime,
 }
 
 ib_euler_beam_huang_t
-ib_euler_beam_huang_new_direction(ib_runtime_t runtime,
+ib_euler_beam_huang_new_direction(ib_coupling_t runtime,
                                   vertex_t s0,
                                   ib_euler_beam_bcs_t bcs,
                                   double   length,
@@ -80,8 +80,8 @@ ib_euler_beam_huang_new_direction(ib_runtime_t runtime,
   auto beam = build_euler_beam_huang(std::move(ic_mesh), length, EI, mu,
                                      static_cast<size_t>(nodes),
                                      boundary_conditions);
-  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-    IBRuntimeModelType::EulerBeamHuang, std::move(beam));
+  return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+    ModelType::EulerBeamHuang, std::move(beam));
   } catch (...) {
     return nullptr;
   }

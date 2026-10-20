@@ -84,7 +84,7 @@ TEST(IBMCapsuleTest, PacksAndRestoresStructuralState) {
   capsule.GetNext(velocity, 0.25);
   capsule.computeElasticForces();
 
-  IBModelState state;
+  ModelState state;
   capsule.pack_state(state);
   ASSERT_EQ(state.ints.size(), 7u);
   EXPECT_EQ(state.ints[1], capsule.mesh().numNodes());

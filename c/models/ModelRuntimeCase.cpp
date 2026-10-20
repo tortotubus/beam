@@ -1,11 +1,12 @@
-#include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ModelRuntime.h"
 
 #include "elff/io/C/xmlCase.h"
 #include "elff/io/CXX/xmlCase.hpp"
 #include "elff/models/beam/EulerBeamHuangXML.hpp"
 #include "elff/models/articulated/BendingRodImplicitBuilder.hpp"
 #include "elff/models/beam/EulerBeamHuangBuilder.hpp"
-#include "elff/models/ibm/IBRuntime.hpp"
+#include "elff/models/ModelRuntime.hpp"
+#include "elff/models/ibm/IBCoupling.hpp"
 #include "embeddedELFFDtd.hpp"
 
 #include <cstdio>
@@ -22,17 +23,17 @@ using namespace ELFF;
 
 namespace {
 
-using IBRuntimeModelDefinition = std::variant<EulerBeamHuangDefinition, BendingRodImplicitDefinition>;
+using ModelRuntimeModelDefinition = std::variant<EulerBeamHuangDefinition, BendingRodImplicitDefinition>;
 
 enum class ModelDistribution { Rank0, RoundRobin };
 
-struct IBRuntimeDefinition
+struct ModelRuntimeDefinition
 {
   ModelDistribution distribution = ModelDistribution::Rank0;
-  std::vector<IBRuntimeModelDefinition> models;
+  std::vector<ModelRuntimeModelDefinition> models;
 };
 
-void clear_error(ib_runtime_error* error)
+void clear_error(model_runtime_error* error)
 {
   if (!error)
     return;
@@ -42,7 +43,7 @@ void clear_error(ib_runtime_error* error)
   error->message[0] = '\0';
 }
 
-void set_error(ib_runtime_error* error,
+void set_error(model_runtime_error* error,
                size_t model_index,
                long line,
                long column,
@@ -59,7 +60,7 @@ void set_error(ib_runtime_error* error,
                 message ? message : "Unknown runtime error.");
 }
 
-bool copy_xml_error(ib_runtime_error* error,
+bool copy_xml_error(model_runtime_error* error,
                     size_t model_index,
                     const elff_xml_error& xml_error,
                     const char* fallback)
@@ -76,7 +77,7 @@ bool unique_child(elff_xml_node_t parent,
                   const char* name,
                   elff_xml_node_t& child,
                   size_t model_index,
-                  ib_runtime_error* error)
+                  model_runtime_error* error)
 {
   elff_xml_error xml_error = {};
   if (elff_xml_node_unique_child(parent, name, &child, &xml_error) !=
@@ -86,8 +87,8 @@ bool unique_child(elff_xml_node_t parent,
 }
 
 bool parse_runtime_definition(elff_xml_node_t elff,
-                              IBRuntimeDefinition& definition,
-                              ib_runtime_error* error)
+                              ModelRuntimeDefinition& definition,
+                              model_runtime_error* error)
 {
   elff_xml_error xml_error = {};
   elff_xml_node_t models = nullptr;
@@ -154,23 +155,26 @@ bool parse_runtime_definition(elff_xml_node_t elff,
 }
 
 bool
-build_runtime(IBRuntime& runtime,
-              const IBRuntimeDefinition& definition,
-              ib_runtime_error* error)
+build_runtime(ModelRuntime& runtime,
+              const ModelRuntimeDefinition& definition,
+              model_runtime_error* error)
 {
+  auto* coupling = runtime.attach_component<IBCoupling>();
+  if (!coupling) return false;
   for (size_t i = 0; i < definition.models.size(); ++i) {
     const auto* huang =
       std::get_if<EulerBeamHuangDefinition>(&definition.models[i]);
     const auto* rod = std::get_if<BendingRodImplicitDefinition>(&definition.models[i]);
-    const auto type = huang ? IBRuntimeModelType::EulerBeamHuang
-                           : IBRuntimeModelType::BendingRodImplicit;
+    const auto type = huang ? ModelType::EulerBeamHuang
+                           : ModelType::BendingRodImplicit;
     const long source_line = huang ? huang->source_line : rod->source_line;
     ib_model_info_t info = {1, 0, -1, 0};
     info.node_count = huang ? static_cast<int>(huang->nodes) : rod->config.links + 1;
     info.owner_rank = definition.distribution == ModelDistribution::RoundRobin
       ? static_cast<int>(i % static_cast<size_t>(runtime.ranks())) : 0;
     if (runtime.rank() != info.owner_rank) {
-      runtime.add_remote_force_model(type, info);
+      if (coupling->add_remote_model(type, IB_MODEL_VIEW_FORCE_COUPLED, info) == invalid_model_id)
+        return false;
       continue;
     }
     try {
@@ -183,11 +187,10 @@ build_runtime(IBRuntime& runtime,
       } else {
         model = build_bending_rod_implicit(*rod);
       }
-      if (!runtime.adopt_owned_model(type, std::move(model))) {
+      if (!coupling->adopt_owned_model(type, std::move(model), info)) {
         set_error(error, i, source_line, 0, "Unable to adopt model.");
         return false;
       }
-      runtime.configure_last_model(info);
     } catch (const std::exception& exception) {
       set_error(error, i, source_line, 0, exception.what());
       return false;
@@ -200,12 +203,11 @@ build_runtime(IBRuntime& runtime,
       return false;
     }
   }
-  runtime.seal();
-  return true;
+  return runtime.seal() == 0;
 }
 
-int load_runtime_document(IBRuntime& runtime, elff_xml_document_t document,
-                          ib_runtime_error* error)
+int load_runtime_document(ModelRuntime& runtime, elff_xml_document_t document,
+                          model_runtime_error* error)
 {
   try {
     elff_xml_node_t root = nullptr, elff = nullptr;
@@ -229,7 +231,7 @@ int load_runtime_document(IBRuntime& runtime, elff_xml_document_t document,
       return -1;
     }
 
-    IBRuntimeDefinition definition;
+    ModelRuntimeDefinition definition;
     if (!parse_runtime_definition(elff, definition, error))
       return -1;
     return build_runtime(runtime, definition, error) ? 0 : -1;
@@ -251,8 +253,8 @@ int load_runtime_document(IBRuntime& runtime, elff_xml_document_t document,
 }
 
 int create_runtime_case(const char* path, elff_xml_document_t document,
-                        ib_runtime_t* out_runtime,
-                        ib_runtime_error* error
+                        model_runtime_t* out_runtime,
+                        model_runtime_error* error
 #ifdef ELFF_USE_MPI
                         , MPI_Comm comm
 #endif
@@ -262,7 +264,7 @@ int create_runtime_case(const char* path, elff_xml_document_t document,
   if (out_runtime)
     *out_runtime = nullptr;
   try {
-    auto runtime = std::make_unique<IBRuntime>();
+    auto runtime = std::make_unique<ModelRuntime>();
 #ifdef ELFF_USE_MPI
     // Establish the runtime's rank context before parsing or constructing models.
     if (comm != MPI_COMM_NULL)
@@ -309,7 +311,7 @@ int create_runtime_case(const char* path, elff_xml_document_t document,
 #endif
     if (rc != 0)
       return rc;
-    *out_runtime = reinterpret_cast<ib_runtime_t>(runtime.release());
+    *out_runtime = reinterpret_cast<model_runtime_t>(runtime.release());
     return 0;
   } catch (const std::exception& exception) {
     set_error(error, std::numeric_limits<size_t>::max(), 0, 0, exception.what());
@@ -325,18 +327,9 @@ int create_runtime_case(const char* path, elff_xml_document_t document,
 
 extern "C" {
 
-ib_runtime_t ib_runtime_new()
-{
-  try {
-    return reinterpret_cast<ib_runtime_t>(new IBRuntime());
-  } catch (...) {
-    return nullptr;
-  }
-}
-
-int ib_runtime_create_from_case_file(const char* path,
-                                     ib_runtime_t* out_runtime,
-                                     ib_runtime_error* error)
+int model_runtime_create_from_case_file(const char* path,
+                                     model_runtime_t* out_runtime,
+                                     model_runtime_error* error)
 {
   return create_runtime_case(path, nullptr, out_runtime, error
 #ifdef ELFF_USE_MPI
@@ -345,9 +338,9 @@ int ib_runtime_create_from_case_file(const char* path,
                              );
 }
 
-int ib_runtime_create_from_case_document(elff_xml_document_t document,
-                                         ib_runtime_t* out_runtime,
-                                         ib_runtime_error* error)
+int model_runtime_create_from_case_document(elff_xml_document_t document,
+                                         model_runtime_t* out_runtime,
+                                         model_runtime_error* error)
 {
   return create_runtime_case(nullptr, document, out_runtime, error
 #ifdef ELFF_USE_MPI
@@ -357,9 +350,9 @@ int ib_runtime_create_from_case_document(elff_xml_document_t document,
 }
 
 #ifdef ELFF_USE_MPI
-int ib_runtime_create_from_case_file_mpi(const char* path, MPI_Comm comm,
-                                         ib_runtime_t* out_runtime,
-                                         ib_runtime_error* error)
+int model_runtime_create_from_case_file_mpi(const char* path, MPI_Comm comm,
+                                         model_runtime_t* out_runtime,
+                                         model_runtime_error* error)
 {
   if (comm == MPI_COMM_NULL) {
     clear_error(error);
@@ -371,9 +364,9 @@ int ib_runtime_create_from_case_file_mpi(const char* path, MPI_Comm comm,
   }
   return create_runtime_case(path, nullptr, out_runtime, error, comm);
 }
-int ib_runtime_create_from_case_document_mpi(elff_xml_document_t document, MPI_Comm comm,
-                                             ib_runtime_t* out_runtime,
-                                             ib_runtime_error* error)
+int model_runtime_create_from_case_document_mpi(elff_xml_document_t document, MPI_Comm comm,
+                                             model_runtime_t* out_runtime,
+                                             model_runtime_error* error)
 {
   if (comm == MPI_COMM_NULL) {
     clear_error(error);
@@ -387,87 +380,4 @@ int ib_runtime_create_from_case_document_mpi(elff_xml_document_t document, MPI_C
 
 #endif
 
-int ib_runtime_get_model_views(ib_runtime_t runtime,
-                               ib_model_view_array_t* out_views)
-{
-  if (!out_views)
-    return -1;
-  out_views->count = 0;
-  out_views->data = nullptr;
-  if (!runtime)
-    return -1;
-  try {
-    return reinterpret_cast<IBRuntime*>(runtime)->get_model_views(*out_views);
-  } catch (...) {
-    return -1;
-  }
-}
-
-#ifdef ELFF_USE_MPI
-int ib_runtime_set_communicator(ib_runtime_t runtime, MPI_Comm comm)
-{
-  if (!runtime)
-    return -1;
-
-  try {
-    reinterpret_cast<IBRuntime*>(runtime)->set_communicator(comm);
-    return 0;
-  } catch (...) {
-    return -1;
-  }
-}
-#endif
-
-int ib_runtime_checkpoint(ib_runtime_t runtime, const char* fname)
-{
-  if (!runtime || !fname)
-    return -1;
-
-  try {
-    return reinterpret_cast<IBRuntime*>(runtime)->write_checkpoint(fname);
-  } catch (...) {
-    return -1;
-  }
-}
-
-int ib_runtime_restore(ib_runtime_t runtime, const char* fname)
-{
-  if (!runtime || !fname)
-    return -1;
-
-  try {
-    return reinterpret_cast<IBRuntime*>(runtime)->read_checkpoint(fname);
-  } catch (...) {
-    return -1;
-  }
-}
-
-int ib_runtime_write_polydata(ib_runtime_t runtime,
-                              const char* fname,
-                              int overwrite)
-{
-  if (!runtime || !fname)
-    return -1;
-
-  try {
-    return reinterpret_cast<IBRuntime*>(runtime)->write_polydata(fname,
-                                                                 overwrite != 0);
-  } catch (...) {
-    return -1;
-  }
-}
-
-void ib_runtime_delete(ib_runtime_t runtime)
-{
-  delete reinterpret_cast<IBRuntime*>(runtime);
-}
-
 } // extern "C"
-
-extern "C" int ib_model_descriptor_get_info(ib_model_descriptor_t descriptor,
-                                            ib_model_info_t* info)
-{
-  if (!descriptor || !info) return -1;
-  *info = *static_cast<const ib_model_info_t*>(descriptor);
-  return 0;
-}

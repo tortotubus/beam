@@ -1,8 +1,10 @@
+#include "elff/c/models/ibm/IBCoupling.h"
 #include <gtest/gtest.h>
 
 #include "elff/models/capsule/CapsuleMeshBuilder.hpp"
 #include "elff/models/capsule/IBMCapsule.hpp"
-#include "elff/models/ibm/IBRuntime.hpp"
+#include "elff/models/ModelRuntime.hpp"
+#include "elff/models/ibm/IBCoupling.hpp"
 
 #include <hdf5.h>
 
@@ -32,14 +34,14 @@ public:
       ++*destruction_count_;
   }
 
-  void pack_state(IBModelState& state) const override
+  void pack_state(ModelState& state) const override
   {
     state.ints = {value_};
     state.reals.clear();
     state.bytes.clear();
   }
 
-  void unpack_state(const IBModelState& state) override
+  void unpack_state(const ModelState& state) override
   {
     if (state.ints.size() != 1)
       throw std::invalid_argument("invalid mock state");
@@ -82,25 +84,26 @@ bool hdf5_link_exists(const std::filesystem::path& path,
   return exists > 0;
 }
 
-TEST(IBRuntimeTest, OwnsModelsExactlyOnceAndKeepsStableBorrowedViews)
+TEST(ModelRuntimeTest, OwnsModelsExactlyOnceAndKeepsStableBorrowedViews)
 {
   int destructions = 0;
   void* first_handle = nullptr;
   {
-    IBRuntime runtime;
+    ModelRuntime runtime;
+    auto* coupling = runtime.attach_component<IBCoupling>();
     auto first = std::make_unique<MockForceModel>(&destructions, 1);
     first_handle = first.get();
-    ASSERT_EQ(runtime.adopt_owned_model(IBRuntimeModelType::EulerBeam,
+    ASSERT_EQ(coupling->adopt_owned_model(ModelType::EulerBeam,
                                         std::move(first)),
               first_handle);
     auto second = std::make_unique<MockForceModel>(&destructions, 2);
     void* second_handle = second.get();
-    ASSERT_EQ(runtime.adopt_owned_model(IBRuntimeModelType::EulerBeamHuang,
+    ASSERT_EQ(coupling->adopt_owned_model(ModelType::EulerBeamHuang,
                                         std::move(second)),
               second_handle);
 
     ib_model_view_array_t views = {};
-    ASSERT_EQ(runtime.get_model_views(views), 0);
+    ASSERT_EQ(coupling->get_model_views(views), 0);
     ASSERT_EQ(views.count, 2U);
     ASSERT_NE(views.data, nullptr);
     const ib_model_view_t* stable_data = views.data;
@@ -109,12 +112,12 @@ TEST(IBRuntimeTest, OwnsModelsExactlyOnceAndKeepsStableBorrowedViews)
     EXPECT_EQ(views.data[0].kind, IB_MODEL_VIEW_FORCE_COUPLED);
 
     ib_model_view_array_t again = {};
-    EXPECT_EQ(runtime.get_model_views(again), 0);
+    EXPECT_EQ(coupling->get_model_views(again), 0);
     EXPECT_EQ(again.data, stable_data);
     EXPECT_EQ(again.data[0].handle, first_handle);
 
     auto rejected = std::make_unique<MockForceModel>(&destructions, 3);
-    EXPECT_EQ(runtime.adopt_owned_model(IBRuntimeModelType::EulerBeam,
+    EXPECT_EQ(coupling->adopt_owned_model(ModelType::EulerBeam,
                                         std::move(rejected)),
               nullptr);
     EXPECT_EQ(destructions, 1);
@@ -122,45 +125,46 @@ TEST(IBRuntimeTest, OwnsModelsExactlyOnceAndKeepsStableBorrowedViews)
   EXPECT_EQ(destructions, 3);
 }
 
-TEST(IBRuntimeTest, ReturnsOneThousandViewsInAdoptionOrder)
+TEST(ModelRuntimeTest, ReturnsOneThousandViewsInAdoptionOrder)
 {
-  IBRuntime runtime;
+  ModelRuntime runtime;
+    auto* coupling = runtime.attach_component<IBCoupling>();
   std::vector<void*> expected;
   expected.reserve(1000);
   for (size_t i = 0; i < 1000; ++i) {
     auto model = std::make_unique<MockForceModel>(nullptr, i);
     expected.push_back(model.get());
-    ASSERT_NE(runtime.adopt_owned_model(IBRuntimeModelType::EulerBeam,
+    ASSERT_NE(coupling->adopt_owned_model(ModelType::EulerBeam,
                                         std::move(model)),
               nullptr);
   }
   ib_model_view_array_t views = {};
-  ASSERT_EQ(runtime.get_model_views(views), 0);
+  ASSERT_EQ(coupling->get_model_views(views), 0);
   ASSERT_EQ(views.count, expected.size());
   for (size_t i = 0; i < views.count; ++i)
     EXPECT_EQ(views.data[i].handle, expected[i]);
 }
 
-TEST(IBRuntimeTest, CViewAPIHandlesNullAndSealsManualRuntime)
+TEST(ModelRuntimeTest, CViewAPIHandlesNullAndSealsManualRuntime)
 {
   ib_model_view_array_t views = {17, reinterpret_cast<ib_model_view_t*>(1)};
-  EXPECT_NE(ib_runtime_get_model_views(nullptr, &views), 0);
+  EXPECT_NE(ib_coupling_get_model_views(ib_coupling_attach(nullptr), &views), 0);
   EXPECT_EQ(views.count, 0U);
   EXPECT_EQ(views.data, nullptr);
 
-  ib_runtime_t runtime = ib_runtime_new();
+  model_runtime_t runtime = model_runtime_new();
   ASSERT_NE(runtime, nullptr);
-  EXPECT_EQ(ib_runtime_get_model_views(runtime, &views), 0);
+  EXPECT_EQ(ib_coupling_get_model_views(ib_coupling_attach(runtime), &views), 0);
   EXPECT_EQ(views.count, 0U);
   EXPECT_EQ(views.data, nullptr);
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 }
 
-TEST(IBRuntimeTest, DefaultModelPolyDataHookIsNoOp)
+TEST(ModelRuntimeTest, DefaultModelPolyDataHookIsNoOp)
 {
-  IBRuntime runtime;
+  ModelRuntime runtime;
   ASSERT_NE(runtime.adopt_owned_model(
-              IBRuntimeModelType::EulerBeam,
+              ModelType::EulerBeam,
               std::make_unique<MockForceModel>()),
             nullptr);
   IO::CXX::vtkPolyData pd = runtime.to_vtk_polydata();
@@ -170,16 +174,16 @@ TEST(IBRuntimeTest, DefaultModelPolyDataHookIsNoOp)
   EXPECT_EQ(pd.number_of_celldata(), 0);
 }
 
-TEST(IBRuntimeTest, WritesOwnedCapsulePolyData)
+TEST(ModelRuntimeTest, WritesOwnedCapsulePolyData)
 {
   const std::filesystem::path output_path =
-    test_output_path("elff_ib_runtime_capsule_polydata.vtkhdf");
+    test_output_path("elff_model_runtime_capsule_polydata.vtkhdf");
   remove_file_if_present(output_path);
 
-  IBRuntime runtime;
+  ModelRuntime runtime;
   auto capsule = std::make_unique<IBMCapsule>(
     CapsuleMeshBuilder::sphere({1.0, Vec3::Zero(), 1}));
-  ASSERT_NE(runtime.adopt_owned_model(IBRuntimeModelType::Capsule,
+  ASSERT_NE(runtime.adopt_owned_model(ModelType::Capsule,
                                       std::move(capsule)),
             nullptr);
 
@@ -195,19 +199,19 @@ TEST(IBRuntimeTest, WritesOwnedCapsulePolyData)
   remove_file_if_present(output_path);
 }
 
-TEST(IBRuntimeTest, CheckpointV2RoundTripsOrderedMultipleModels)
+TEST(ModelRuntimeTest, CheckpointV2RoundTripsOrderedMultipleModels)
 {
   const auto path = test_output_path("elff_runtime_v2.checkpoint");
   remove_file_if_present(path);
-  IBRuntime runtime;
+  ModelRuntime runtime;
   auto first = std::make_unique<MockForceModel>(nullptr, 11);
   auto* first_view = first.get();
   auto second = std::make_unique<MockForceModel>(nullptr, 29);
   auto* second_view = second.get();
-  ASSERT_NE(runtime.adopt_owned_model(IBRuntimeModelType::EulerBeam,
+  ASSERT_NE(runtime.adopt_owned_model(ModelType::EulerBeam,
                                       std::move(first)),
             nullptr);
-  ASSERT_NE(runtime.adopt_owned_model(IBRuntimeModelType::EulerBeamHuang,
+  ASSERT_NE(runtime.adopt_owned_model(ModelType::EulerBeamHuang,
                                       std::move(second)),
             nullptr);
   ASSERT_EQ(runtime.write_checkpoint(path.string().c_str()), 0);
@@ -219,21 +223,21 @@ TEST(IBRuntimeTest, CheckpointV2RoundTripsOrderedMultipleModels)
   remove_file_if_present(path);
 }
 
-TEST(IBRuntimeTest, RejectsCountAndTypeSequenceBeforeMutation)
+TEST(ModelRuntimeTest, RejectsCountAndTypeSequenceBeforeMutation)
 {
-  IBRuntime runtime;
+  ModelRuntime runtime;
   auto first = std::make_unique<MockForceModel>(nullptr, 1);
   auto* first_view = first.get();
   auto second = std::make_unique<MockForceModel>(nullptr, 2);
   auto* second_view = second.get();
-  ASSERT_NE(runtime.adopt_owned_model(IBRuntimeModelType::EulerBeam,
+  ASSERT_NE(runtime.adopt_owned_model(ModelType::EulerBeam,
                                       std::move(first)),
             nullptr);
-  ASSERT_NE(runtime.adopt_owned_model(IBRuntimeModelType::EulerBeamHuang,
+  ASSERT_NE(runtime.adopt_owned_model(ModelType::EulerBeamHuang,
                                       std::move(second)),
             nullptr);
 
-  IBRuntimeState state;
+  RuntimeState state;
   ASSERT_EQ(runtime.export_state(state), 0);
   state.models[0].state.ints[0] = 101;
   state.models[1].state.ints[0] = 202;
@@ -245,7 +249,7 @@ TEST(IBRuntimeTest, RejectsCountAndTypeSequenceBeforeMutation)
   EXPECT_NE(runtime.import_state(state), 0);
 }
 
-TEST(IBRuntimeTest, RejectsV1AndTruncatedCheckpointFiles)
+TEST(ModelRuntimeTest, RejectsV1AndTruncatedCheckpointFiles)
 {
   const auto v1_path = test_output_path("elff_runtime_v1.checkpoint");
   const auto truncated_path =
@@ -269,7 +273,7 @@ TEST(IBRuntimeTest, RejectsV1AndTruncatedCheckpointFiles)
     out.write(reinterpret_cast<const char*>(&legacy), 5);
   }
 
-  IBRuntime runtime;
+  ModelRuntime runtime;
   EXPECT_NE(runtime.read_checkpoint(v1_path.string().c_str()), 0);
   EXPECT_NE(runtime.read_checkpoint(truncated_path.string().c_str()), 0);
   remove_file_if_present(v1_path);

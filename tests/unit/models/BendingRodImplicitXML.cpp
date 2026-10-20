@@ -1,6 +1,7 @@
+#include "elff/c/models/ibm/IBCoupling.h"
 #include <gtest/gtest.h>
 #include "elff/models/articulated/BendingRodImplicitBuilder.hpp"
-#include "elff/models/ibm/IBRuntime.hpp"
+#include "elff/models/ModelRuntime.hpp"
 #include "elff/c/models/ibm/IBForceCoupled.h"
 #include "elff/io/CXX/xmlCase.hpp"
 #include "embeddedELFFDtd.hpp"
@@ -49,7 +50,7 @@ std::string section(const std::string &models) {
 std::string case_xml(const std::string &models) {
   return "<Case formatVersion='1'>" + section(models) + "</Case>";
 }
-using Runtime = std::unique_ptr<void, decltype(&ib_runtime_delete)>;
+using Runtime = std::unique_ptr<void, decltype(&model_runtime_delete)>;
 }
 
 TEST(BendingRodImplicitXMLTest, DefaultsAndGeometrySurviveDocumentDestruction)
@@ -135,17 +136,17 @@ TEST(BendingRodImplicitXMLTest, RuntimeFileDocumentSteppingAndCheckpoint)
   ASSERT_EQ(elff_xml_case_render(source.get(), &rendered, &xml_error), ELFF_XML_OK) << xml_error.message;
   Document doc(rendered, elff_xml_document_destroy);
   source.reset();
-  ib_runtime_t raw = nullptr, raw_restored = nullptr;
-  ib_runtime_error error{};
-  ASSERT_EQ(ib_runtime_create_from_case_file(file.c_str(), &raw, &error), 0) << error.message;
-  Runtime runtime(raw, ib_runtime_delete);
+  model_runtime_t raw = nullptr, raw_restored = nullptr;
+  model_runtime_error error{};
+  ASSERT_EQ(model_runtime_create_from_case_file(file.c_str(), &raw, &error), 0) << error.message;
+  Runtime runtime(raw, model_runtime_delete);
   std::filesystem::remove(file);
-  ASSERT_EQ(ib_runtime_create_from_case_document(doc.get(), &raw_restored, &error), 0) << error.message;
-  Runtime restored(raw_restored, ib_runtime_delete);
+  ASSERT_EQ(model_runtime_create_from_case_document(doc.get(), &raw_restored, &error), 0) << error.message;
+  Runtime restored(raw_restored, model_runtime_delete);
   doc.reset();
   ib_model_view_array_t views{}, restored_views{};
-  ASSERT_EQ(ib_runtime_get_model_views(raw, &views), 0);
-  ASSERT_EQ(ib_runtime_get_model_views(raw_restored, &restored_views), 0);
+  ASSERT_EQ(ib_coupling_get_model_views(ib_coupling_attach(raw), &views), 0);
+  ASSERT_EQ(ib_coupling_get_model_views(ib_coupling_attach(raw_restored), &restored_views), 0);
   ASSERT_EQ(views.count, 1u);
   EXPECT_EQ(views.data[0].kind, IB_MODEL_VIEW_FORCE_COUPLED);
   auto direct = build_bending_rod_implicit(parse(xml));
@@ -162,8 +163,8 @@ TEST(BendingRodImplicitXMLTest, RuntimeFileDocumentSteppingAndCheckpoint)
     ib_mesh_free(&next);
   }
   const auto checkpoint = std::filesystem::temp_directory_path() / "elff_implicit_rod_checkpoint.bin";
-  ASSERT_EQ(ib_runtime_checkpoint(raw, checkpoint.c_str()), 0);
-  ASSERT_EQ(ib_runtime_restore(raw_restored, checkpoint.c_str()), 0);
+  ASSERT_EQ(model_runtime_checkpoint(raw, checkpoint.c_str()), 0);
+  ASSERT_EQ(model_runtime_restore(raw_restored, checkpoint.c_str()), 0);
   std::filesystem::remove(checkpoint);
   for (double dt : {0.01, 0.005}) {
     auto a = ib_force_coupled_get_next(views.data[0].handle, force.data(), 5, dt);
@@ -177,9 +178,9 @@ TEST(BendingRodImplicitXMLTest, RuntimeFileDocumentSteppingAndCheckpoint)
 TEST(BendingRodImplicitXMLTest, RuntimeReportsIndexedRodSemanticError)
 {
   auto doc = document(case_xml(valid + changed("nodes=\"5\"", "nodes=\"1\"")));
-  ib_runtime_t runtime = nullptr;
-  ib_runtime_error error{};
-  EXPECT_NE(ib_runtime_create_from_case_document(doc.get(), &runtime, &error), 0);
+  model_runtime_t runtime = nullptr;
+  model_runtime_error error{};
+  EXPECT_NE(model_runtime_create_from_case_document(doc.get(), &runtime, &error), 0);
   EXPECT_EQ(runtime, nullptr);
   EXPECT_EQ(error.model_index, 1u);
   EXPECT_GT(error.line, 0);

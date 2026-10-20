@@ -1,9 +1,10 @@
+#include "elff/c/models/ibm/IBCoupling.h"
 #include <gtest/gtest.h>
 
 #include <elff/c/models/capsule/IBCapsule.h>
 #include <elff/c/models/ibm/IBMesh.h>
 #include <elff/c/models/ibm/IBVelocityCoupled.h>
-#include <elff/c/models/ibm/IBRuntime.h>
+#include <elff/c/models/ModelRuntime.h>
 
 #include <vector>
 
@@ -33,32 +34,32 @@ void expect_valid_current_mesh(ib_capsule_t capsule, int expected_nodes)
 
 TEST(IBCapsuleCAPITest, CreatesBuilderCapsulesAsVelocityCoupledModels)
 {
-  ib_runtime_t runtime = ib_runtime_new();
+  model_runtime_t runtime = model_runtime_new();
   ASSERT_NE(runtime, nullptr);
   ib_capsule_t sphere =
-    ib_capsule_sphere_new(runtime, 1.0, vertex(0.0, 0.0, 0.0), 1, 1.0);
+    ib_capsule_sphere_new(ib_coupling_attach(runtime), 1.0, vertex(0.0, 0.0, 0.0), 1, 1.0);
   ib_capsule_t ellipsoid =
-    ib_capsule_ellipsoid_new(runtime,
+    ib_capsule_ellipsoid_new(ib_coupling_attach(runtime),
                              vertex(1.0, 0.75, 0.5),
                              vertex(0.25, 0.5, 0.75),
                              1,
                              1.0);
   ib_capsule_t biconcave =
-    ib_capsule_biconcave_new(runtime, 1.0, vertex(0.0, 0.0, 0.0), 1, 1.0);
+    ib_capsule_biconcave_new(ib_coupling_attach(runtime), 1.0, vertex(0.0, 0.0, 0.0), 1, 1.0);
 
   expect_valid_current_mesh(sphere, 42);
   expect_valid_current_mesh(ellipsoid, 42);
   expect_valid_current_mesh(biconcave, 42);
 
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 }
 
 TEST(IBCapsuleCAPITest, AdvancesThroughVelocityCoupledInterface)
 {
-  ib_runtime_t runtime = ib_runtime_new();
+  model_runtime_t runtime = model_runtime_new();
   ASSERT_NE(runtime, nullptr);
   ib_capsule_t capsule =
-    ib_capsule_sphere_new(runtime, 1.0, vertex(0.0, 0.0, 0.0), 0, 1.0);
+    ib_capsule_sphere_new(ib_coupling_attach(runtime), 1.0, vertex(0.0, 0.0, 0.0), 0, 1.0);
   ib_velocity_coupled_t vc = ib_capsule_as_velocity_coupled(capsule);
 
   ib_mesh_t current = ib_velocity_coupled_get_current(vc);
@@ -81,15 +82,15 @@ TEST(IBCapsuleCAPITest, AdvancesThroughVelocityCoupledInterface)
 
   ib_mesh_free(&current);
   ib_mesh_free(&next);
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 }
 
 TEST(IBCapsuleCAPITest, SetsMembraneAndBendingLaws)
 {
-  ib_runtime_t runtime = ib_runtime_new();
+  model_runtime_t runtime = model_runtime_new();
   ASSERT_NE(runtime, nullptr);
   ib_capsule_t capsule =
-    ib_capsule_sphere_new(runtime, 1.0, vertex(0.0, 0.0, 0.0), 1, 1.0);
+    ib_capsule_sphere_new(ib_coupling_attach(runtime), 1.0, vertex(0.0, 0.0, 0.0), 1, 1.0);
 
   ib_capsule_set_skalak_law(capsule, 2.0, 10.0);
   ib_capsule_set_neo_hookean_law(capsule, 1.5);
@@ -98,15 +99,15 @@ TEST(IBCapsuleCAPITest, SetsMembraneAndBendingLaws)
   ib_capsule_clear_bending_law(capsule);
 
   expect_valid_current_mesh(capsule, 42);
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 }
 
 TEST(IBCapsuleCAPITest, ExposesTriangleTopology)
 {
-  ib_runtime_t runtime = ib_runtime_new();
+  model_runtime_t runtime = model_runtime_new();
   ASSERT_NE(runtime, nullptr);
   ib_capsule_t capsule =
-    ib_capsule_sphere_new(runtime, 1.0, vertex(0.0, 0.0, 0.0), 0, 1.0);
+    ib_capsule_sphere_new(ib_coupling_attach(runtime), 1.0, vertex(0.0, 0.0, 0.0), 0, 1.0);
 
   const int triangle_count = ib_capsule_get_triangle_count(capsule);
   EXPECT_EQ(triangle_count, 20);
@@ -124,5 +125,5 @@ TEST(IBCapsuleCAPITest, ExposesTriangleTopology)
   EXPECT_NE(nodes[1], nodes[2]);
   EXPECT_NE(nodes[2], nodes[0]);
 
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 }

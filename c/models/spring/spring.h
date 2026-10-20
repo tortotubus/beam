@@ -1,6 +1,6 @@
 #pragma once
 
-#include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ibm/IBCoupling.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -27,7 +27,7 @@ extern "C"
    * @param center_y Circle center y-coordinate
    * @return Opaque spring-circle handle
    */
-  ib_spring_circle_t ib_spring_circle_create_circle(ib_runtime_t runtime,
+  ib_spring_circle_t ib_spring_circle_create_circle(ib_coupling_t runtime,
                                                     int npoints,
                                                     double K,
                                                     double radius,
@@ -45,7 +45,7 @@ extern "C"
    * @param center_y Ellipse center y-coordinate
    * @return Opaque spring-circle handle
    */
-  ib_spring_circle_t ib_spring_circle_create_ellipse(ib_runtime_t runtime,
+  ib_spring_circle_t ib_spring_circle_create_ellipse(ib_coupling_t runtime,
                                                      int npoints,
                                                      double K,
                                                      double radius_x,

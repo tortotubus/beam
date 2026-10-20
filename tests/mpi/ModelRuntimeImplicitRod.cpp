@@ -1,5 +1,6 @@
+#include "elff/c/models/ibm/IBCoupling.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
-#include "elff/models/ibm/IBRuntime.hpp"
+#include "elff/models/ModelRuntime.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -25,19 +26,19 @@ std::string xml(const char *policy) {
 <RodBoundary type='free'/><Gravity x='0' y='-1'/></BendingRodSegmentsImplicit>
 </Models></ELFF></Case>)";
 }
-ib_runtime_t create(const std::string &text, MPI_Comm comm) {
+model_runtime_t create(const std::string &text, MPI_Comm comm) {
   elff_xml_document_t doc = nullptr;
   elff_xml_error xml_error{};
   check(elff_xml_document_load_memory(text.data(), text.size(), &doc, &xml_error) == ELFF_XML_OK, xml_error.message);
-  ib_runtime_t runtime = nullptr;
-  ib_runtime_error error{};
-  check(ib_runtime_create_from_case_document_mpi(doc, comm, &runtime, &error) == 0, error.message);
+  model_runtime_t runtime = nullptr;
+  model_runtime_error error{};
+  check(model_runtime_create_from_case_document_mpi(doc, comm, &runtime, &error) == 0, error.message);
   elff_xml_document_destroy(doc);
   return runtime;
 }
-void step(ib_runtime_t runtime, double dt) {
+void step(model_runtime_t runtime, double dt) {
   ib_model_view_array_t views{};
-  check(ib_runtime_get_model_views(runtime, &views) == 0, "get views");
+  check(ib_coupling_get_model_views(ib_coupling_attach(runtime), &views) == 0, "get views");
   for (size_t i = 0; i < views.count; ++i) {
     if (!views.data[i].handle) continue;
     const int count = ib_force_coupled_get_number_of_nodes(views.data[i].handle);
@@ -50,7 +51,7 @@ void step(ib_runtime_t runtime, double dt) {
     ib_mesh_free(&mesh);
   }
 }
-void equal(const IBRuntimeState &a, const IBRuntimeState &b) {
+void equal(const RuntimeState &a, const RuntimeState &b) {
   check(a.models.size() == b.models.size(), "model count mismatch");
   for (size_t i = 0; i < a.models.size(); ++i)
     check(a.models[i].type == b.models[i].type && a.models[i].state.ints == b.models[i].state.ints &&
@@ -70,7 +71,7 @@ int main(int argc, char **argv) {
   auto runtime = create(xml("round-robin"), reversed);
   MPI_Comm_free(&reversed);
   ib_model_view_array_t views{};
-  check(ib_runtime_get_model_views(runtime, &views) == 0 && views.count == 2, "mixed views");
+  check(ib_coupling_get_model_views(ib_coupling_attach(runtime), &views) == 0 && views.count == 2, "mixed views");
   for (size_t i = 0; i < 2; ++i) {
     ib_model_info_t info{};
     check(ib_model_descriptor_get_info(views.data[i].descriptor, &info) == 0, "descriptor");
@@ -80,34 +81,34 @@ int main(int argc, char **argv) {
   }
   step(runtime, 0.01);
   step(runtime, 0.01);
-  auto *cpp = static_cast<IBRuntime*>(runtime);
-  IBRuntimeState saved, expected, actual;
+  auto *cpp = static_cast<ModelRuntime*>(runtime);
+  RuntimeState saved, expected, actual;
   check(cpp->export_state(saved) == 0, "export state");
-  check(saved.models[1].type == IBRuntimeModelType::BendingRodImplicit, "persistent rod identifier");
+  check(saved.models[1].type == ModelType::BendingRodImplicit, "persistent rod identifier");
   const char *path = "implicit_rod_mpi_checkpoint.bin";
-  check(ib_runtime_checkpoint(runtime, path) == 0, "distributed checkpoint");
+  check(model_runtime_checkpoint(runtime, path) == 0, "distributed checkpoint");
   MPI_Barrier(MPI_COMM_WORLD);
   step(runtime, 0.005);
   check(cpp->export_state(expected) == 0, "continuation state");
-  check(ib_runtime_restore(runtime, path) == 0, "distributed restore");
+  check(model_runtime_restore(runtime, path) == 0, "distributed restore");
   check(cpp->export_state(actual) == 0, "restored state");
   equal(saved, actual);
   step(runtime, 0.005);
   check(cpp->export_state(actual) == 0, "restored continuation");
   equal(expected, actual);
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 
   runtime = create(xml("rank0"), MPI_COMM_WORLD);
-  check(ib_runtime_get_model_views(runtime, &views) == 0, "rank0 views");
+  check(ib_coupling_get_model_views(ib_coupling_attach(runtime), &views) == 0, "rank0 views");
   for (size_t i = 0; i < 2; ++i)
     check((views.data[i].handle != nullptr) == (rank == 0), "rank0 ownership");
-  check(ib_runtime_restore(runtime, path) == 0, "restore with new ownership");
+  check(model_runtime_restore(runtime, path) == 0, "restore with new ownership");
   step(runtime, 0.005);
   if (rank == 0) {
-    check(static_cast<IBRuntime*>(runtime)->export_state(actual) == 0, "rank0 continuation export");
+    check(static_cast<ModelRuntime*>(runtime)->export_state(actual) == 0, "rank0 continuation export");
     equal(expected, actual);
   }
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
   MPI_Barrier(MPI_COMM_WORLD);
   if (rank == 0) std::filesystem::remove(path);
 
@@ -116,9 +117,9 @@ int main(int argc, char **argv) {
   elff_xml_document_t doc = nullptr;
   elff_xml_error xml_error{};
   check(elff_xml_document_load_memory(bad.data(), bad.size(), &doc, &xml_error) == ELFF_XML_OK, xml_error.message);
-  ib_runtime_error error{};
+  model_runtime_error error{};
   runtime = nullptr;
-  check(ib_runtime_create_from_case_document_mpi(doc, MPI_COMM_WORLD, &runtime, &error) != 0,
+  check(model_runtime_create_from_case_document_mpi(doc, MPI_COMM_WORLD, &runtime, &error) != 0,
     "rank-local rod failure was not propagated");
   check(!runtime && error.message[0], "failed factory published runtime or lost error");
   elff_xml_document_destroy(doc);

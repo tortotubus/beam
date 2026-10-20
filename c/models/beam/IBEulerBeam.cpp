@@ -3,7 +3,7 @@
 #include "elff/c/models/beam/IBEulerBeamBCs.hpp"
 #include "elff/config/config.hpp"
 #include "elff/models/beam/IBEulerBeam.hpp"
-#include "elff/models/ibm/IBRuntime.hpp"
+#include "elff/models/ibm/IBCoupling.hpp"
 
 #include <cmath>
 #include <memory>
@@ -14,7 +14,7 @@ using namespace ELFF;
 extern "C"
 {
 
-  ib_euler_beam_t ib_euler_beam_new(ib_runtime_t runtime,
+  ib_euler_beam_t ib_euler_beam_new(ib_coupling_t runtime,
                         vertex_t s0,
                         ib_euler_beam_bcs_t bcs,
                         double length,
@@ -52,14 +52,14 @@ extern "C"
                                               static_cast<real_t>(r_penalty));
 
     beam->apply_initial_condition(ic_mesh);
-    return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-      IBRuntimeModelType::EulerBeam, std::move(beam));
+    return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+      ModelType::EulerBeam, std::move(beam));
     } catch (...) {
       return nullptr;
     }
   }
 
-  ib_euler_beam_t ib_euler_beam_new_theta(ib_runtime_t runtime,
+  ib_euler_beam_t ib_euler_beam_new_theta(ib_coupling_t runtime,
                               vertex_t s0,
                               ib_euler_beam_bcs_t bcs,
                               double length,
@@ -111,8 +111,8 @@ extern "C"
                                               static_cast<real_t>(r_penalty));
 
     beam->apply_initial_condition(ic_mesh);
-    return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-      IBRuntimeModelType::EulerBeam, std::move(beam));
+    return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+      ModelType::EulerBeam, std::move(beam));
     } catch (...) {
       return nullptr;
     }

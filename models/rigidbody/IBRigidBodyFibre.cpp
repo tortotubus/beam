@@ -78,7 +78,7 @@ IBRigidBodyFibre::RigidBodyToIBMeshes()
 }
 
 void
-IBRigidBodyFibre::pack_state(IBModelState& s) const
+IBRigidBodyFibre::pack_state(ModelState& s) const
 {
   s.ints.clear();
   s.reals.clear();
@@ -114,7 +114,7 @@ IBRigidBodyFibre::pack_state(IBModelState& s) const
 }
 
 void
-IBRigidBodyFibre::unpack_state(const IBModelState& s)
+IBRigidBodyFibre::unpack_state(const ModelState& s)
 {
   ELFF_ASSERT(s.ints.size() == 3,
               "IBRigidBodyFibre::unpack_state(): invalid integer metadata.\n");

@@ -2,14 +2,14 @@
 
 #include "elff/c/models/beam/IBEulerBeam.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
-#include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ModelRuntime.h"
 
 static ib_force_coupled_t beam;
 
 int
 main()
 {
-  ib_runtime_t runtime = ib_runtime_new();
+  model_runtime_t runtime = model_runtime_new();
   {
     const double L = 1.;
     const double EI = 1.;
@@ -45,7 +45,7 @@ main()
     t += dt;
   }
 
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 
   return 0;
 }

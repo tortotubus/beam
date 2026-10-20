@@ -1,11 +1,11 @@
 #pragma once
 
-#include "elff/c/models/ibm/IBRuntime.h"
 #include "elff/io/CXX/vtkHDFPolyData.hpp"
 #include "elff/io/CXX/vtkPolyData.hpp"
-#include "elff/models/ibm/IBForceCoupled.hpp"
-#include "elff/models/ibm/IBModel.hpp"
-#include "elff/models/ibm/IBVelocityCoupled.hpp"
+#include "elff/models/Model.hpp"
+#include "elff/models/RuntimeComponent.hpp"
+#include "elff/general/error.hpp"
+#include <typeindex>
 #include "elff/mpi/CommHandle.hpp"
 
 #include <cstdint>
@@ -24,7 +24,7 @@ namespace ELFF {
 namespace Models {
 
 /** Exact concrete model type stored in checkpoints. Values are persistent. */
-enum class IBRuntimeModelType : int32_t
+enum class ModelType : int32_t
 {
   Invalid = 0,
   EulerBeam = 1,
@@ -43,60 +43,82 @@ enum class IBRuntimeModelType : int32_t
   BendingRodImplicit = 14
 };
 
-struct IBRuntimeModelState
+struct RuntimeModelState
 {
-  IBRuntimeModelType type = IBRuntimeModelType::Invalid;
-  IBModelState state;
+  ModelType type = ModelType::Invalid;
+  ModelState state;
 };
 
 /** Serializable, ordered snapshot of every model owned by a runtime. */
-struct IBRuntimeState
+struct RuntimeState
 {
-  std::vector<IBRuntimeModelState> models;
+  std::vector<RuntimeModelState> models;
 };
 
-/** Owns an ordered set of immersed-boundary models and their C views. */
-class IBRuntime
+using ModelId = size_t;
+inline constexpr ModelId invalid_model_id = std::numeric_limits<ModelId>::max();
+
+/** @brief Owns ordered models and optional components independently of coupling. */
+class ModelRuntime
 {
 public:
-  struct Entry
-  {
-    IBRuntimeModelType type;
+  struct Entry {
+    ModelType type;
     int owner_pid;
-    ib_model_view_kind_t coupling_kind;
-    std::unique_ptr<IBModel> model;
-    IBModel* base_model;
-    void* coupling_handle;
-    ib_model_info_t info = {0, 0, -1, 0};
+    std::unique_ptr<Model> model;
   };
 
-  IBRuntime() = default;
+  ModelRuntime() = default;
+  virtual ~ModelRuntime() { components_.clear(); entries_.clear(); }
+  ModelRuntime(const ModelRuntime&) = delete;
+  ModelRuntime& operator=(const ModelRuntime&) = delete;
 
-  template<typename T>
-  T* adopt_owned_model(IBRuntimeModelType type, std::unique_ptr<T> model)
-  {
-    static_assert(std::is_base_of<IBModel, T>::value,
-                  "runtime models must derive from IBModel");
-
-    if (sealed_ || !model || type == IBRuntimeModelType::Invalid)
-      return nullptr;
-
-    T* result = model.get();
-    IBModel* base = result;
-    IBForceCoupled* force = dynamic_cast<IBForceCoupled*>(base);
-    IBVelocityCoupled* velocity = dynamic_cast<IBVelocityCoupled*>(base);
-    if ((force == nullptr) == (velocity == nullptr))
-      return nullptr;
-
-    const ib_model_view_kind_t kind =
-      force ? IB_MODEL_VIEW_FORCE_COUPLED
-            : IB_MODEL_VIEW_VELOCITY_COUPLED;
-    void* coupling_handle =
-      force ? static_cast<void*>(force) : static_cast<void*>(velocity);
-    std::unique_ptr<IBModel> owner = std::move(model);
-    entries_.push_back(
-      {type, 0, kind, std::move(owner), base, coupling_handle});
+  /** @brief Attach one component of each exact type before sealing. */
+  template<class T> T* attach_component() {
+    static_assert(std::is_base_of_v<RuntimeComponent, T>);
+    if (auto* existing = component<T>()) return existing;
+    if (sealed_ || sealing_) return nullptr;
+    auto owned = std::make_unique<T>(*this);
+    T* result = owned.get();
+    components_.emplace_back(std::type_index(typeid(T)), std::move(owned));
     return result;
+  }
+  template<class T> T* component() const {
+    for (const auto& entry : components_)
+      if (entry.first == std::type_index(typeid(T)))
+        return static_cast<T*>(entry.second.get());
+    return nullptr;
+  }
+
+  /** @brief Adopt a locally owned model. Its ID is its immutable insertion index. */
+  template<class T>
+  T* adopt_owned_model(ModelType type, std::unique_ptr<T> model) {
+    static_assert(std::is_base_of_v<Model, T>);
+    if (sealed_ || sealing_ || !model || type == ModelType::Invalid) return nullptr;
+    T* result = model.get();
+    entries_.push_back({type, rank(), std::move(model)});
+    return result;
+  }
+  /** @brief Append a remote placeholder, or return invalid_model_id on invalid input. */
+  ModelId add_remote_model(ModelType type, int owner) {
+    if (sealed_ || sealing_ || type == ModelType::Invalid || owner < 0 ||
+        owner >= ranks() || owner == rank()) return invalid_model_id;
+    const ModelId id = entries_.size();
+    entries_.push_back({type, owner, nullptr});
+    return id;
+  }
+  const Entry* entry(ModelId id) const {
+    return id < entries_.size() ? &entries_[id] : nullptr;
+  }
+  Model* model(ModelId id) const {
+    const auto* e = entry(id);
+    return e ? e->model.get() : nullptr;
+  }
+  /** @brief Reserve before a multi-part registration so its commit cannot allocate. */
+  bool reserve_model() {
+    if (sealed_ || sealing_) return false;
+    entries_.reserve(entries_.size() + 1);
+    return true;
   }
 
   int rank() const { return local_rank(); }
@@ -109,68 +131,49 @@ public:
     return count;
   }
 
-  void add_remote_force_model(IBRuntimeModelType type, ib_model_info_t info) {
-    if (sealed_) throw std::logic_error("Runtime is sealed");
-    entries_.push_back({type, info.owner_rank,
-      IB_MODEL_VIEW_FORCE_COUPLED, nullptr, nullptr, nullptr, info});
-  }
-  void add_remote_huang(ib_model_info_t info) {
-    add_remote_force_model(IBRuntimeModelType::EulerBeamHuang, info);
-  }
-  void configure_last_model(ib_model_info_t info) {
-    entries_.back().info = info;
-    entries_.back().owner_pid = info.owner_rank;
-  }
-
-  int seal()
-  {
-    if (sealed_)
-      return 0;
-
-    views_.clear();
-    views_.reserve(entries_.size());
-    for (const auto& entry : entries_)
-      views_.push_back({entry.coupling_kind, entry.coupling_handle, &entry.info});
+  /** @brief Freeze models and components; repeated successful calls are harmless. */
+  int seal() {
+    if (sealed_) return 0;
+    if (sealing_) return -1;
+    sealing_ = true;
+    try {
+      for (auto& component : components_)
+        if (component.second->seal() != 0) { sealing_ = false; return -1; }
+    } catch (...) { sealing_ = false; throw; }
+    sealing_ = false;
     sealed_ = true;
     return 0;
   }
-
-  int get_model_views(ib_model_view_array_t& views)
-  {
-    seal();
-    views.count = views_.size();
-    views.data = views_.empty() ? nullptr : views_.data();
-    return 0;
-  }
+  bool mutable_registration() const { return !sealed_ && !sealing_; }
 
   bool sealed() const { return sealed_; }
   size_t size() const { return entries_.size(); }
 
 #ifdef ELFF_USE_MPI
-  void set_communicator(MPI_Comm comm)
+  int set_communicator(MPI_Comm comm)
   {
-    if (!entries_.empty())
-      throw std::logic_error("Set communicator before model construction");
+    if (!mutable_registration() || !entries_.empty()) return -1;
     communicator_ =
       (comm != MPI_COMM_NULL) ? ELFF::MPI::CommHandle::duplicate(comm)
                               : ELFF::MPI::CommHandle();
+    return 0;
   }
 #endif
 
-  int export_state(IBRuntimeState& state)
+  int export_state(RuntimeState& state)
   {
-    seal();
+    if (seal() != 0) return -1;
     const bool distributed = checkpoint_owner_pid() < 0;
     if (!distributed)
       for (const auto& entry : entries_)
-        if (!entry.base_model) return -1;
+        if (!entry.model) return -1;
     state.models.clear();
     state.models.resize(entries_.size());
     for (size_t i = 0; i < entries_.size(); ++i) {
       state.models[i].type = entries_[i].type;
       auto& packed = state.models[i].state;
-      if (entries_[i].base_model)
-        entries_[i].base_model->pack_state(packed);
+      if (entries_[i].model)
+        entries_[i].model->pack_state(packed);
 #ifdef ELFF_USE_MPI
       if (distributed) {
         broadcast_vector(packed.ints, entries_[i].owner_pid);
@@ -182,9 +185,9 @@ public:
     return 0;
   }
 
-  int import_state(const IBRuntimeState& state)
+  int import_state(const RuntimeState& state)
   {
-    seal();
+    if (seal() != 0) return -1;
     if (state.models.size() != entries_.size())
       return -1;
 
@@ -195,23 +198,23 @@ public:
     }
 
     for (size_t i = 0; i < entries_.size(); ++i)
-      if (entries_[i].base_model)
-        entries_[i].base_model->unpack_state(state.models[i].state);
+      if (entries_[i].model)
+        entries_[i].model->unpack_state(state.models[i].state);
     return 0;
   }
 
   IO::CXX::vtkPolyData to_vtk_polydata()
   {
-    seal();
+    if (seal() != 0) ELFF_ABORT("Unable to seal model runtime for output.");
     std::vector<IO::CXX::vtkPolyData> datasets;
     for (const auto& entry : entries_)
-      if (entry.base_model) entry.base_model->append_vtk_polydata(datasets);
+      if (entry.model) entry.model->append_vtk_polydata(datasets);
     return IO::CXX::vtkPolyData::append_many(datasets);
   }
 
   int write_polydata(const char* fname, bool overwrite = true)
   {
-    seal();
+    if (seal() != 0) return -1;
     if (checkpoint_owner_pid() < 0) return -1;
     if (!should_checkpoint_locally())
       return 0;
@@ -226,7 +229,7 @@ public:
 
   int write_checkpoint(const char* fname)
   {
-    seal();
+    if (seal() != 0) return -1;
 #ifdef ELFF_USE_MPI
     if (checkpoint_owner_pid() < 0) {
       // All owners contribute; rank zero publishes the existing ordered format.
@@ -256,7 +259,7 @@ public:
 
   int read_checkpoint(const char* fname)
   {
-    seal();
+    if (seal() != 0) return -1;
     if (checkpoint_owner_pid() >= 0 && !should_checkpoint_locally())
       return 0;
     if (!fname)
@@ -272,10 +275,10 @@ public:
 
   int write_checkpoint(FILE* fp)
   {
-    seal();
+    if (seal() != 0) return -1;
     const bool distributed = checkpoint_owner_pid() < 0;
     if (!distributed && !should_checkpoint_locally()) return 0;
-    IBRuntimeState state;
+    RuntimeState state;
     if (export_state(state) != 0) return -1;
     if (distributed && local_rank() != 0) return 0;
     if (!fp) return -1;
@@ -313,7 +316,7 @@ public:
 
   int read_checkpoint(FILE* fp)
   {
-    seal();
+    if (seal() != 0) return -1;
     if (checkpoint_owner_pid() >= 0 && !should_checkpoint_locally())
       return 0;
     if (!fp)
@@ -325,11 +328,8 @@ public:
     if (header.magic != file_magic)
       return -1;
     if (header.version != file_version) {
-      std::fprintf(stderr,
-                   "IBRuntime checkpoint version %d is unsupported; "
-                   "expected version %d.\n",
-                   header.version,
-                   file_version);
+      ELFF_LOG("ModelRuntime checkpoint version " << header.version
+               << " is unsupported; expected " << file_version << ".");
       return -1;
     }
     if (header.nmodels < 0)
@@ -338,7 +338,7 @@ public:
         static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
       return -1;
 
-    IBRuntimeState state;
+    RuntimeState state;
     state.models.resize(static_cast<size_t>(header.nmodels));
     for (auto& model_state : state.models) {
       int32_t type = 0;
@@ -357,7 +357,7 @@ public:
             static_cast<uint64_t>(std::numeric_limits<size_t>::max()))
         return -1;
 
-      model_state.type = static_cast<IBRuntimeModelType>(type);
+      model_state.type = static_cast<ModelType>(type);
       model_state.state.ints.resize(static_cast<size_t>(ni));
       model_state.state.reals.resize(static_cast<size_t>(nr));
       model_state.state.bytes.resize(static_cast<size_t>(nb));
@@ -436,7 +436,8 @@ private:
   }
 
   std::vector<Entry> entries_;
-  std::vector<ib_model_view_t> views_;
+  std::vector<std::pair<std::type_index, std::unique_ptr<RuntimeComponent>>> components_;
+  bool sealing_ = false;
   bool sealed_ = false;
   ELFF::MPI::CommHandle communicator_;
 };

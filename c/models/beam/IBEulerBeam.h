@@ -1,7 +1,7 @@
 #pragma once
 
 #include "elff/c/models/beam/IBEulerBeamBCs.h"
-#include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ibm/IBCoupling.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -30,7 +30,7 @@ extern "C"
    * @param r_penalty Penalty parameter used in the inextensibility constraint
    * @return Opaque beam handle
    */
-  ib_euler_beam_t ib_euler_beam_new(ib_runtime_t runtime,
+  ib_euler_beam_t ib_euler_beam_new(ib_coupling_t runtime,
                         vertex_t s0,
                         ib_euler_beam_bcs_t bcs,
                         double length,
@@ -52,7 +52,7 @@ extern "C"
    * @param theta Initial angle parameter
    * @return Opaque beam handle
    */
-  ib_euler_beam_t ib_euler_beam_new_theta(ib_runtime_t runtime,
+  ib_euler_beam_t ib_euler_beam_new_theta(ib_coupling_t runtime,
                               vertex_t s0,
                               ib_euler_beam_bcs_t bcs,
                               double length,

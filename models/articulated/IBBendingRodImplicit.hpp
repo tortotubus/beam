@@ -12,8 +12,8 @@ public:
   using BendingRodImplicit::solve;
   void solve(real_t dt, const std::vector<Vector>& density) override;
   void ComputeNextPoints(std::vector<IBMesh::IBVertex> force, real_t dt) override;
-  void pack_state(IBModelState &s) const override;
-  void unpack_state(const IBModelState &s) override;
+  void pack_state(ModelState &s) const override;
+  void unpack_state(const ModelState &s) override;
 
 protected:
   void setState(const Eigen::VectorXd &state) override;

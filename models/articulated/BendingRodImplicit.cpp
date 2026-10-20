@@ -463,7 +463,7 @@ void BendingRodImplicit::advance(real_t dt, const std::vector<Vec3> &loads) {
   update_mesh();
 }
 
-void BendingRodImplicit::pack_state(IBModelState &s) const {
+void BendingRodImplicit::pack_state(ModelState &s) const {
   s.ints = {1, n_, static_cast<int64_t>(boundary_), max_iterations_,
             acceleration_.size() != 0 ? 1 : 0};
   s.bytes.clear();
@@ -482,8 +482,8 @@ void BendingRodImplicit::pack_state(IBModelState &s) const {
                    acceleration_.data() + acceleration_.size());
 }
 
-void BendingRodImplicit::unpack_state(const IBModelState &s) {
-  IBModelState expected;
+void BendingRodImplicit::unpack_state(const ModelState &s) {
+  ModelState expected;
   BendingRodImplicit::pack_state(expected);
   const size_t prefix = 9 + masses_.size() + inertias_.size() +
                         bending_stiffness_.size() + bending_damping_.size();

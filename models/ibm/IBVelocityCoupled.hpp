@@ -96,7 +96,7 @@ public:
     : mesh(NumberOfPoints)
     , mesh_next(NumberOfPoints) {};
 
-  void pack_state(IBModelState& s) const override
+  void pack_state(ModelState& s) const override
   {
     static constexpr int64_t state_version = 1;
 
@@ -113,7 +113,7 @@ public:
     pack_mesh_state(s, mesh_next);
   }
 
-  void unpack_state(const IBModelState& s) override
+  void unpack_state(const ModelState& s) override
   {
     static constexpr int64_t state_version = 1;
 
@@ -184,14 +184,14 @@ public:
   }
 
 private:
-  static void pack_vertex(IBModelState& s, const IBMesh::IBVertex& value)
+  static void pack_vertex(ModelState& s, const IBMesh::IBVertex& value)
   {
     s.reals.push_back(value.x);
     s.reals.push_back(value.y);
     s.reals.push_back(value.z);
   }
 
-  static void unpack_vertex(const IBModelState& s,
+  static void unpack_vertex(const ModelState& s,
                             size_t& k,
                             IBMesh::IBVertex& value)
   {
@@ -200,7 +200,7 @@ private:
     value.z = s.reals[k++];
   }
 
-  static void pack_mesh_state(IBModelState& s, const IBMesh& ib_mesh)
+  static void pack_mesh_state(ModelState& s, const IBMesh& ib_mesh)
   {
     const size_t n = ib_mesh.GetNumberOfPoints();
     const auto& points = ib_mesh.GetPoints();
@@ -218,7 +218,7 @@ private:
       s.reals.push_back(measures[i]);
   }
 
-  static void unpack_mesh_state(const IBModelState& s,
+  static void unpack_mesh_state(const ModelState& s,
                                 size_t& k,
                                 IBMesh& ib_mesh)
   {

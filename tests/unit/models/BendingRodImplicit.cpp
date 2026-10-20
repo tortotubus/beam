@@ -96,7 +96,7 @@ TEST(BendingRodImplicitTest, CurvedMovingMeshInitializesAndRestartsThroughBase)
     EXPECT_DOUBLE_EQ(rod.GetCurrent().GetPoints()[i].y, base.get_mesh().get_centerline(i)[1]);
   }
   base.solve(0.001);
-  IBModelState saved;
+  ModelState saved;
   rod.pack_state(saved);
   restored.unpack_state(saved);
   EXPECT_EQ(rod.get_mesh().get_centerline(), restored.get_mesh().get_centerline());
@@ -116,7 +116,7 @@ TEST(BendingRodImplicitTest, InvalidInitialMeshesLeaveStateAndHistoryUnchanged)
   config.length = 2;
   IBBendingRodImplicit rod(config);
   rod.solve(0.001);
-  IBModelState before, after;
+  ModelState before, after;
   rod.pack_state(before);
   for (int invalid = 0; invalid < 5; ++invalid) {
     BendingRodMesh initial(3, 2);
@@ -260,7 +260,7 @@ TEST(BendingRodImplicitTest, IndependentSolverMatchesDensityAdapterAndVelocities
       EXPECT_LT((velocities - difference).norm(), 1e-6);
       EXPECT_NEAR(coupled.GetCurrent().GetVelocity().back().z, velocities(3, 2), 1e-13);
     }
-    IBModelState before, after;
+    ModelState before, after;
     structural.pack_state(before);
     structural.advance(0, loads);
     structural.pack_state(after);
@@ -288,7 +288,7 @@ TEST(BendingRodImplicitTest, CheckedCFailurePreservesStateAndMeshes)
   ASSERT_EQ(ib_force_coupled_get_next_checked(handle, force.data(), 4, 0,
     &output, error, sizeof(error)), 0) << error;
   ib_mesh_free(&output);
-  IBModelState before, after;
+  ModelState before, after;
   rod.pack_state(before);
   const auto mesh = rod.GetCurrent();
 #ifdef ELFF_USE_EXCEPTIONS
@@ -411,14 +411,14 @@ TEST(BendingRodImplicitTest, ForceCouplingAndRestart)
   coupled.GetNext(force, 0.01);
   EXPECT_NEAR(rod.state()[1], 0.0001, 1e-12);
   EXPECT_NEAR(coupled.GetCurrent().GetVelocity()[0].y, 0.02, 1e-12);
-  IBModelState checkpoint;
+  ModelState checkpoint;
   coupled.pack_state(checkpoint);
   restored.unpack_state(checkpoint);
   EXPECT_TRUE(restored.state().isApprox(rod.state(), 1e-14));
   rod.GetNext(force, 0.01);
   restored.GetNext(force, 0.01);
   EXPECT_TRUE(restored.state().isApprox(rod.state(), 1e-14));
-  IBModelState wrong_scheme = checkpoint;
+  ModelState wrong_scheme = checkpoint;
   wrong_scheme.ints[4] = 2;
   EXPECT_ROD_ERROR(restored.unpack_state(wrong_scheme));
   // Structural and coupled checkpoints have distinct payloads.
@@ -460,7 +460,7 @@ TEST(BendingRodImplicitTest, RotatingCheckpointPreservesHistory)
   std::vector<IBMesh::IBVertex> force(4, {0.1, -0.2, 0.3});
   rod.setState(rod.initialState({Vec3(1, 0.2, 0), Vec3(1, 0, 0.1), Vec3(1, -0.1, 0)},
                                 {Vec3(0.1, 0.2, 0.3)}));
-  IBModelState checkpoint;
+  ModelState checkpoint;
   rod.pack_state(checkpoint); // Unstarted history is also valid.
   restored.unpack_state(checkpoint);
   for (int i = 0; i < 4; ++i) rod.GetNext(force, 0.01);
@@ -486,7 +486,7 @@ TEST(BendingRodImplicitTest, NonconvergenceDoesNotAdvanceOrChangeHistory)
   config.nonlinear_tolerance = 1e-13;
   TestIBRod rod(config);
   rod.setState(rod.initialState({Vec3(1, 0.2, 0), Vec3(1, 0, 0.1), Vec3(1, -0.1, 0)}));
-  IBModelState before, after;
+  ModelState before, after;
   rod.pack_state(before);
   std::vector<IBMesh::IBVertex> force(4, {0, 0, 0});
   EXPECT_ROD_ERROR(rod.GetNext(force, 0.1));

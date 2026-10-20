@@ -30,8 +30,8 @@ public:
   void ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
                          real_t dt) override;
 
-  void pack_state(IBModelState& s) const override;
-  void unpack_state(const IBModelState& s) override;
+  void pack_state(ModelState& s) const override;
+  void unpack_state(const ModelState& s) override;
 
 private:
   void RigidBodyToIBMesh(IBMesh& ib_mesh) const;

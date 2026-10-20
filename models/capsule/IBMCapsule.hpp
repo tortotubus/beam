@@ -44,7 +44,7 @@ public:
     datasets.push_back(CapsuleMeshVTK::to_vtk_polydata(Capsule::mesh()));
   }
 
-  void pack_state(IBModelState &state) const override {
+  void pack_state(ModelState &state) const override {
     static constexpr int64_t stateVersion = 1;
 
     state.ints.clear();
@@ -116,7 +116,7 @@ public:
     }
   }
 
-  void unpack_state(const IBModelState &state) override {
+  void unpack_state(const ModelState &state) override {
     static constexpr int64_t stateVersion = 1;
 
     ELFF_VERIFY(state.ints.size() == 7,
@@ -333,7 +333,7 @@ private:
     throw std::runtime_error("Unsupported capsule bending law checkpoint type");
   }
 
-  static void packMembraneLaw(IBModelState &state,
+  static void packMembraneLaw(ModelState &state,
                               const CapsuleMembraneLaw &law,
                               int lawType) {
     if (lawType == 1) {
@@ -350,7 +350,7 @@ private:
     throw std::runtime_error("Unsupported capsule membrane law checkpoint type");
   }
 
-  void packBendingLaw(IBModelState &state, int lawType) const {
+  void packBendingLaw(ModelState &state, int lawType) const {
     if (lawType == 0) {
       return;
     }
@@ -369,7 +369,7 @@ private:
     throw std::runtime_error("Unsupported capsule bending law checkpoint type");
   }
 
-  void unpackMembraneLaw(const IBModelState &state, size_t &k, int lawType) {
+  void unpackMembraneLaw(const ModelState &state, size_t &k, int lawType) {
     if (lawType == 1) {
       Capsule::setLaw(std::make_unique<CapsuleNeoHookeanLaw>(state.reals[k++]));
       return;
@@ -384,7 +384,7 @@ private:
     throw std::runtime_error("Unsupported capsule membrane law checkpoint type");
   }
 
-  void unpackBendingLaw(const IBModelState &state, size_t &k, int lawType) {
+  void unpackBendingLaw(const ModelState &state, size_t &k, int lawType) {
     if (lawType == 0) {
       Capsule::setBendingLaw(nullptr);
       return;
@@ -403,7 +403,7 @@ private:
   }
 
   template <typename Derived>
-  static void packMatrix(IBModelState &state,
+  static void packMatrix(ModelState &state,
                          const Eigen::MatrixBase<Derived> &matrix) {
     for (Eigen::Index c = 0; c < matrix.cols(); ++c)
       for (Eigen::Index r = 0; r < matrix.rows(); ++r)
@@ -411,14 +411,14 @@ private:
   }
 
   template <typename Derived>
-  static void packVector(IBModelState &state,
+  static void packVector(ModelState &state,
                          const Eigen::MatrixBase<Derived> &vector) {
     for (Eigen::Index i = 0; i < vector.size(); ++i)
       state.reals.push_back(vector(i));
   }
 
   template <typename MatrixType>
-  static void unpackMatrix(const IBModelState &state,
+  static void unpackMatrix(const ModelState &state,
                            size_t &k,
                            MatrixType &matrix,
                            int rows,
@@ -430,7 +430,7 @@ private:
   }
 
   template <typename VectorType>
-  static void unpackVector(const IBModelState &state,
+  static void unpackVector(const ModelState &state,
                            size_t &k,
                            VectorType &vector,
                            int size) {

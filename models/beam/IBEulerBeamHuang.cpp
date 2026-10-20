@@ -5,7 +5,7 @@ namespace Models {
 
 namespace {
 void
-pack_matrix(IBModelState& s, const EulerBeamHuang::MatX3& m)
+pack_matrix(ModelState& s, const EulerBeamHuang::MatX3& m)
 {
   for (Eigen::Index i = 0; i < m.rows(); ++i) {
     for (Eigen::Index j = 0; j < m.cols(); ++j) {
@@ -15,7 +15,7 @@ pack_matrix(IBModelState& s, const EulerBeamHuang::MatX3& m)
 }
 
 void
-unpack_matrix(const IBModelState&                  s,
+unpack_matrix(const ModelState&                  s,
               size_t&                              k,
               EulerBeamHuang::MatX3&   m)
 {
@@ -121,7 +121,7 @@ IBEulerBeamHuang::ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
 }
 
 void
-IBEulerBeamHuang::pack_state(IBModelState& s) const
+IBEulerBeamHuang::pack_state(ModelState& s) const
 {
   static constexpr int64_t state_version = 1;
   const int64_t beam_nodes = static_cast<int64_t>(EulerBeam::mesh.get_nodes());
@@ -150,7 +150,7 @@ IBEulerBeamHuang::pack_state(IBModelState& s) const
 }
 
 void
-IBEulerBeamHuang::unpack_state(const IBModelState& s)
+IBEulerBeamHuang::unpack_state(const ModelState& s)
 {
   static constexpr int64_t state_version = 1;
   const size_t beam_nodes = EulerBeam::mesh.get_nodes();

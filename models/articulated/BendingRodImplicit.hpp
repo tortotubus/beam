@@ -2,7 +2,7 @@
 
 #include "elff/models/articulated/BendingRod.hpp"
 #include <Eigen/Dense>
-#include "elff/models/ibm/IBModel.hpp"
+#include "elff/models/Model.hpp"
 
 namespace ELFF {
 namespace Models {
@@ -162,14 +162,14 @@ public:
    * @param[out] s Checkpoint container whose previous contents are replaced.
    * The structural payload excludes coupling forces; an IB adapter may append them.
    */
-  virtual void pack_state(IBModelState &s) const;
+  virtual void pack_state(ModelState &s) const;
   /**
    * @brief Restore a compatible checkpoint and refresh the common mesh.
    * @param s Structural checkpoint produced by pack_state().
    * Model parameters and payload dimensions must match this solver. Restoration
    * preserves the saved acceleration history and timestep rather than resetting them.
    */
-  virtual void unpack_state(const IBModelState &s);
+  virtual void unpack_state(const ModelState &s);
   /**
    * @brief Return the current kinetic, bending and gravitational potential energy.
    * @return Mechanical energy; excludes external-load work and dissipated energy.

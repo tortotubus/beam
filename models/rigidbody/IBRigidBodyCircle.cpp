@@ -77,7 +77,7 @@ IBRigidBodyCircle::RigidBodyToIBMeshes()
 }
 
 void
-IBRigidBodyCircle::pack_state(IBModelState& s) const
+IBRigidBodyCircle::pack_state(ModelState& s) const
 {
   s.ints.clear();
   s.reals.clear();
@@ -105,7 +105,7 @@ IBRigidBodyCircle::pack_state(IBModelState& s) const
 }
 
 void
-IBRigidBodyCircle::unpack_state(const IBModelState& s)
+IBRigidBodyCircle::unpack_state(const ModelState& s)
 {
   ELFF_ASSERT(s.ints.size() == 3,
               "IBRigidBodyCircle::unpack_state(): invalid integer metadata.\n");

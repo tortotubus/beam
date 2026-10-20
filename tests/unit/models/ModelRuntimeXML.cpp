@@ -1,8 +1,9 @@
+#include "elff/c/models/ibm/IBCoupling.h"
 #include <gtest/gtest.h>
 
 #include "elff/c/models/beam/IBEulerBeamHuang.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
-#include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ModelRuntime.h"
 #include "elff/config/_config.hpp"
 
 #include <filesystem>
@@ -66,73 +67,73 @@ std::string case_xml(const std::string& models)
 
 #ifdef ELFF_USE_LIBXML2
 
-TEST(IBRuntimeXMLTest, BuildsRepeatedHuangModelsInDocumentOrder)
+TEST(ModelRuntimeXMLTest, BuildsRepeatedHuangModelsInDocumentOrder)
 {
   TemporaryCase file("elff_runtime_ordered_models.xml",
                      case_xml(std::string("<!-- first -->") + huang("4") +
                               "\n<!-- second -->\n" + huang("7")));
-  ib_runtime_t runtime = nullptr;
-  ib_runtime_error error = {};
-  ASSERT_EQ(ib_runtime_create_from_case_file(file.path(), &runtime, &error), 0)
+  model_runtime_t runtime = nullptr;
+  model_runtime_error error = {};
+  ASSERT_EQ(model_runtime_create_from_case_file(file.path(), &runtime, &error), 0)
     << error.message;
   ASSERT_NE(runtime, nullptr);
 
   ib_model_view_array_t views = {};
-  ASSERT_EQ(ib_runtime_get_model_views(runtime, &views), 0);
+  ASSERT_EQ(ib_coupling_get_model_views(ib_coupling_attach(runtime), &views), 0);
   ASSERT_EQ(views.count, 2U);
   EXPECT_EQ(views.data[0].kind, IB_MODEL_VIEW_FORCE_COUPLED);
   EXPECT_EQ(views.data[1].kind, IB_MODEL_VIEW_FORCE_COUPLED);
   EXPECT_EQ(ib_force_coupled_get_number_of_nodes(views.data[0].handle), 4);
   EXPECT_EQ(ib_force_coupled_get_number_of_nodes(views.data[1].handle), 7);
 
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 }
 
-TEST(IBRuntimeXMLTest, UsesEmbeddedDtdAndRejectsLegacyModelNames)
+TEST(ModelRuntimeXMLTest, UsesEmbeddedDtdAndRejectsLegacyModelNames)
 {
   TemporaryCase file(
     "elff_runtime_legacy_model.xml",
     case_xml(std::string("<Model id=\"named\">") + huang("4") +
              "</Model>"));
-  ib_runtime_t runtime = reinterpret_cast<ib_runtime_t>(1);
-  ib_runtime_error error = {};
-  EXPECT_NE(ib_runtime_create_from_case_file(file.path(), &runtime, &error), 0);
+  model_runtime_t runtime = reinterpret_cast<model_runtime_t>(1);
+  model_runtime_error error = {};
+  EXPECT_NE(model_runtime_create_from_case_file(file.path(), &runtime, &error), 0);
   EXPECT_EQ(runtime, nullptr);
   EXPECT_NE(error.message[0], '\0');
 }
 
-TEST(IBRuntimeXMLTest, ReportsIndexedSemanticFailureTransactionally)
+TEST(ModelRuntimeXMLTest, ReportsIndexedSemanticFailureTransactionally)
 {
   TemporaryCase file("elff_runtime_invalid_second_model.xml",
                      case_xml(huang("4") + huang("7", "1", "0")));
-  ib_runtime_t runtime = reinterpret_cast<ib_runtime_t>(1);
-  ib_runtime_error error = {};
-  EXPECT_NE(ib_runtime_create_from_case_file(file.path(), &runtime, &error), 0);
+  model_runtime_t runtime = reinterpret_cast<model_runtime_t>(1);
+  model_runtime_error error = {};
+  EXPECT_NE(model_runtime_create_from_case_file(file.path(), &runtime, &error), 0);
   EXPECT_EQ(runtime, nullptr);
   EXPECT_EQ(error.model_index, 1U);
   EXPECT_GT(error.line, 0);
   EXPECT_NE(std::string(error.message).find("direction"), std::string::npos);
 }
 
-TEST(IBRuntimeXMLTest, RejectsNonpositiveGeometryWithModelLocation)
+TEST(ModelRuntimeXMLTest, RejectsNonpositiveGeometryWithModelLocation)
 {
   TemporaryCase file("elff_runtime_invalid_geometry.xml",
                      case_xml(huang("4", "-1")));
-  ib_runtime_t runtime = nullptr;
-  ib_runtime_error error = {};
-  EXPECT_NE(ib_runtime_create_from_case_file(file.path(), &runtime, &error), 0);
+  model_runtime_t runtime = nullptr;
+  model_runtime_error error = {};
+  EXPECT_NE(model_runtime_create_from_case_file(file.path(), &runtime, &error), 0);
   EXPECT_EQ(runtime, nullptr);
   EXPECT_EQ(error.model_index, 0U);
   EXPECT_GT(error.line, 0);
 }
 
-TEST(IBRuntimeXMLTest, RejectsNonfiniteGeometryAndAnchorValues)
+TEST(ModelRuntimeXMLTest, RejectsNonfiniteGeometryAndAnchorValues)
 {
   TemporaryCase infinite_length("elff_runtime_infinite_length.xml",
                                 case_xml(huang("4", "inf")));
-  ib_runtime_t runtime = nullptr;
-  ib_runtime_error error = {};
-  EXPECT_NE(ib_runtime_create_from_case_file(
+  model_runtime_t runtime = nullptr;
+  model_runtime_error error = {};
+  EXPECT_NE(model_runtime_create_from_case_file(
               infinite_length.path(), &runtime, &error),
             0);
   EXPECT_EQ(runtime, nullptr);
@@ -146,7 +147,7 @@ TEST(IBRuntimeXMLTest, RejectsNonfiniteGeometryAndAnchorValues)
                 "<Anchor x=\"nan\" y=\"0\"/>");
   TemporaryCase nan_anchor("elff_runtime_nan_anchor.xml", case_xml(model));
   error = {};
-  EXPECT_NE(ib_runtime_create_from_case_file(
+  EXPECT_NE(model_runtime_create_from_case_file(
               nan_anchor.path(), &runtime, &error),
             0);
   EXPECT_EQ(runtime, nullptr);
@@ -154,12 +155,12 @@ TEST(IBRuntimeXMLTest, RejectsNonfiniteGeometryAndAnchorValues)
   EXPECT_GT(error.line, 0);
 }
 
-TEST(IBRuntimeXMLTest, ReturnedRuntimeIsAlreadySealed)
+TEST(ModelRuntimeXMLTest, ReturnedRuntimeIsAlreadySealed)
 {
   TemporaryCase file("elff_runtime_sealed.xml", case_xml(huang("4")));
-  ib_runtime_t runtime = nullptr;
-  ib_runtime_error error = {};
-  ASSERT_EQ(ib_runtime_create_from_case_file(file.path(), &runtime, &error), 0)
+  model_runtime_t runtime = nullptr;
+  model_runtime_error error = {};
+  ASSERT_EQ(model_runtime_create_from_case_file(file.path(), &runtime, &error), 0)
     << error.message;
 
   ib_euler_beam_bcs_t bcs = {};
@@ -169,18 +170,18 @@ TEST(IBRuntimeXMLTest, ReturnedRuntimeIsAlreadySealed)
   bcs.type[1] = IB_EULER_BEAM_BC_FREE;
   const vertex_t origin = {0, 0, 0};
   EXPECT_EQ(ib_euler_beam_huang_new(
-              runtime, origin, bcs, 1.0, 1.0, 1.0, 4),
+              ib_coupling_attach(runtime), origin, bcs, 1.0, 1.0, 1.0, 4),
             nullptr);
-  ib_runtime_delete(runtime);
+  model_runtime_delete(runtime);
 }
 
 #else
 
-TEST(IBRuntimeXMLTest, ReportsUnavailableWithoutLibxml2)
+TEST(ModelRuntimeXMLTest, ReportsUnavailableWithoutLibxml2)
 {
-  ib_runtime_t runtime = nullptr;
-  ib_runtime_error error = {};
-  EXPECT_NE(ib_runtime_create_from_case_file("case.xml", &runtime, &error), 0);
+  model_runtime_t runtime = nullptr;
+  model_runtime_error error = {};
+  EXPECT_NE(model_runtime_create_from_case_file("case.xml", &runtime, &error), 0);
   EXPECT_EQ(runtime, nullptr);
 }
 

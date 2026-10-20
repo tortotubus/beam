@@ -205,7 +205,7 @@ trace int elff_vc_advance (void* ctx, void* mesh, double dt) {
 
 /** Adapter buffers are indexed by model node id, independent of local storage. */
 typedef struct {
-  ib_force_coupled_t model; /* Borrowed from IBRuntime. */
+  ib_force_coupled_t model; /* Borrowed from ModelRuntime. */
   int count;
   vertex_t* forces;
   ib_mesh_t output;
@@ -514,7 +514,7 @@ IBMeshModel elff_euler_beam_new (double length,
                                  coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_t beam_ptr =
-    ib_euler_beam_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
+    ib_euler_beam_new (elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -532,7 +532,7 @@ IBMeshModel elff_euler_beam_new_theta (double length,
                                        coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_t beam_ptr = ib_euler_beam_new_theta (
-    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
+    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -549,7 +549,7 @@ IBMeshModel elff_euler_beam_penalty_new (double length,
                                          coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new (
-    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
+    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -567,7 +567,7 @@ IBMeshModel elff_euler_beam_penalty_new_theta (double length,
                                                coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new_theta (
-    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
+    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -584,7 +584,7 @@ IBMeshModel elff_euler_beam_ggl_new (double length,
                                      coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_ggl_t beam_ptr =
-    ib_euler_beam_ggl_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
+    ib_euler_beam_ggl_new (elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -602,7 +602,7 @@ IBMeshModel elff_euler_beam_ggl_new_theta (double length,
                                            coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_ggl_t beam_ptr = ib_euler_beam_ggl_new_theta (
-    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
+    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -619,7 +619,7 @@ IBMeshModel elff_euler_beam_addm_new (double length,
                                       coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_addm_t beam_ptr = ib_euler_beam_addm_new (
-    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
+    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -637,7 +637,7 @@ IBMeshModel elff_euler_beam_addm_new_theta (double length,
                                             coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_addm_t beam_ptr = ib_euler_beam_addm_new_theta (
-    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
+    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -653,7 +653,7 @@ IBMeshModel elff_euler_beam_huang_new (double length,
                                        coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_huang_t beam_ptr =
-    ib_euler_beam_huang_new (elff_runtime_get (), v0, bcs, length, EI, mu, nodes);
+    ib_euler_beam_huang_new (elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -670,7 +670,7 @@ IBMeshModel elff_euler_beam_huang_new_theta (double length,
                                              coord s0 = {0}) {
   vertex_t v0 = {s0.x, s0.y, s0.z};
   ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_theta (
-    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, theta);
+    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, theta);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -689,7 +689,7 @@ IBMeshModel elff_euler_beam_huang_new_direction (
   vertex_t v0 = {s0.x, s0.y, s0.z};
   vertex_t tangent = {direction.x, direction.y, direction.z};
   ib_euler_beam_huang_t beam_ptr = ib_euler_beam_huang_new_direction (
-    elff_runtime_get (), v0, bcs, length, EI, mu, nodes, tangent);
+    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, tangent);
 
   return elff_force_coupled_model (beam_ptr);
 }
@@ -702,7 +702,7 @@ IBMeshModel elff_capsule_sphere_new (double radius,
                                      int refinements = 0,
                                      double elastic_modulus = 1.) {
   ib_capsule_t capsule_ptr = ib_capsule_sphere_new (
-    elff_runtime_get (), radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
+    elff_ib_coupling_get (), radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
 
   return elff_velocity_coupled_model (capsule_ptr);
 }
@@ -715,7 +715,7 @@ IBMeshModel elff_capsule_ellipsoid_new (coord radii,
                                         int refinements = 0,
                                         double elastic_modulus = 1.) {
   ib_capsule_t capsule_ptr = ib_capsule_ellipsoid_new (
-    elff_runtime_get (),
+    elff_ib_coupling_get (),
     elff_vertex_from_coord (radii),
     elff_vertex_from_coord (center),
     refinements,
@@ -732,7 +732,7 @@ IBMeshModel elff_capsule_biconcave_new (double radius,
                                         int refinements = 0,
                                         double elastic_modulus = 1.) {
   ib_capsule_t capsule_ptr = ib_capsule_biconcave_new (
-    elff_runtime_get (), radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
+    elff_ib_coupling_get (), radius, elff_vertex_from_coord (center), refinements, elastic_modulus);
 
   return elff_velocity_coupled_model (capsule_ptr);
 }
@@ -750,7 +750,7 @@ IBMeshModel elff_rigid_body_circle_new (double radius,
   vertex_t x = {center.x, center.y, center.z};
   vertex_t v = {velocity.x, velocity.y, velocity.z};
   ib_rigid_body_circle_t body_ptr = ib_rigid_body_circle_new (
-    elff_runtime_get (), radius, point_count, density, x, v, angle, angular_velocity_z);
+    elff_ib_coupling_get (), radius, point_count, density, x, v, angle, angular_velocity_z);
 
   return elff_force_coupled_model (body_ptr);
 }
@@ -775,7 +775,7 @@ IBMeshModel elff_rigid_body_fibre_new (double length,
                     angular_velocity_body.z};
 
   ib_rigid_body_fibre_t body_ptr = ib_rigid_body_fibre_new (
-    elff_runtime_get (), length, diameter, nodes, linear_density, x, v, q, omega);
+    elff_ib_coupling_get (), length, diameter, nodes, linear_density, x, v, q, omega);
 
   return elff_force_coupled_model (body_ptr);
 }
@@ -790,7 +790,7 @@ IBMeshModel elff_pinned_rigid_body_circle_new (double radius,
                                                double angle = 0.) {
   vertex_t x = {center.x, center.y, center.z};
   ib_pinned_rigid_body_circle_t body_ptr =
-    ib_pinned_rigid_body_circle_new (elff_runtime_get (), radius, point_count, density, x, angle);
+    ib_pinned_rigid_body_circle_new (elff_ib_coupling_get (), radius, point_count, density, x, angle);
 
   return elff_force_coupled_model (body_ptr);
 }
@@ -809,7 +809,7 @@ IBMeshModel elff_pinned_rigid_body_fibre_new (double length,
   quaternion_t q = {q_w, q_xyz.x, q_xyz.y, q_xyz.z};
 
   ib_pinned_rigid_body_fibre_t body_ptr = ib_pinned_rigid_body_fibre_new (
-    elff_runtime_get (), length, diameter, nodes, linear_density, x, q);
+    elff_ib_coupling_get (), length, diameter, nodes, linear_density, x, q);
 
   return elff_force_coupled_model (body_ptr);
 }
@@ -833,7 +833,7 @@ IBMeshModel elff_rigid_body_sphere_new (double radius,
                     angular_velocity_body.z};
 
   ib_rigid_body_sphere_t body_ptr =
-    ib_rigid_body_sphere_new (elff_runtime_get (), radius, point_count, density, x, v, q, omega);
+    ib_rigid_body_sphere_new (elff_ib_coupling_get (), radius, point_count, density, x, v, q, omega);
 
   return elff_force_coupled_model (body_ptr);
 }
@@ -851,7 +851,7 @@ IBMeshModel elff_pinned_rigid_body_sphere_new (double radius,
   quaternion_t q = {q_w, q_xyz.x, q_xyz.y, q_xyz.z};
 
   ib_pinned_rigid_body_sphere_t body_ptr =
-    ib_pinned_rigid_body_sphere_new (elff_runtime_get (), radius, point_count, density, x, q);
+    ib_pinned_rigid_body_sphere_new (elff_ib_coupling_get (), radius, point_count, density, x, q);
 
   return elff_force_coupled_model (body_ptr);
 }

@@ -98,7 +98,7 @@ IBEulerBeamADDM::ComputeNextPoints(std::vector<IBMesh::IBVertex> force,
 }
 
 void
-IBEulerBeamADDM::pack_state(IBModelState& s) const
+IBEulerBeamADDM::pack_state(ModelState& s) const
 {
   static constexpr int64_t state_version = 1;
   const size_t beam_nodes = EulerBeam::mesh.get_nodes();
@@ -158,7 +158,7 @@ IBEulerBeamADDM::pack_state(IBModelState& s) const
 }
 
 void
-IBEulerBeamADDM::unpack_state(const IBModelState& s)
+IBEulerBeamADDM::unpack_state(const ModelState& s)
 {
   static constexpr int64_t state_version = 1;
   const size_t beam_nodes = EulerBeam::mesh.get_nodes();

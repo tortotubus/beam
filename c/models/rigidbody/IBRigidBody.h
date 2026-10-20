@@ -1,7 +1,7 @@
 #pragma once
 
 #include "elff/c/models/ibm/IBMesh.h"
-#include "elff/c/models/ibm/IBRuntime.h"
+#include "elff/c/models/ibm/IBCoupling.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -20,7 +20,7 @@ extern "C"
   typedef void* ib_pinned_rigid_body_fibre_t;
   typedef void* ib_pinned_rigid_body_sphere_t;
 
-  ib_rigid_body_circle_t ib_rigid_body_circle_new(ib_runtime_t runtime,
+  ib_rigid_body_circle_t ib_rigid_body_circle_new(ib_coupling_t runtime,
                                                   double radius,
                                                   int point_count,
                                                   double density,
@@ -30,7 +30,7 @@ extern "C"
                                                   double angular_velocity_z);
 
   ib_rigid_body_fibre_t ib_rigid_body_fibre_new(
-    ib_runtime_t runtime,
+    ib_coupling_t runtime,
     double length,
     double diameter,
     int nodes,
@@ -41,7 +41,7 @@ extern "C"
     vertex_t angular_velocity_body);
 
   ib_pinned_rigid_body_circle_t ib_pinned_rigid_body_circle_new(
-    ib_runtime_t runtime,
+    ib_coupling_t runtime,
     double radius,
     int point_count,
     double density,
@@ -49,7 +49,7 @@ extern "C"
     double angle);
 
   ib_pinned_rigid_body_fibre_t ib_pinned_rigid_body_fibre_new(
-    ib_runtime_t runtime,
+    ib_coupling_t runtime,
     double length,
     double diameter,
     int nodes,
@@ -58,7 +58,7 @@ extern "C"
     quaternion_t q_bw);
 
   ib_rigid_body_sphere_t ib_rigid_body_sphere_new(
-    ib_runtime_t runtime,
+    ib_coupling_t runtime,
     double radius,
     int point_count,
     double density,
@@ -68,7 +68,7 @@ extern "C"
     vertex_t angular_velocity_body);
 
   ib_pinned_rigid_body_sphere_t ib_pinned_rigid_body_sphere_new(
-    ib_runtime_t runtime,
+    ib_coupling_t runtime,
     double radius,
     int point_count,
     double density,

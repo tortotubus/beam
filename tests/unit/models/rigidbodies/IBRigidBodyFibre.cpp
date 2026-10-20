@@ -90,7 +90,7 @@ TEST(IBRigidBodyFibreTest, PackUnpackRestoresDynamicStateAndIBMesh)
   std::vector<IBMesh::IBVertex> force(N, { 0.5, 0.25, -0.1 });
   fibre.GetNext(force, 0.05);
 
-  IBModelState state;
+  ModelState state;
   fibre.pack_state(state);
 
   IBRigidBodyFibre restored(L, d, N, linear_density);

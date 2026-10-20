@@ -8,7 +8,7 @@
 #include "elff/models/rigidbody/IBRigidBodyCircle.hpp"
 #include "elff/models/rigidbody/IBRigidBodyFibre.hpp"
 #include "elff/models/rigidbody/IBRigidBodySphere.hpp"
-#include "elff/models/ibm/IBRuntime.hpp"
+#include "elff/models/ibm/IBCoupling.hpp"
 
 #include <memory>
 
@@ -38,7 +38,7 @@ extern "C"
 {
 
 ib_rigid_body_circle_t
-ib_rigid_body_circle_new(ib_runtime_t runtime,
+ib_rigid_body_circle_new(ib_coupling_t runtime,
                          double radius,
                          int point_count,
                          double density,
@@ -62,15 +62,15 @@ ib_rigid_body_circle_new(ib_runtime_t runtime,
                           static_cast<real_t>(angle),
                           static_cast<real_t>(angular_velocity_z));
 
-  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-    IBRuntimeModelType::RigidBodyCircle, std::move(body));
+  return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+    ModelType::RigidBodyCircle, std::move(body));
   } catch (...) {
     return nullptr;
   }
 }
 
 ib_rigid_body_fibre_t
-ib_rigid_body_fibre_new(ib_runtime_t runtime,
+ib_rigid_body_fibre_new(ib_coupling_t runtime,
                         double length,
                         double diameter,
                         int nodes,
@@ -96,15 +96,15 @@ ib_rigid_body_fibre_new(ib_runtime_t runtime,
                          to_quat(q_bw),
                          to_vec3(angular_velocity_body));
 
-  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-    IBRuntimeModelType::RigidBodyFibre, std::move(body));
+  return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+    ModelType::RigidBodyFibre, std::move(body));
   } catch (...) {
     return nullptr;
   }
 }
 
 ib_pinned_rigid_body_circle_t
-ib_pinned_rigid_body_circle_new(ib_runtime_t runtime,
+ib_pinned_rigid_body_circle_new(ib_coupling_t runtime,
                                 double radius,
                                 int point_count,
                                 double density,
@@ -125,15 +125,15 @@ ib_pinned_rigid_body_circle_new(ib_runtime_t runtime,
                                 to_vec3(center),
                                 static_cast<real_t>(angle));
 
-  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-    IBRuntimeModelType::PinnedRigidBodyCircle, std::move(body));
+  return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+    ModelType::PinnedRigidBodyCircle, std::move(body));
   } catch (...) {
     return nullptr;
   }
 }
 
 ib_pinned_rigid_body_fibre_t
-ib_pinned_rigid_body_fibre_new(ib_runtime_t runtime,
+ib_pinned_rigid_body_fibre_new(ib_coupling_t runtime,
                                double length,
                                double diameter,
                                int nodes,
@@ -155,15 +155,15 @@ ib_pinned_rigid_body_fibre_new(ib_runtime_t runtime,
                                to_vec3(center),
                                to_quat(q_bw));
 
-  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-    IBRuntimeModelType::PinnedRigidBodyFibre, std::move(body));
+  return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+    ModelType::PinnedRigidBodyFibre, std::move(body));
   } catch (...) {
     return nullptr;
   }
 }
 
 ib_rigid_body_sphere_t
-ib_rigid_body_sphere_new(ib_runtime_t runtime,
+ib_rigid_body_sphere_new(ib_coupling_t runtime,
                          double radius,
                          int point_count,
                          double density,
@@ -187,15 +187,15 @@ ib_rigid_body_sphere_new(ib_runtime_t runtime,
                           to_quat(q_bw),
                           to_vec3(angular_velocity_body));
 
-  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-    IBRuntimeModelType::RigidBodySphere, std::move(body));
+  return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+    ModelType::RigidBodySphere, std::move(body));
   } catch (...) {
     return nullptr;
   }
 }
 
 ib_pinned_rigid_body_sphere_t
-ib_pinned_rigid_body_sphere_new(ib_runtime_t runtime,
+ib_pinned_rigid_body_sphere_new(ib_coupling_t runtime,
                                 double radius,
                                 int point_count,
                                 double density,
@@ -216,8 +216,8 @@ ib_pinned_rigid_body_sphere_new(ib_runtime_t runtime,
                                 to_vec3(center),
                                 to_quat(q_bw));
 
-  return reinterpret_cast<IBRuntime*>(runtime)->adopt_owned_model(
-    IBRuntimeModelType::PinnedRigidBodySphere, std::move(body));
+  return reinterpret_cast<IBCoupling*>(runtime)->adopt_owned_model(
+    ModelType::PinnedRigidBodySphere, std::move(body));
   } catch (...) {
     return nullptr;
   }
