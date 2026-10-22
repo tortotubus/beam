@@ -59,8 +59,7 @@ elff_xml_document_load_file(const char* path,
                             elff_xml_error* error);
 
 /** Render numeric ${expression} attributes and leaf text into an independent in-memory Case
- * document. Bare names and parameters.NAME query parameters; coefficients.NAME
- * queries output coefficients. Definitions are retained unchanged for provenance.
+ * document. Bare names and parameters.NAME query parameters. Definitions are retained unchanged for provenance.
  * V1 requires Parameters when using expressions; v2 permits constant expressions. Expressions
  * must occupy the whole value (apart from whitespace). Source is unchanged.
  * Legacy cases without definitions or expressions are copied unchanged.

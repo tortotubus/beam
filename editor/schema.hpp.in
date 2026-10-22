@@ -1,0 +1,5 @@
+#pragma once
+
+namespace editor {
+inline constexpr char embeddedDtd[] = R"ELFF_DTD(@EDITOR_DTD_TEXT@)ELFF_DTD";
+}

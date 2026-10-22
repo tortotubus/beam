@@ -4,29 +4,26 @@
      backend capabilities require semantic validation. Numeric attributes and
      text may contain expressions; leaf-text expressions are rendered before construction. -->
 
-<!ELEMENT Case (Parameters?, Nondimensionalization?, ((ELFF, Basilisk?)|(Basilisk, ELFF?)))>
-<!ATTLIST Case formatVersion (2) #REQUIRED>
+<!ELEMENT Case (Parameters?, ((ELFF, Basilisk?)|(Basilisk, ELFF?)))>
+<!ATTLIST Case formatVersion (2) #REQUIRED dimension (2|3) #REQUIRED>
 
 <!ELEMENT Parameters (Parameter*)>
 <!ELEMENT Parameter EMPTY>
 <!-- Exactly one of value/expression must be supplied. -->
 <!ATTLIST Parameter name CDATA #REQUIRED value CDATA #IMPLIED expression CDATA #IMPLIED>
-<!ELEMENT Nondimensionalization (Coefficient*)>
-<!ELEMENT Coefficient EMPTY>
-<!ATTLIST Coefficient name CDATA #REQUIRED expression CDATA #REQUIRED>
 
 <!-- Basilisk.
      Domain geometry now belongs to Grid: there is no duplicate Domain block.
      caseType selects application-specific behavior, not a different DTD. -->
-<!ELEMENT Basilisk (Time, Fluid, Grid, Restart?, ImmersedBoundary?, Output)>
-<!ATTLIST Basilisk schemaVersion (2) #REQUIRED caseType CDATA #REQUIRED>
+<!ELEMENT Basilisk (Time?, Fluid?, Grid?, Restart?, ImmersedBoundary?, Output?)>
+<!ATTLIST Basilisk caseType (flapping_fibre|settling_fibre) #REQUIRED>
 
 <!-- Run duration and output schedules are distinct.
      Time.step is the timestep control; schedule.step is an output interval.
      WallTime values are wall-clock seconds. Schedule end is optional.
      MPI wall-clock triggers must be agreed across ranks. -->
 <!ELEMENT Time EMPTY>
-<!ATTLIST Time step CDATA #REQUIRED end CDATA #REQUIRED>
+<!ATTLIST Time step CDATA #IMPLIED end CDATA #IMPLIED>
 <!ELEMENT SimulationTime EMPTY>
 <!ATTLIST SimulationTime step CDATA #REQUIRED end CDATA #IMPLIED>
 <!ELEMENT WallTime EMPTY>
@@ -42,9 +39,10 @@
     <Value>1.0</Value>
   </FluidBoundaryCondition>
 -->
-<!ELEMENT Fluid (FluidMaterial, FluidBoundaryCondition*)>
-<!ELEMENT FluidMaterial EMPTY>
-<!ATTLIST FluidMaterial density CDATA #REQUIRED dynamicViscosity CDATA #REQUIRED>
+<!ELEMENT Fluid (FluidMaterial?, FluidBoundaryCondition*)>
+<!ELEMENT FluidMaterial (Density?, DynamicViscosity?)>
+<!ELEMENT Density (#PCDATA)>
+<!ELEMENT DynamicViscosity (#PCDATA)>
 <!ELEMENT FluidBoundaryCondition (Value?)>
 <!ATTLIST FluidBoundaryCondition
   type (dirichlet|neumann|periodic) #REQUIRED
@@ -76,22 +74,22 @@
        </AdaptWavelet>
      </Grid>
 -->
-<!ELEMENT Grid (Origin, Length, Depth, AdaptWavelet?)>
+<!ELEMENT Grid (Origin?, Length?, Depth?, AdaptWavelet?)>
 <!ATTLIST Grid type (multigrid|multigrid3D|quadtree|octree) #REQUIRED>
 <!ELEMENT Origin EMPTY>
-<!ATTLIST Origin x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
+<!ATTLIST Origin x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
 <!ELEMENT Length EMPTY>
 <!ATTLIST Length x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
 <!ELEMENT Depth (#PCDATA)>
 
 <!-- Restart restores the complete simulation, including fluid and model state.
-     Omission disables restart; presence enables it unless enable="false".
+     Omission inherits case defaults; presence enables it unless enable="false".
      Readers must apply this default even without DTD default expansion. -->
 <!ELEMENT Restart EMPTY>
-<!ATTLIST Restart enable (true|false) "true">
+<!ATTLIST Restart enable (true|false) #REQUIRED>
 
-<!ELEMENT AdaptWavelet (VectorField|ScalarField)+>
-<!ATTLIST AdaptWavelet minLevel CDATA #REQUIRED maxLevel CDATA #REQUIRED>
+<!ELEMENT AdaptWavelet (VectorField|ScalarField)*>
+<!ATTLIST AdaptWavelet minLevel CDATA #IMPLIED maxLevel CDATA #IMPLIED enable (true|false) #REQUIRED>
 
 <!-- Shared by adaptation and output; tolerance is required only for adaptation.
      Readers expand VectorField into its active scalar components, applying the
@@ -109,7 +107,7 @@
 <!-- Basilisk Immersed Boundary.
      Coupling blocks configure models of the corresponding coupling kind;
      both kinds may coexist. Kernel names must be supported by the reader.
-     An omitted level uses the finest configured grid level.
+     An omitted level inherits the case default.
      Readers supply defaults when optional elements are absent.
 
      Example:
@@ -128,18 +126,18 @@
      </ImmersedBoundary>
 -->
 <!ELEMENT ImmersedBoundary (ForceCoupled?, VelocityCoupled?, ImmersedBoundaryKernel?, UniformForceDensity?)>
-<!ATTLIST ImmersedBoundary level CDATA #IMPLIED>
+<!ATTLIST ImmersedBoundary level CDATA #REQUIRED>
 <!ELEMENT ForceCoupled (Iterations?, Relaxation?)>
 <!ELEMENT VelocityCoupled EMPTY>
 <!ELEMENT Iterations (#PCDATA)>
 <!ELEMENT Relaxation (#PCDATA)>
 <!ELEMENT ImmersedBoundaryKernel EMPTY>
-<!ATTLIST ImmersedBoundaryKernel type CDATA #REQUIRED>
+<!ATTLIST ImmersedBoundaryKernel type (Cosine|Roma) #REQUIRED>
 <!ELEMENT UniformForceDensity EMPTY>
-<!ATTLIST UniformForceDensity x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
+<!ATTLIST UniformForceDensity x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
 
 <!-- Basilisk Output.
-     Omitted output/checkpoint blocks are disabled; present blocks are enabled
+     Omitted output/checkpoint blocks inherit case defaults; present blocks are enabled
      unless enable="false". Readers must apply these defaults independently of DTD
      default expansion.
      Checkpoints always include required fluid and model restart state; listed
@@ -168,11 +166,11 @@
 <!ELEMENT Output (FluidOutput?, SolidOutput?, Checkpoint?)>
 <!ATTLIST Output directory CDATA #REQUIRED>
 <!ELEMENT FluidOutput (SimulationTime?, (ScalarField|VectorField)*)>
-<!ATTLIST FluidOutput enable (true|false) "true">
+<!ATTLIST FluidOutput enable (true|false) #REQUIRED>
 <!ELEMENT SolidOutput (SimulationTime?, (IBScalarField|IBVectorField)*)>
-<!ATTLIST SolidOutput enable (true|false) "true">
+<!ATTLIST SolidOutput enable (true|false) #REQUIRED>
 <!ELEMENT Checkpoint (SimulationTime?, (ScalarField|VectorField|IBScalarField|IBVectorField)*)>
-<!ATTLIST Checkpoint enable (true|false) "true">
+<!ATTLIST Checkpoint enable (true|false) #REQUIRED>
 
 <!-- ELFF.
      The v2 BendingRodSegments tag denotes the implicit implementation only.
@@ -180,9 +178,8 @@
      LinearDensity is linear density (mass per unit length), not volume density.
      Two boundary entries must identify distinct ends. The DTD enforces their
      number; the reader enforces left/right uniqueness and supported combinations. -->
-     
+
 <!ELEMENT ELFF (InsertionDomain?, Models)>
-<!ATTLIST ELFF schemaVersion (2) #REQUIRED dimensions (2|3) #REQUIRED units (nondimensional|SI) #REQUIRED>
 <!ELEMENT Models (EulerBeamHuang|BendingRodSegments)+>
 <!ATTLIST Models distribution (rank0|round-robin) "rank0">
 

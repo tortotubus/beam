@@ -10,4 +10,3 @@ elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/isotropic_fibre_serial
 elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/isotropic_fibre_mpi.c") 
 elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/settling_fibre_serial.c")
 elff_basilisk_mpi_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/settling_fibre_mpi.c")
-elff_basilisk_add_executable("${CMAKE_CURRENT_SOURCE_DIR}/generic_ibm_case.c")

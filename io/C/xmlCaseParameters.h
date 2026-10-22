@@ -6,14 +6,13 @@
 extern "C" {
 #endif
 
-/** Owned, resolved numeric parameters and nondimensional coefficients. */
+/** Owned, resolved numeric parameters. */
 typedef struct elff_xml_parameters_handle *elff_xml_parameters_t;
 
 /**
- * Explicitly read optional Parameters and Nondimensionalization children of
+ * Explicitly read the optional Parameters child of
  * Case. Parameters require name and exactly one of value/expression;
- * Coefficients require name and expression. Expressions reference parameters
- * only, with forward references allowed. Names use [A-Za-z_][A-Za-z0-9_]*; pi
+ * Expressions reference other parameters, with forward references allowed. Names use [A-Za-z_][A-Za-z0-9_]*; pi
  * is reserved. Grammar: decimal/scientific numbers, pi, sqrt(...), + - * / ^
  * and parentheses. Powers associate right and bind more tightly than unary
  * signs. All values are finite doubles; no units, substitution or model binding
@@ -32,13 +31,8 @@ elff_xml_status elff_xml_parameters_create(elff_xml_node_t case_node,
 elff_xml_status elff_xml_parameters_get(elff_xml_parameters_t context,
                                         const char *name, double *value,
                                         elff_xml_error *error);
-elff_xml_status
-elff_xml_parameters_get_coefficient(elff_xml_parameters_t context,
-                                    const char *name, double *value,
-                                    elff_xml_error *error);
-
 /** Evaluate a render expression: bare names and parameters.NAME refer to
- * parameters; coefficients.NAME refers to a coefficient. Output is unchanged
+ * parameters. Output is unchanged
  * on failure. No XML is modified. */
 elff_xml_status elff_xml_parameters_evaluate(elff_xml_parameters_t context,
                                             const char *expression, double *value,

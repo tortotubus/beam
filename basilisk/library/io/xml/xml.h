@@ -58,7 +58,7 @@ typedef struct {
 } BasiliskXMLField;
 
 /** @brief Generic case settings, populated before run().
- * Boundary storage and named parameters/coefficients are owned; field lists
+ * Boundary storage and named parameters are owned; field lists
  * are borrowed unless owns_field_lists is set by the XML reader. Copies borrow the owned
  * storage and must not be destroyed separately. XML parsing is separate from field
  * binding and from the simulation events. Use basilisk_xml_case_defaults() before
@@ -101,18 +101,24 @@ typedef struct {
  * Function Declarations
  */
 
+/** @brief Allocate shared case output/adaptation defaults; caller owns the result. */
+static int basilisk_xml_default_fields (BasiliskXMLCase* c,
+    const BasiliskXMLField* fluid, size_t fluid_count, double tolerance);
+static int basilisk_xml_copy_defaults (const BasiliskXMLCase* source,
+    BasiliskXMLCase* target, elff_xml_error* error);
+
 /** @brief Initialize defaults before reading or assigning configuration. */
 static void basilisk_xml_case_defaults (BasiliskXMLCase* c);
 
 /** @brief Release owned configuration storage after the simulation has finished. */
 static void basilisk_xml_case_destroy (BasiliskXMLCase* c);
 
-/** @brief Resolve and own Parameters and Nondimensionalization from a Case document.
+/** @brief Resolve and own Parameters from a Case document.
  * Replaces named values only on success; the document may then be destroyed.
  * Case-specific readers choose recognized names, defaults and range checks.
  * Definitions do not automatically change simulation settings.
- * Both sections may be absent. Parameter expressions use the existing ELFF
- * evaluator; coefficients occupy a separate namespace. Call this reader before
+ * The section may be absent. Parameter expressions use the existing ELFF
+ * evaluator. Call this reader before
  * the lookup helpers, even when no definitions are expected.
  * @code
  * double stats_interval = 10.;
@@ -134,18 +140,10 @@ static elff_xml_status basilisk_xml_parameter (const BasiliskXMLCase* c,
                                                double* value,
                                                elff_xml_error* error);
 
-/** @brief Query a resolved coefficient, independently of the parameter namespace.
- * Output is unchanged on failure; missing names return NOT_FOUND.
- */
-static elff_xml_status basilisk_xml_coefficient (const BasiliskXMLCase* c,
-                                                 const char* name,
-                                                 double* value,
-                                                 elff_xml_error* error);
-
 /** @brief ... */
 static int basilisk_xml_error (elff_xml_error* error, size_t line, const char* message);
 
-/** @brief Check v2 grid selection and optional ELFF dimensions against this executable.
+/** @brief Check v2 grid selection and required Case dimension against this executable.
  * Call before constructing models or configuring the grid. Grid.type also fixes
  * the dimension for fluid-only cases. No simulation settings are modified.
  * Returns zero on success, otherwise a source-located diagnostic.
@@ -183,9 +181,12 @@ static int generic_case_agree (int success);
 /** @brief Validate an enabled simulation-time output schedule. */
 static bool generic_schedule_valid (BasiliskOutputSchedule schedule);
 
+static int basilisk_xml_validate_configuration (const BasiliskXMLCase* c, elff_xml_error* error);
 static int generic_ibm_case_run (const BasiliskXMLCase* configuration);
 
 /** @brief Read a rendered v2 document; configuration must have defaults initialized.
+ * Missing sections/attributes inherit the supplied case defaults.
+ * Explicit collection entries replace their default collection.
  * On failure the previous configuration is unchanged. Parser-created field lists
  * are owned. Field names are bound after IB defaults have allocated their fields.
  */
@@ -462,14 +463,6 @@ static elff_xml_status basilisk_xml_parameter (const BasiliskXMLCase* c,
   return elff_xml_parameters_get (c ? c->named_values : NULL, name, value, error);
 }
 
-static elff_xml_status basilisk_xml_coefficient (const BasiliskXMLCase* c,
-                                                 const char* name,
-                                                 double* value,
-                                                 elff_xml_error* error) {
-  return elff_xml_parameters_get_coefficient (
-    c ? c->named_values : NULL, name, value, error);
-}
-
 static int basilisk_xml_error (elff_xml_error* error, size_t line, const char* message) {
   elff_xml_error_set (error, line, 0, message);
   return 1;
@@ -477,16 +470,19 @@ static int basilisk_xml_error (elff_xml_error* error, size_t line, const char* m
 
 static int basilisk_xml_validate_backend (elff_xml_document_t document,
                                           elff_xml_error* error) {
-  elff_xml_node_t root = NULL, basilisk = NULL, grid = NULL, elff = NULL;
+  elff_xml_node_t root = NULL, basilisk = NULL, grid = NULL;
   char type[64];
   size_t line = 0;
-  if (elff_xml_document_root (document, "Case", &root, error) != ELFF_XML_OK ||
-      elff_xml_node_unique_child (root, "Basilisk", &basilisk, error) != ELFF_XML_OK ||
-      elff_xml_node_unique_child (basilisk, "Grid", &grid, error) != ELFF_XML_OK ||
-      elff_xml_node_attribute_string (grid, "type", type, sizeof (type), NULL, error) !=
-        ELFF_XML_OK)
-    return 1;
-  elff_xml_node_line (grid, &line, NULL);
+  if (elff_xml_document_root(document, "Case", &root, error) != ELFF_XML_OK ||
+      basilisk_xml_optional(root, "Basilisk", &basilisk, error) ||
+      basilisk_xml_optional(basilisk, "Grid", &grid, error)) return 1;
+  type[0] = '\0';
+  if (grid) {
+    elff_xml_status status = elff_xml_node_attribute_string(grid, "type", type, sizeof(type), NULL, error);
+    if (status == ELFF_XML_NOT_FOUND) elff_xml_error_clear(error);
+    else if (status != ELFF_XML_OK) return 1;
+    elff_xml_node_line(grid, &line, NULL);
+  }
   const char* expected = NULL;
   if (!strcmp (GRIDNAME, "Quadtree") && dimension == 2)
     expected = "quadtree";
@@ -501,7 +497,7 @@ static int basilisk_xml_validate_backend (elff_xml_document_t document,
   if (!expected)
     return basilisk_xml_error (
       error, line, "Compiled grid backend is unsupported by the v2 XML schema.");
-  if (strcmp (type, expected)) {
+  if (type[0] && strcmp (type, expected)) {
     char message[ELFF_XML_ERROR_MESSAGE_CAPACITY];
     snprintf (
       message,
@@ -512,22 +508,15 @@ static int basilisk_xml_validate_backend (elff_xml_document_t document,
       dimension);
     return basilisk_xml_error (error, line, message);
   }
-  elff_xml_status status = elff_xml_node_unique_child (root, "ELFF", &elff, error);
-  if (status == ELFF_XML_NOT_FOUND) {
-    elff_xml_error_clear (error);
-    return 0;
-  }
-  if (status != ELFF_XML_OK)
-    return 1;
   int dimensions = 0;
-  if (elff_xml_node_attribute_int (elff, "dimensions", &dimensions, error) != ELFF_XML_OK)
+  if (elff_xml_node_attribute_int (root, "dimension", &dimensions, error) != ELFF_XML_OK)
     return 1;
   if (dimensions != dimension) {
     char message[ELFF_XML_ERROR_MESSAGE_CAPACITY];
-    elff_xml_node_line (elff, &line, NULL);
+    elff_xml_node_line (root, &line, NULL);
     snprintf (message,
               sizeof (message),
-              "ELFF dimensions=%d does not match this executable's dimension %d.",
+              "Case dimension=%d does not match this executable's dimension %d.",
               dimensions,
               dimension);
     return basilisk_xml_error (error, line, message);
@@ -754,12 +743,8 @@ static int basilisk_xml_read_boundaries (elff_xml_node_t fluid,
   return 0;
 }
 
-static int generic_ibm_case_run (const BasiliskXMLCase* configuration) {
-  elff_xml_error error = {0};
-  if (!generic_case_agree (configuration != NULL))
-    return 1;
-  generic_case = *configuration;
-  BasiliskXMLCase* c = &generic_case;
+/** @brief Validate fully merged settings before model construction or simulation. */
+static int basilisk_xml_validate_configuration (const BasiliskXMLCase* c, elff_xml_error* error) {
   bool valid =
     isfinite (c->time_max_dt) && c->time_max_dt > 0 && isfinite (c->time_end) &&
     c->time_end > 0 && isfinite (c->fluid_density) && c->fluid_density > 0 &&
@@ -788,7 +773,22 @@ static int generic_ibm_case_run (const BasiliskXMLCase* configuration) {
     valid = false;
 #endif
   if (valid)
-    valid = !basilisk_xml_validate_boundaries (c, &error);
+    valid = !basilisk_xml_validate_boundaries (c, error);
+  if (!valid) {
+    if (!error || !error->message[0])
+      basilisk_xml_error(error, 0, "Invalid merged case settings (time, material, grid, coupling or output).");
+    return 1;
+  }
+  return 0;
+}
+
+static int generic_ibm_case_run (const BasiliskXMLCase* configuration) {
+  elff_xml_error error = {0};
+  if (!generic_case_agree (configuration != NULL))
+    return 1;
+  generic_case = *configuration;
+  BasiliskXMLCase* c = &generic_case;
+  bool valid = !basilisk_xml_validate_configuration(c, &error);
   if (!generic_case_agree (valid)) {
     if (!valid)
       fprintf (stderr,
@@ -839,6 +839,8 @@ static int basilisk_xml_optional (elff_xml_node_t parent,
                                   const char* name,
                                   elff_xml_node_t* node,
                                   elff_xml_error* error) {
+  *node = NULL;
+  if (!parent) return 0;
   elff_xml_status status = elff_xml_node_unique_child (parent, name, node, error);
   if (status == ELFF_XML_NOT_FOUND) {
     *node = NULL;
@@ -875,8 +877,7 @@ static int basilisk_xml_schedule (elff_xml_node_t node,
                                   double end,
                                   BasiliskOutputSchedule* schedule,
                                   elff_xml_error* error) {
-  schedule->start = 0.;
-  schedule->interval = 1.;
+  if (!node) return 0;
   schedule->end = end;
   if (basilisk_xml_enabled (node, &schedule->enabled, error))
     return 1;
@@ -886,7 +887,7 @@ static int basilisk_xml_schedule (elff_xml_node_t node,
   if (basilisk_xml_optional (node, "SimulationTime", &time, error))
     return 1;
   if (time &&
-      (elff_xml_node_attribute_double (time, "step", &schedule->interval, error) !=
+      (elff_xml_node_attribute_double_or (time, "step", schedule->interval, &schedule->interval, error) !=
          ELFF_XML_OK ||
        elff_xml_node_attribute_double_or (time, "end", end, &schedule->end, error) !=
          ELFF_XML_OK))
@@ -911,6 +912,15 @@ static int basilisk_xml_output_fields (elff_xml_node_t node,
     return 1;
   if (n > (size_t) -1 / sizeof (BasiliskXMLField))
     return basilisk_xml_error (error, 0, "Too many output fields.");
+  size_t field_count = 0;
+  for (size_t j = 0; j < n; ++j) {
+    elff_xml_node_t child = NULL; const char* tag = NULL;
+    if (elff_xml_node_element_child_at(node, j, &child, error) != ELFF_XML_OK ||
+        elff_xml_node_name(child, &tag, error) != ELFF_XML_OK) return 1;
+    if (strcmp(tag, "SimulationTime")) ++field_count;
+  }
+  if (!field_count) return 0;
+  free(*fields); *fields = NULL; *count = 0;
   *fields = calloc (n ? n : 1, sizeof (BasiliskXMLField));
   if (!*fields)
     return basilisk_xml_error (error, 0, "Cannot allocate output fields.");
@@ -982,12 +992,66 @@ static int basilisk_xml_bind_output_fields (BasiliskXMLCase* c, elff_xml_error* 
   return 0;
 }
 
+/** @brief Allocate output selections and velocity adaptation shared by the cases. */
+static int basilisk_xml_default_fields (BasiliskXMLCase* c,
+    const BasiliskXMLField* fluid, size_t fluid_count, double tolerance) {
+  const BasiliskXMLField solid[] = {{"eulvel", true, 0}, {"nforce", true, 0}, {"nvel", true, 0}};
+  c->owns_field_lists = true;
+  c->fluid_fields = malloc(fluid_count*sizeof(*fluid));
+  c->solid_fields = malloc(sizeof(solid));
+  c->adapt_tolerances = malloc(dimension*sizeof(double));
+  if (!c->fluid_fields || !c->solid_fields || !c->adapt_tolerances) {
+    basilisk_xml_case_destroy(c); return 1;
+  }
+  memcpy(c->fluid_fields, fluid, fluid_count*sizeof(*fluid));
+  memcpy(c->solid_fields, solid, sizeof(solid));
+  c->fluid_field_count = fluid_count; c->solid_field_count = 3;
+  c->adapt_enable = true;
+  foreach_dimension() {
+    c->adapt_fields = list_append(c->adapt_fields, u.x);
+    c->adapt_tolerances[c->adapt_tolerance_count++] = tolerance;
+  }
+  c->fluid_output.enabled = c->solid_output.enabled = true;
+  c->fluid_output.start = c->fluid_output.interval;
+  c->solid_output.start = c->solid_output.interval;
+  c->fluid_output.end = c->solid_output.end = c->time_end;
+  c->restore_enable = c->checkpoint_enable = true;
+  return 0;
+}
+
+/** @brief Copy setup-owned lists so failed XML overrides preserve the defaults. */
+static int basilisk_xml_copy_defaults (const BasiliskXMLCase* source,
+                                       BasiliskXMLCase* target, elff_xml_error* error) {
+  *target = *source;
+  target->named_values = NULL;
+  target->bcs = NULL;
+  target->fluid_fields = target->solid_fields = NULL;
+  target->adapt_fields = NULL; target->adapt_tolerances = NULL;
+  target->fluid_scalars = NULL; target->fluid_vectors = NULL;
+  target->solid_scalars = NULL; target->solid_vectors = NULL;
+  target->owns_field_lists = true;
+#define COPY_DEFAULT(field, count) \
+  do { if (source->field && (count)) { \
+    target->field = malloc((count)*sizeof(*source->field)); \
+    if (!target->field) { basilisk_xml_case_destroy(target); \
+      return basilisk_xml_error(error, 0, "Cannot copy case defaults."); } \
+    memcpy(target->field, source->field, (count)*sizeof(*source->field)); \
+  } } while (0)
+  COPY_DEFAULT(bcs, source->bc_count);
+  COPY_DEFAULT(fluid_fields, source->fluid_field_count);
+  COPY_DEFAULT(solid_fields, source->solid_field_count);
+  COPY_DEFAULT(adapt_tolerances, source->adapt_tolerance_count);
+  COPY_DEFAULT(adapt_fields, source->adapt_fields ? list_len(source->adapt_fields) + 1 : 0);
+#undef COPY_DEFAULT
+  return 0;
+}
+
 static int basilisk_xml_case_read (elff_xml_document_t document,
                                    const char* expected_case,
                                    BasiliskXMLCase* configuration,
                                    elff_xml_error* error) {
   BasiliskXMLCase parsed;
-  basilisk_xml_case_defaults (&parsed);
+  if (basilisk_xml_copy_defaults(configuration, &parsed, error)) return 1;
   BasiliskXMLCase* c = &parsed;
   c->owns_field_lists = true;
   elff_xml_node_t root = NULL, b = NULL, time = NULL, fluid = NULL, material = NULL;
@@ -1007,6 +1071,10 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
       return 1;                                                                          \
     }                                                                                    \
   } while (0)
+#define XML_ATTR(call) do { elff_xml_status status = (call); \
+    if (status == ELFF_XML_NOT_FOUND) elff_xml_error_clear(error); \
+    else if (status != ELFF_XML_OK) { basilisk_xml_case_destroy(&parsed); return 1; } \
+  } while (0)
   XML_READ (elff_xml_case_validate (document, error));
   XML_READ (elff_xml_document_root (document, "Case", &root, error));
   XML_READ (elff_xml_node_attribute_int (root, "formatVersion", &version, error));
@@ -1019,8 +1087,13 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
   }
   XML_CHECK (basilisk_xml_validate_backend (document, error));
   XML_READ (basilisk_xml_read_named_values (document, c, error));
-  XML_READ (elff_xml_node_unique_child (root, "Basilisk", &b, error));
-  XML_READ (elff_xml_node_attribute_string (
+  XML_CHECK (basilisk_xml_optional(root, "Basilisk", &b, error));
+  if (!expected_case || strlen(expected_case) >= sizeof(c->case_name)) {
+    basilisk_xml_case_destroy(&parsed);
+    return basilisk_xml_error(error, 0, "Invalid expected case name.");
+  }
+  strcpy(c->case_name, expected_case);
+  if (b) XML_ATTR (elff_xml_node_attribute_string (
     b, "caseType", c->case_name, sizeof (c->case_name), NULL, error));
   if (!expected_case || strcmp (c->case_name, expected_case)) {
     size_t line = 0;
@@ -1031,41 +1104,72 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
       return 1;
     }
   }
-  XML_READ (elff_xml_node_unique_child (b, "Time", &time, error));
-  XML_READ (elff_xml_node_attribute_double (time, "step", &c->time_max_dt, error));
-  XML_READ (elff_xml_node_attribute_double (time, "end", &c->time_end, error));
-  XML_READ (elff_xml_node_unique_child (b, "Fluid", &fluid, error));
-  XML_READ (elff_xml_node_unique_child (fluid, "FluidMaterial", &material, error));
-  XML_READ (
-    elff_xml_node_attribute_double (material, "density", &c->fluid_density, error));
-  XML_READ (elff_xml_node_attribute_double (
-    material, "dynamicViscosity", &c->dynamic_viscosity, error));
-  XML_CHECK (basilisk_xml_read_boundaries (fluid, c, error));
-  XML_READ (elff_xml_node_unique_child (b, "Grid", &grid, error));
-  XML_READ (elff_xml_node_unique_child (grid, "Origin", &node, error));
-  XML_READ (elff_xml_node_attribute_xyz (node, 0., c->grid_origin, error));
-  XML_READ (elff_xml_node_unique_child (grid, "Length", &node, error));
-  XML_READ (elff_xml_node_attribute_xyz (node, 1., c->grid_size, error));
-#if dimension == 3
-  XML_READ (elff_xml_node_attribute_double (node, "z", &c->grid_size[2], error));
-#endif
-  XML_READ (elff_xml_node_unique_child (grid, "Depth", &node, error));
-  double depth = 0.;
-  XML_READ (elff_xml_node_text_double (node, &depth, error));
-  if (depth < 0 || depth >= 30 || floor (depth) != depth) {
-    basilisk_xml_error (error, 0, "Depth must be an integer in [0,30).");
-    {
-      basilisk_xml_case_destroy (&parsed);
-      return 1;
+  XML_CHECK (basilisk_xml_optional(b, "Time", &time, error));
+  if (time) {
+    XML_ATTR(elff_xml_node_attribute_double(time, "step", &c->time_max_dt, error));
+    XML_ATTR(elff_xml_node_attribute_double(time, "end", &c->time_end, error));
+  }
+  // Default schedules follow the merged run duration unless XML supplies an end.
+  c->fluid_output.end = c->solid_output.end = c->time_end;
+  XML_CHECK (basilisk_xml_optional(b, "Fluid", &fluid, error));
+  XML_CHECK (basilisk_xml_optional(fluid, "FluidMaterial", &material, error));
+  if (material) {
+    const char* attributes[2] = {"density", "dynamicViscosity"};
+    const char* elements[2] = {"Density", "DynamicViscosity"};
+    double* values[2] = {&c->fluid_density, &c->dynamic_viscosity};
+    for (int j = 0; j < 2; ++j) {
+      elff_xml_status status = elff_xml_node_attribute_double(material, attributes[j], values[j], error);
+      if (status == ELFF_XML_NOT_FOUND) elff_xml_error_clear(error);
+      else if (status != ELFF_XML_OK) { basilisk_xml_case_destroy(&parsed); return 1; }
+      XML_CHECK(basilisk_xml_optional(material, elements[j], &node, error));
+      if (node) {
+        if (status == ELFF_XML_OK) {
+          basilisk_xml_case_destroy(&parsed);
+          return basilisk_xml_error(error, 0, "Specify fluid material using either an attribute or an element, not both.");
+        }
+        XML_READ(elff_xml_node_text_double(node, values[j], error));
+      }
     }
   }
-  c->grid_initial_level = c->grid_min_level = c->grid_max_level = (int) depth;
+  if (fluid) {
+    size_t count = 0;
+    XML_READ(elff_xml_node_element_child_count(fluid, &count, error));
+    if (count > (material ? 1u : 0u)) {
+      free(c->bcs); c->bcs = NULL; c->bc_count = 0;
+      memset(c->periodic_axis, 0, sizeof(c->periodic_axis));
+      XML_CHECK(basilisk_xml_read_boundaries(fluid, c, error));
+    }
+  }
+  XML_CHECK(basilisk_xml_optional(b, "Grid", &grid, error));
+  XML_CHECK(basilisk_xml_optional(grid, "Origin", &node, error));
+  if (node) {
+    XML_ATTR(elff_xml_node_attribute_double(node, "x", &c->grid_origin[0], error));
+    XML_ATTR(elff_xml_node_attribute_double(node, "y", &c->grid_origin[1], error));
+    XML_ATTR(elff_xml_node_attribute_double(node, "z", &c->grid_origin[2], error));
+  }
+  XML_CHECK(basilisk_xml_optional(grid, "Length", &node, error));
+  if (node) {
+    XML_ATTR(elff_xml_node_attribute_double(node, "x", &c->grid_size[0], error));
+    XML_ATTR(elff_xml_node_attribute_double(node, "y", &c->grid_size[1], error));
+    XML_ATTR(elff_xml_node_attribute_double(node, "z", &c->grid_size[2], error));
+  }
+  XML_CHECK(basilisk_xml_optional(grid, "Depth", &node, error));
+  if (node) {
+    double depth = 0.;
+    XML_READ(elff_xml_node_text_double(node, &depth, error));
+    if (!isfinite(depth) || depth < 0 || depth >= 30 || floor(depth) != depth) {
+      basilisk_xml_case_destroy(&parsed);
+      return basilisk_xml_error(error, 0, "Depth must be an integer in [0,30).");
+    }
+    c->grid_initial_level = (int)depth;
+    if (!c->adapt_enable) c->grid_min_level = c->grid_max_level = (int)depth;
+  }
   XML_CHECK (basilisk_xml_optional (grid, "AdaptWavelet", &adaptation, error));
   if (adaptation) {
-    c->adapt_enable = true;
-    XML_READ (
+    XML_CHECK(basilisk_xml_enabled(adaptation, &c->adapt_enable, error));
+    XML_ATTR (
       elff_xml_node_attribute_int (adaptation, "minLevel", &c->grid_min_level, error));
-    XML_READ (
+    XML_ATTR (
       elff_xml_node_attribute_int (adaptation, "maxLevel", &c->grid_max_level, error));
     size_t count = 0;
     XML_READ (elff_xml_node_element_child_count (adaptation, &count, error));
@@ -1076,51 +1180,57 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
         return 1;
       }
     }
-    c->adapt_tolerances = calloc (count ? count * dimension : 1, sizeof (double));
-    if (!c->adapt_tolerances) {
-      basilisk_xml_error (error, 0, "Cannot allocate tolerances.");
-      {
-        basilisk_xml_case_destroy (&parsed);
-        return 1;
-      }
+    if (!c->adapt_enable || count) {
+      free(c->adapt_fields); free(c->adapt_tolerances);
+      c->adapt_fields = NULL; c->adapt_tolerances = NULL; c->adapt_tolerance_count = 0;
     }
-    for (size_t j = 0; j < count; ++j) {
-      const char* tag = NULL;
-      char name[128];
-      double tolerance = 0.;
-      XML_READ (elff_xml_node_element_child_at (adaptation, j, &node, error));
-      XML_READ (elff_xml_node_name (node, &tag, error));
-      XML_READ (
-        elff_xml_node_attribute_string (node, "name", name, sizeof (name), NULL, error));
-      XML_READ (elff_xml_node_attribute_double (node, "tolerance", &tolerance, error));
-      if (!strcmp (tag, "VectorField")) {
-        vector v = lookup_vector (name);
-        if (v.x.i < 0) {
-          basilisk_xml_error (error, 0, "Unknown adaptation vector.");
-          {
-            basilisk_xml_case_destroy (&parsed);
-            return 1;
-          }
+    if (!c->adapt_enable) c->grid_min_level = c->grid_max_level = c->grid_initial_level;
+    if (count) {
+      c->adapt_tolerances = calloc (count ? count * dimension : 1, sizeof (double));
+      if (!c->adapt_tolerances) {
+        basilisk_xml_error (error, 0, "Cannot allocate tolerances.");
+        {
+          basilisk_xml_case_destroy (&parsed);
+          return 1;
         }
-        foreach_dimension () {
-          c->adapt_fields = list_append (c->adapt_fields, v.x);
+      }
+      for (size_t j = 0; j < count; ++j) {
+        const char* tag = NULL;
+        char name[128];
+        double tolerance = 0.;
+        XML_READ (elff_xml_node_element_child_at (adaptation, j, &node, error));
+        XML_READ (elff_xml_node_name (node, &tag, error));
+        XML_READ (
+          elff_xml_node_attribute_string (node, "name", name, sizeof (name), NULL, error));
+        XML_READ (elff_xml_node_attribute_double (node, "tolerance", &tolerance, error));
+        if (!strcmp (tag, "VectorField")) {
+          vector v = lookup_vector (name);
+          if (v.x.i < 0) {
+            basilisk_xml_error (error, 0, "Unknown adaptation vector.");
+            {
+              basilisk_xml_case_destroy (&parsed);
+              return 1;
+            }
+          }
+          foreach_dimension () {
+            c->adapt_fields = list_append (c->adapt_fields, v.x);
+            c->adapt_tolerances[c->adapt_tolerance_count++] = tolerance;
+          }
+        } else {
+          scalar s = lookup_field (name);
+          if (s.i < 0) {
+            basilisk_xml_error (error, 0, "Unknown adaptation scalar.");
+            {
+              basilisk_xml_case_destroy (&parsed);
+              return 1;
+            }
+          }
+          c->adapt_fields = list_append (c->adapt_fields, s);
           c->adapt_tolerances[c->adapt_tolerance_count++] = tolerance;
         }
-      } else {
-        scalar s = lookup_field (name);
-        if (s.i < 0) {
-          basilisk_xml_error (error, 0, "Unknown adaptation scalar.");
-          {
-            basilisk_xml_case_destroy (&parsed);
-            return 1;
-          }
-        }
-        c->adapt_fields = list_append (c->adapt_fields, s);
-        c->adapt_tolerances[c->adapt_tolerance_count++] = tolerance;
       }
     }
   }
-  c->ib_level = c->grid_max_level;
   XML_CHECK (basilisk_xml_optional (b, "ImmersedBoundary", &ib, error));
   if (ib) {
     elff_xml_status status =
@@ -1132,8 +1242,11 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
       return 1;
     }
     XML_CHECK (basilisk_xml_optional (ib, "UniformForceDensity", &node, error));
-    if (node)
-      XML_READ (elff_xml_node_attribute_xyz (node, 0., c->force_density, error));
+    if (node) {
+      XML_ATTR(elff_xml_node_attribute_double(node, "x", &c->force_density[0], error));
+      XML_ATTR(elff_xml_node_attribute_double(node, "y", &c->force_density[1], error));
+      XML_ATTR(elff_xml_node_attribute_double(node, "z", &c->force_density[2], error));
+    }
     XML_CHECK (basilisk_xml_optional (ib, "ForceCoupled", &node, error));
     if (node) {
       elff_xml_node_t control = NULL;
@@ -1157,7 +1270,8 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
     XML_CHECK (basilisk_xml_optional (ib, "ImmersedBoundaryKernel", &node, error));
     if (node) {
       char name[64];
-      XML_READ (
+      strcpy(name, c->kernel == roma_three_point_kernel_1d ? "Roma" : "Cosine");
+      XML_ATTR (
         elff_xml_node_attribute_string (node, "type", name, sizeof (name), NULL, error));
       if (!strcmp (name, "Roma"))
         c->kernel = roma_three_point_kernel_1d;
@@ -1173,9 +1287,9 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
     }
   }
   XML_CHECK (basilisk_xml_optional (b, "Restart", &node, error));
-  XML_CHECK (basilisk_xml_enabled (node, &c->restore_enable, error));
-  XML_READ (elff_xml_node_unique_child (b, "Output", &output, error));
-  XML_READ (elff_xml_node_attribute_string (
+  if (node) XML_CHECK (basilisk_xml_enabled (node, &c->restore_enable, error));
+  XML_CHECK (basilisk_xml_optional(b, "Output", &output, error));
+  if (output) XML_ATTR (elff_xml_node_attribute_string (
     output, "directory", c->output_directory, sizeof (c->output_directory), NULL, error));
   XML_CHECK (basilisk_xml_optional (output, "FluidOutput", &node, error));
   XML_CHECK (basilisk_xml_schedule (node, c->time_end, &c->fluid_output, error));
@@ -1186,7 +1300,7 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
   XML_CHECK (basilisk_xml_output_fields (
     node, true, &c->solid_fields, &c->solid_field_count, error));
   XML_CHECK (basilisk_xml_optional (output, "Checkpoint", &node, error));
-  XML_CHECK (basilisk_xml_enabled (node, &c->checkpoint_enable, error));
+  if (node) XML_CHECK (basilisk_xml_enabled (node, &c->checkpoint_enable, error));
   if (node) {
     elff_xml_node_t schedule = NULL;
     XML_CHECK (basilisk_xml_optional (node, "SimulationTime", &schedule, error));
@@ -1214,9 +1328,11 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
       }
     }
   }
+  XML_CHECK(basilisk_xml_validate_configuration(c, error));
   basilisk_xml_case_destroy (configuration);
   *configuration = parsed;
   return 0;
+#undef XML_ATTR
 #undef XML_READ
 #undef XML_CHECK
 }

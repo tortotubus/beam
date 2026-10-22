@@ -9,9 +9,40 @@ typedef struct {
   double initial_velocity;
 } FlappingFibreCase;
 
+/** @brief Default nondimensional flapping domain, inlet and fluid controls. */
+static int flapping_fibre_defaults (BasiliskXMLCase* c) {
+  basilisk_xml_case_defaults(c);
+  for (int d = 0; d < dimension; ++d) { c->grid_size[d] = 16.; c->grid_origin[d] = -8.; }
+  c->grid_origin[0] = -2.;
+  c->grid_initial_level = c->grid_min_level = 6;
+  c->grid_max_level = 10; c->ib_level = 11;
+  c->time_max_dt = 0.0003; c->time_end = 50.;
+  c->fluid_density = 1.; c->dynamic_viscosity = 0.005;
+  c->force_density[0] = 0.75; c->force_relaxation = 1.;
+  c->fluid_output.interval = c->solid_output.interval = 0.05;
+  strcpy(c->output_directory, "flapping_fibre_output");
+  const BasiliskXMLField fields[] = {{"omega", false, 0}, {"p", false, 0},
+    {"u", true, 0}, {"ibmf", true, 0}};
+  if (basilisk_xml_default_fields(c, fields, 4, 0.005)) return 1;
+  elff_xml_error error = {0};
+  if (basilisk_xml_add_bc(c, "u.x", BASILISK_BC_LEFT, BASILISK_BC_DIRICHLET, 1., 0, &error) ||
+      basilisk_xml_add_bc(c, "u.y", BASILISK_BC_LEFT, BASILISK_BC_DIRICHLET, 0., 0, &error) ||
+      basilisk_xml_add_bc(c, "p", BASILISK_BC_LEFT, BASILISK_BC_NEUMANN, 0., 0, &error) ||
+      basilisk_xml_add_bc(c, "pf", BASILISK_BC_LEFT, BASILISK_BC_NEUMANN, 0., 0, &error) ||
+      basilisk_xml_add_bc(c, "u.x", BASILISK_BC_RIGHT, BASILISK_BC_NEUMANN, 0., 0, &error) ||
+      basilisk_xml_add_bc(c, "p", BASILISK_BC_RIGHT, BASILISK_BC_DIRICHLET, 0., 0, &error) ||
+      basilisk_xml_add_bc(c, "pf", BASILISK_BC_RIGHT, BASILISK_BC_DIRICHLET, 0., 0, &error)) {
+    basilisk_xml_case_destroy(c); return 1;
+  }
+  return 0;
+}
+
 static int flapping_fibre_case_init(const char *path,
                                     FlappingFibreCase *configuration) {
-  basilisk_xml_case_defaults(&configuration->basilisk);
+  int defaults_ok = !flapping_fibre_defaults(&configuration->basilisk);
+  if (!generic_case_agree(defaults_ok)) {
+    basilisk_xml_case_destroy(&configuration->basilisk); return 1;
+  }
   configuration->initial_velocity = 1.;
 
   elff_xml_document_t document = NULL;
@@ -24,7 +55,7 @@ static int flapping_fibre_case_init(const char *path,
                                       &configuration->basilisk, &error);
   if (success) {
     elff_xml_status status =
-        basilisk_xml_coefficient(&configuration->basilisk, "inletSpeed",
+        basilisk_xml_parameter(&configuration->basilisk, "inletSpeed",
                                  &configuration->initial_velocity, &error);
     success = status == ELFF_XML_OK || status == ELFF_XML_NOT_FOUND;
     if (status == ELFF_XML_NOT_FOUND)

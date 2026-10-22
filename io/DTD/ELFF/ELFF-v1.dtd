@@ -1,15 +1,12 @@
 <!-- Unified version-1 case schema. Shared element names are declared once.
      Also supports validation of standalone ELFF or Basilisk subtrees.
      Numeric expressions are CDATA; numeric/contextual checks belong to readers. -->
-<!ELEMENT Case (Parameters?, Nondimensionalization?, ((ELFF, Basilisk?)|(Basilisk, ELFF?)))>
+<!ELEMENT Case (Parameters?, ((ELFF, Basilisk?)|(Basilisk, ELFF?)))>
 <!ATTLIST Case formatVersion (1) #REQUIRED>
 <!ELEMENT Parameters (Parameter*)>
 <!ELEMENT Parameter EMPTY>
 <!-- Exactly one of value/expression is enforced by the parameter reader. -->
 <!ATTLIST Parameter name CDATA #REQUIRED value CDATA #IMPLIED expression CDATA #IMPLIED>
-<!ELEMENT Nondimensionalization (Coefficient*)>
-<!ELEMENT Coefficient EMPTY>
-<!ATTLIST Coefficient name CDATA #REQUIRED expression CDATA #REQUIRED>
 
 <!ELEMENT Basilisk (Domain, Time, Fluid, Grid, ImmersedBoundary?, Settling?, Output)>
 <!ATTLIST Basilisk schemaVersion (1) #REQUIRED caseType CDATA #REQUIRED>

@@ -12,7 +12,6 @@
 
 struct elff_xml_parameters_handle {
   std::map<std::string, double> parameters;
-  std::map<std::string, double> coefficients;
 };
 
 namespace {
@@ -226,7 +225,7 @@ struct Definition {
 };
 using Definitions = std::map<std::string, Definition>;
 Definitions read_section(elff_xml_node_t root, const char *section_name,
-                         const char *entry_name, bool coefficient) {
+                         const char *entry_name) {
   elff_xml_error error{};
   elff_xml_node_t section = nullptr;
   auto status =
@@ -256,11 +255,8 @@ Definitions read_section(elff_xml_node_t root, const char *section_name,
         invalid("Expected a valid name; pi is reserved.");
       std::string value = attribute(node, "value", has_value);
       std::string expression = attribute(node, "expression", has_expression);
-      if (coefficient ? (!has_expression || has_value)
-                   : (has_value == has_expression))
-        invalid(coefficient
-                    ? "Coefficient requires expression and no value."
-                    : "Parameter requires exactly one of value or expression.");
+      if (has_value == has_expression)
+        invalid("Parameter requires exactly one of value or expression.");
       if (!definitions
                .emplace(name, Definition{has_value ? value : expression, line,
                                          has_value})
@@ -280,7 +276,7 @@ Definitions read_section(elff_xml_node_t root, const char *section_name,
   return definitions;
 }
 
-void resolve_all(Definitions &parameters, Definitions &coefficients,
+void resolve_all(Definitions &parameters,
                  elff_xml_parameters_handle &context) {
   std::function<double(const std::string &, size_t)> resolve;
   resolve = [&](const std::string &name, size_t depth) -> double {
@@ -311,24 +307,12 @@ void resolve_all(Definitions &parameters, Definitions &coefficients,
   };
   for (const auto &entry : parameters)
     context.parameters.emplace(entry.first, resolve(entry.first, 0));
-  for (const auto &entry : coefficients) {
-    try {
-      context.coefficients.emplace(
-          entry.first,
-          Expression(entry.second.text, [&](const std::string &name) {
-            return resolve(name, 0);
-          }).evaluate());
-    } catch (Failure &failure) {
-      failure.line = entry.second.line;
-      failure.message = "Coefficient '" + entry.first + "': " + failure.message;
-      throw;
-    }
-  }
+
 }
 #endif
 
 elff_xml_status query(elff_xml_parameters_t context, const char *name,
-                      double *value, elff_xml_error *error, bool coefficient) {
+                      double *value, elff_xml_error *error) {
   elff_xml_error_clear(error);
   if (!context || !name || !*name || !value) {
     elff_xml_error_set(error, 0, 0,
@@ -336,8 +320,7 @@ elff_xml_status query(elff_xml_parameters_t context, const char *name,
     return ELFF_XML_INVALID_ARGUMENT;
   }
   try {
-    const auto &values =
-        coefficient ? context->coefficients : context->parameters;
+    const auto &values = context->parameters;
     auto found = values.find(name);
     if (found == values.end()) {
       elff_xml_error_set(error, 0, 0, "Requested name was not found.");
@@ -374,12 +357,10 @@ elff_xml_parameters_create(elff_xml_node_t case_node,
     check(elff_xml_node_name(case_node, &name, &diagnostic), diagnostic);
     if (std::string(name) != "Case")
       invalid("Expected a Case element.");
-    auto parameters = read_section(case_node, "Parameters", "Parameter", false);
-    auto coefficients =
-        read_section(case_node, "Nondimensionalization", "Coefficient", true);
+    auto parameters = read_section(case_node, "Parameters", "Parameter");
     std::unique_ptr<elff_xml_parameters_handle> context(
         new elff_xml_parameters_handle);
-    resolve_all(parameters, coefficients, *context);
+    resolve_all(parameters, *context);
     *out_context = context.release();
     return ELFF_XML_OK;
   } catch (const Failure &failure) {
@@ -396,14 +377,7 @@ elff_xml_parameters_create(elff_xml_node_t case_node,
 extern "C" elff_xml_status
 elff_xml_parameters_get(elff_xml_parameters_t context, const char *name,
                         double *value, elff_xml_error *error) {
-  return query(context, name, value, error, false);
-}
-
-extern "C" elff_xml_status
-elff_xml_parameters_get_coefficient(elff_xml_parameters_t context,
-                                    const char *name, double *value,
-                                    elff_xml_error *error) {
-  return query(context, name, value, error, true);
+  return query(context, name, value, error);
 }
 
 extern "C" void elff_xml_parameters_destroy(elff_xml_parameters_t context) {
@@ -423,9 +397,8 @@ elff_xml_parameters_evaluate(elff_xml_parameters_t context, const char* expressi
     std::string text(expression);
     if (text.size() > max_text) invalid("Expression length limit exceeded.");
     double result = Expression(text, [&](const std::string& name) {
-      const bool coefficient = name.compare(0, 13, "coefficients.") == 0;
-      const auto& values = coefficient ? context->coefficients : context->parameters;
-      std::string key = coefficient ? name.substr(13) :
+      const auto& values = context->parameters;
+      std::string key =
         (name.compare(0, 11, "parameters.") == 0 ? name.substr(11) : name);
       auto found = values.find(key);
       if (found == values.end()) invalid("Undefined reference '" + name + "'.");

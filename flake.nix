@@ -48,6 +48,7 @@
               gdb
               strace
               ninja
+              ncurses
               doxygen
               apptainer
               criterion

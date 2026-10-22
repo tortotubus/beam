@@ -19,7 +19,7 @@ static int flapping_fibre_case_init (const char* path, FlappingFibreCase* config
   if (success) success = !basilisk_xml_case_read(document, "flapping_fibre",
                                                 &configuration->basilisk, &error);
   if (success) {
-    elff_xml_status status = basilisk_xml_coefficient(&configuration->basilisk,
+    elff_xml_status status = basilisk_xml_parameter(&configuration->basilisk,
       "inletSpeed", &configuration->initial_velocity, &error);
     success = status == ELFF_XML_OK || status == ELFF_XML_NOT_FOUND;
     if (status == ELFF_XML_NOT_FOUND) elff_xml_error_clear(&error);

@@ -74,6 +74,9 @@ endif()
 
 add_subdirectory(third_party)  
 
+add_subdirectory(editor)  
+
+
 # 
 # Floating point precision settings
 #
@@ -349,6 +352,20 @@ endif()
 
 if (ELFF_USE_BASILISK)
   add_subdirectory(basilisk)
+endif()
+
+if(ELFF_USE_LIBXML2 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  add_executable(elff tools/elff.cpp)
+  target_compile_features(elff PRIVATE cxx_std_17)
+  target_link_libraries(elff PRIVATE ELFF)
+  file(RELATIVE_PATH ELFF_LAUNCHER_LIBDIR
+    "${CMAKE_INSTALL_PREFIX}/${ELFF_INSTALL_BINDIR}"
+    "${CMAKE_INSTALL_PREFIX}/${ELFF_INSTALL_LIBDIR}")
+  set_target_properties(elff PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/basilisk/examples"
+    INSTALL_RPATH "$ORIGIN/${ELFF_LAUNCHER_LIBDIR}")
+  install(TARGETS elff RUNTIME DESTINATION "${ELFF_INSTALL_BINDIR}"
+    COMPONENT ELFF_Runtime)
 endif()
 
 #

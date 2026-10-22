@@ -118,7 +118,7 @@ std::uint64_t positive_count(const IO::CXX::XMLNode& node, const char* name) {
   return value;
 }
 
-bool parse_runtime_definition(elff_xml_node_t elff,
+bool parse_runtime_definition(elff_xml_node_t root, elff_xml_node_t elff,
                               ModelRuntimeDefinition& definition,
                               model_runtime_error* error)
 {
@@ -154,8 +154,12 @@ bool parse_runtime_definition(elff_xml_node_t elff,
                           "Unable to enumerate models.");
 
   const IO::CXX::XMLNode section(elff);
-  definition.dimensions = section.integer("dimensions");
-  definition.units = section.string("units");
+  const IO::CXX::XMLNode case_node(root);
+  const bool v1 = case_node.integer("formatVersion") == 1;
+  definition.dimensions = v1 ? section.integer("dimensions") : case_node.integer("dimension");
+  if (definition.dimensions != 2 && definition.dimensions != 3)
+    case_node.invalid("Case dimension must be 2 or 3.");
+  definition.units = v1 ? section.string("units") : "";
   if (auto domain = IO::Case::optional_xml_child(section, "InsertionDomain"))
     definition.domain = IO::Case::parse_placement_box(*domain, definition.dimensions, true);
   bool has_insertion = false;
@@ -468,8 +472,8 @@ int load_runtime_document(elff_xml_document_t document, ModelRuntimeDefinition& 
     }
     const IO::CXX::XMLNode root_node(root), elff_node(elff);
     const int version = root_node.integer("formatVersion");
-    if ((version != 1 && version != 2) || elff_node.integer("schemaVersion") != version)
-      elff_node.invalid("Case formatVersion and ELFF schemaVersion must match and be 1 or 2.");
+    if ((version != 1 && version != 2) || (version == 1 && elff_node.integer("schemaVersion") != version))
+      elff_node.invalid("Case formatVersion must be 1 or 2; v1 ELFF schemaVersion must match.");
     char diagnostic[ELFF_XML_ERROR_MESSAGE_CAPACITY] = {};
     auto validation = elff_xml_dtd_validate_node(
       elff, reinterpret_cast<const char*>(version == 2 ? elff_embedded_elff_v2_dtd : elff_embedded_elff_v1_dtd),
@@ -482,7 +486,7 @@ int load_runtime_document(elff_xml_document_t document, ModelRuntimeDefinition& 
       return -1;
     }
 
-    if (!parse_runtime_definition(elff, definition, error))
+    if (!parse_runtime_definition(root, elff, definition, error))
       return -1;
     return 0;
   } catch (const IO::CXX::XMLError& exception) {

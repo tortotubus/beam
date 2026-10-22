@@ -27,10 +27,9 @@ elff_xml_status render_values(xmlNode *root,
   while (!pending.empty()) {
     xmlNode *node = pending.back();
     pending.pop_back();
-    // These sections are source definitions, not downstream attributes.
+    // Parameters are source definitions, not downstream attributes.
     if (node->parent == root &&
-        (xmlStrEqual(node->name, BAD_CAST "Parameters") ||
-         xmlStrEqual(node->name, BAD_CAST "Nondimensionalization")))
+        xmlStrEqual(node->name, BAD_CAST "Parameters"))
       continue;
     for (xmlNode *child = node->children; child; child = child->next)
       if (child->type == XML_ELEMENT_NODE)
@@ -130,15 +129,6 @@ elff_xml_case_render(elff_xml_document_t source,
         return status;
       parameters.reset(context);
     } else if (status == ELFF_XML_NOT_FOUND) {
-      status = elff_xml_node_unique_child(root, "Nondimensionalization",
-                                          &section, error);
-      if (status == ELFF_XML_OK) {
-        elff_xml_error_set(error, 0, 0,
-                           "Nondimensionalization requires Parameters.");
-        return ELFF_XML_INVALID_VALUE;
-      }
-      if (status != ELFF_XML_NOT_FOUND)
-        return status;
       elff_xml_error_clear(error);
     } else
       return status;

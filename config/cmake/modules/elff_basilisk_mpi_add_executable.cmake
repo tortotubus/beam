@@ -22,7 +22,7 @@ function(elff_basilisk_mpi_add_executable SOURCE_FILE)
       -I"${CMAKE_BINARY_DIR}/include"
       -I"${CMAKE_SOURCE_DIR}/basilisk" 
       -source
-    DEPENDS ${SOURCE_FILE} ${basilisk_headers}
+    DEPENDS ${SOURCE_FILE} ${basilisk_headers} basilisk::qcc
     BYPRODUCTS "${CMAKE_CURRENT_BINARY_DIR}/_${source_name}.c"
     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}" 
   )

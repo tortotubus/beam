@@ -209,7 +209,7 @@ namespace {
 const std::string rod_v2 = R"(<BendingRodSegments>
 <Geometry length="0.2" nodes="3"/>
 <InitialCondition><Line><Anchor x="0.4" y="0.5" z="0.5"/><Direction x="1" y="0" z="0"/></Line></InitialCondition>
-<Material><BendingRigidity>${coefficients.rigidity}</BendingRigidity><LinearDensity>2</LinearDensity></Material>
+<Material><BendingRigidity>${parameters.rigidity}</BendingRigidity><LinearDensity>2</LinearDensity></Material>
 <BendingRodBoundary end="right" type="free"/><BendingRodBoundary end="left" type="pinned"/>
 </BendingRodSegments>)";
 const std::string beam_v2 = R"(<EulerBeamHuang>
@@ -219,9 +219,9 @@ const std::string beam_v2 = R"(<EulerBeamHuang>
 <EulerBeamBoundary end="right" type="free"/><EulerBeamBoundary end="left" type="pinned"/>
 </EulerBeamHuang>)";
 std::string case_v2(const std::string& models, const std::string& domain = "") {
-  return "<Case formatVersion='2'><Parameters><Parameter name='ei' value='0.01'/></Parameters>"
-    "<Nondimensionalization><Coefficient name='rigidity' expression='ei'/></Nondimensionalization>"
-    "<ELFF schemaVersion='2' dimensions='3' units='SI'>" + domain + "<Models>" + models +
+  return "<Case formatVersion='2' dimension='3'><Parameters><Parameter name='ei' value='0.01'/>"
+    "<Parameter name='rigidity' expression='ei'/></Parameters>"
+    "<ELFF>" + domain + "<Models>" + models +
     "</Models></ELFF></Case>";
 }
 Document render_v2(const std::string& xml) {
@@ -265,6 +265,43 @@ TEST(XMLV2Test, RodPhysicalDampingValidationAndConstruction)
   model_runtime_error error{};
   EXPECT_NE(model_runtime_create_from_case_document(doc.get(), &runtime, &error), 0);
   EXPECT_EQ(runtime, nullptr);
+}
+
+TEST(XMLV2Test, CaseDimensionIsRequiredAndRestricted)
+{
+  for (const auto& attribute : {"", " dimension='1'", " dimension='4'"}) {
+    auto xml = case_v2(rod_v2);
+    const std::string original = " dimension='3'";
+    xml.replace(xml.find(original), original.size(), attribute);
+    auto doc = render_v2(xml);
+    elff_xml_error error{};
+    EXPECT_NE(elff_xml_case_validate(doc.get(), &error), ELFF_XML_OK);
+    model_runtime_t runtime = nullptr;
+    model_runtime_error runtime_error{};
+    EXPECT_NE(model_runtime_create_from_case_document(doc.get(), &runtime, &runtime_error), 0);
+    EXPECT_EQ(runtime, nullptr);
+  }
+}
+
+TEST(XMLV2Test, OptionalBasiliskSectionsValidateWithoutInjectedOverrides)
+{
+  for (const auto &block : {"", "<Basilisk caseType='settling_fibre'/>",
+      "<Basilisk caseType='settling_fibre'><Time end='2'/><Grid type='octree'><AdaptWavelet enable='false'/></Grid></Basilisk>",
+      "<Basilisk caseType='settling_fibre'><Fluid><FluidMaterial><Density>1</Density><DynamicViscosity>0.01</DynamicViscosity></FluidMaterial></Fluid><Output directory='output'><FluidOutput enable='false'/></Output></Basilisk>"}) {
+    auto xml = case_v2(rod_v2);
+    xml.insert(xml.find("</Case>"), block);
+    auto doc = render_v2(xml);
+    elff_xml_error error{};
+    EXPECT_EQ(elff_xml_case_validate(doc.get(), &error), ELFF_XML_OK) << error.message;
+    elff_xml_node_t basilisk = nullptr;
+    const auto status = elff_xml_node_unique_child(root(doc.get(), "Case"), "Basilisk", &basilisk, &error);
+    if (status == ELFF_XML_OK) {
+      char name[32] = "unchanged";
+      EXPECT_EQ(elff_xml_node_attribute_string(basilisk, "caseType", name, sizeof(name), nullptr, &error),
+                ELFF_XML_OK);
+      EXPECT_STREQ(name, "settling_fibre");
+    } else EXPECT_EQ(status, ELFF_XML_NOT_FOUND);
+  }
 }
 
 TEST(XMLV2Test, MixedModelsRenderConstructAndOwnDefinitions)
@@ -355,12 +392,30 @@ TEST(XMLV2Test, FileFactoryAndCheckpointContinueAcrossVersions)
   std::filesystem::remove(checkpoint);
 }
 
+TEST(XMLV2Test, ParameterExpressionsResolveDependenciesAndRejectInvalidDefinitions)
+{
+  const std::string prefix = "<Case formatVersion='2' dimension='3'><Parameters>";
+  const std::string suffix = "</Parameters><Value>${parameters.viscosity}</Value></Case>";
+  auto doc = render_v2(prefix +
+      "<Parameter name='viscosity' expression='1/Re'/>"
+      "<Parameter name='Re' expression='base*2'/>"
+      "<Parameter name='base' value='100'/>" + suffix);
+  EXPECT_DOUBLE_EQ(ELFF::IO::CXX::XMLNode(root(doc.get(), "Case")).child("Value").text_number(), 0.005);
+  for (const auto& definitions : {
+      "<Parameter name='viscosity' value='1' expression='2'/>",
+      "<Parameter name='viscosity'/>",
+      "<Parameter name='viscosity' value='1'/><Parameter name='viscosity' value='2'/>",
+      "<Parameter name='viscosity' expression='missing'/>",
+      "<Parameter name='viscosity' expression='other'/><Parameter name='other' expression='viscosity'/>"})
+    EXPECT_THROW(render_v2(prefix + definitions + suffix), std::runtime_error);
+}
+
 TEST(XMLV2Test, ConstantTextExpressionsNeedNoParameters)
 {
-  auto doc = render_v2("<Case formatVersion='2'><Value> ${2 * 3} </Value></Case>");
+  auto doc = render_v2("<Case formatVersion='2' dimension='3'><Value> ${2 * 3} </Value></Case>");
   const auto value = ELFF::IO::CXX::XMLNode(root(doc.get(), "Case")).child("Value");
   EXPECT_DOUBLE_EQ(value.text_number(), 6);
-  EXPECT_THROW(render_v2("<Case formatVersion='2'><Value>x${2}</Value></Case>"), std::runtime_error);
+  EXPECT_THROW(render_v2("<Case formatVersion='2' dimension='3'><Value>x${2}</Value></Case>"), std::runtime_error);
 }
 
 #else
