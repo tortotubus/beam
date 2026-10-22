@@ -66,6 +66,11 @@ public:
     return centerline;
   }
 
+  /** @brief Read-only nodal centerline in global coordinates. */
+  const std::vector<std::array<real_t, 3>>& get_centerline() const {
+    return centerline;
+  }
+
   /**
    * @brief Returns one vector \f(\vec{r}_i\f) contained in the centerline.
    *

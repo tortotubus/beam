@@ -1,0 +1,262 @@
+<!-- Unified version-2 case schema.
+     Case.formatVersion selects the embedded v1 or v2 contract.
+     Element names are global. Numeric ranges, cross-field constraints and
+     backend capabilities require semantic validation. Numeric attributes and
+     text may contain expressions; leaf-text expressions are rendered before construction. -->
+
+<!ELEMENT Case (Parameters?, Nondimensionalization?, ((ELFF, Basilisk?)|(Basilisk, ELFF?)))>
+<!ATTLIST Case formatVersion (2) #REQUIRED>
+
+<!ELEMENT Parameters (Parameter*)>
+<!ELEMENT Parameter EMPTY>
+<!-- Exactly one of value/expression must be supplied. -->
+<!ATTLIST Parameter name CDATA #REQUIRED value CDATA #IMPLIED expression CDATA #IMPLIED>
+<!ELEMENT Nondimensionalization (Coefficient*)>
+<!ELEMENT Coefficient EMPTY>
+<!ATTLIST Coefficient name CDATA #REQUIRED expression CDATA #REQUIRED>
+
+<!-- Basilisk.
+     Domain geometry now belongs to Grid: there is no duplicate Domain block.
+     caseType selects application-specific behavior, not a different DTD. -->
+<!ELEMENT Basilisk (Time, Fluid, Grid, Restart?, ImmersedBoundary?, Output)>
+<!ATTLIST Basilisk schemaVersion (2) #REQUIRED caseType CDATA #REQUIRED>
+
+<!-- Run duration and output schedules are distinct.
+     Time.step is the timestep control; schedule.step is an output interval.
+     WallTime values are wall-clock seconds. Schedule end is optional.
+     MPI wall-clock triggers must be agreed across ranks. -->
+<!ELEMENT Time EMPTY>
+<!ATTLIST Time step CDATA #REQUIRED end CDATA #REQUIRED>
+<!ELEMENT SimulationTime EMPTY>
+<!ATTLIST SimulationTime step CDATA #REQUIRED end CDATA #IMPLIED>
+<!ELEMENT WallTime EMPTY>
+<!ATTLIST WallTime step CDATA #REQUIRED end CDATA #IMPLIED>
+
+<!-- Basilisk fluid: one material followed by zero or more boundary conditions.
+     field names identify supported scalar fields or vector components.
+     direction identifies the boundary side, not a vector-valued Direction.
+     Boundary defaults and valid field/side/type combinations need reader checks.
+
+     Example:
+  <FluidBoundaryCondition type="dirichlet" field="u.x" direction="left">
+    <Value>1.0</Value>
+  </FluidBoundaryCondition>
+-->
+<!ELEMENT Fluid (FluidMaterial, FluidBoundaryCondition*)>
+<!ELEMENT FluidMaterial EMPTY>
+<!ATTLIST FluidMaterial density CDATA #REQUIRED dynamicViscosity CDATA #REQUIRED>
+<!ELEMENT FluidBoundaryCondition (Value?)>
+<!ATTLIST FluidBoundaryCondition
+  type (dirichlet|neumann|periodic) #REQUIRED
+  field CDATA #REQUIRED
+  direction (left|right|top|bottom|front|back) #REQUIRED>
+<!-- Dirichlet and Neumann require Value; periodic forbids it. -->
+<!ELEMENT Value (#PCDATA)>
+
+<!-- Basilisk Grid.
+     type must match a backend compiled into the executable.
+     Length gives extents; ordinary square/cubic Basilisk grids require equal
+     positive extents in active dimensions. Depth is the initial refinement level.
+     AdaptWavelet requires an adaptive backend, minLevel <= maxLevel and a
+     positive tolerance for every ScalarField or VectorField; these are semantic checks.
+
+     Example:
+     <Grid type="multigrid3D">
+       <Origin x="0" y="0" z="0"/>
+       <Length x="8" y="8" z="8"/>
+       <Depth>5</Depth>
+     </Grid>
+
+     <Grid type="octree">
+       <Origin x="0" y="0" z="0"/>
+       <Length x="8" y="8" z="8"/>
+       <Depth>5</Depth>
+       <AdaptWavelet minLevel="3" maxLevel="8">
+         <VectorField name="u" tolerance="0.001"/>
+       </AdaptWavelet>
+     </Grid>
+-->
+<!ELEMENT Grid (Origin, Length, Depth, AdaptWavelet?)>
+<!ATTLIST Grid type (multigrid|multigrid3D|quadtree|octree) #REQUIRED>
+<!ELEMENT Origin EMPTY>
+<!ATTLIST Origin x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
+<!ELEMENT Length EMPTY>
+<!ATTLIST Length x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
+<!ELEMENT Depth (#PCDATA)>
+
+<!-- Restart restores the complete simulation, including fluid and model state.
+     Omission disables restart; presence enables it unless enable="false".
+     Readers must apply this default even without DTD default expansion. -->
+<!ELEMENT Restart EMPTY>
+<!ATTLIST Restart enable (true|false) "true">
+
+<!ELEMENT AdaptWavelet (VectorField|ScalarField)+>
+<!ATTLIST AdaptWavelet minLevel CDATA #REQUIRED maxLevel CDATA #REQUIRED>
+
+<!-- Shared by adaptation and output; tolerance is required only for adaptation.
+     Readers expand VectorField into its active scalar components, applying the
+     same tolerance to each component during adaptation. -->
+<!ELEMENT ScalarField EMPTY>
+<!ATTLIST ScalarField name CDATA #REQUIRED tolerance CDATA #IMPLIED>
+<!ELEMENT VectorField EMPTY>
+<!ATTLIST VectorField name CDATA #REQUIRED tolerance CDATA #IMPLIED>
+
+<!ELEMENT IBScalarField EMPTY>
+<!ATTLIST IBScalarField name CDATA #REQUIRED>
+<!ELEMENT IBVectorField EMPTY>
+<!ATTLIST IBVectorField name CDATA #REQUIRED>
+
+<!-- Basilisk Immersed Boundary.
+     Coupling blocks configure models of the corresponding coupling kind;
+     both kinds may coexist. Kernel names must be supported by the reader.
+     An omitted level uses the finest configured grid level.
+     Readers supply defaults when optional elements are absent.
+
+     Example:
+     <ImmersedBoundary>
+       <ForceCoupled>
+         <Iterations>10</Iterations>
+         <Relaxation>0.2</Relaxation>
+       </ForceCoupled>
+       <ImmersedBoundaryKernel type="Roma"/>
+       <UniformForceDensity x="0" y="-1" z="0"/>
+     </ImmersedBoundary>
+
+     <ImmersedBoundary>
+       <VelocityCoupled/>
+       <ImmersedBoundaryKernel type="Roma"/>
+     </ImmersedBoundary>
+-->
+<!ELEMENT ImmersedBoundary (ForceCoupled?, VelocityCoupled?, ImmersedBoundaryKernel?, UniformForceDensity?)>
+<!ATTLIST ImmersedBoundary level CDATA #IMPLIED>
+<!ELEMENT ForceCoupled (Iterations?, Relaxation?)>
+<!ELEMENT VelocityCoupled EMPTY>
+<!ELEMENT Iterations (#PCDATA)>
+<!ELEMENT Relaxation (#PCDATA)>
+<!ELEMENT ImmersedBoundaryKernel EMPTY>
+<!ATTLIST ImmersedBoundaryKernel type CDATA #REQUIRED>
+<!ELEMENT UniformForceDensity EMPTY>
+<!ATTLIST UniformForceDensity x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
+
+<!-- Basilisk Output.
+     Omitted output/checkpoint blocks are disabled; present blocks are enabled
+     unless enable="false". Readers must apply these defaults independently of DTD
+     default expansion.
+     Checkpoints always include required fluid and model restart state; listed
+     fields request additional state, not a replacement for the required state.
+     A missing schedule inherits the application's default output cadence.
+     With both checkpoint schedules, either trigger requests a checkpoint;
+     coincident triggers produce one checkpoint.
+
+     Example:
+     <Output directory="output">
+       <FluidOutput>
+         <SimulationTime step="0.1"/>
+         <VectorField name="u"/>
+         <ScalarField name="p"/>
+       </FluidOutput>
+       <SolidOutput>
+         <SimulationTime step="0.1"/>
+         <IBVectorField name="u"/>
+       </SolidOutput>
+       <Checkpoint>
+         <SimulationTime step="1"/>
+         <VectorField name="ibmf"/>
+       </Checkpoint>
+     </Output>
+-->
+<!ELEMENT Output (FluidOutput?, SolidOutput?, Checkpoint?)>
+<!ATTLIST Output directory CDATA #REQUIRED>
+<!ELEMENT FluidOutput (SimulationTime?, (ScalarField|VectorField)*)>
+<!ATTLIST FluidOutput enable (true|false) "true">
+<!ELEMENT SolidOutput (SimulationTime?, (IBScalarField|IBVectorField)*)>
+<!ATTLIST SolidOutput enable (true|false) "true">
+<!ELEMENT Checkpoint (SimulationTime?, (ScalarField|VectorField|IBScalarField|IBVectorField)*)>
+<!ATTLIST Checkpoint enable (true|false) "true">
+
+<!-- ELFF.
+     The v2 BendingRodSegments tag denotes the implicit implementation only.
+     Geometry, initial-condition and material representations are shared.
+     LinearDensity is linear density (mass per unit length), not volume density.
+     Two boundary entries must identify distinct ends. The DTD enforces their
+     number; the reader enforces left/right uniqueness and supported combinations. -->
+     
+<!ELEMENT ELFF (InsertionDomain?, Models)>
+<!ATTLIST ELFF schemaVersion (2) #REQUIRED dimensions (2|3) #REQUIRED units (nondimensional|SI) #REQUIRED>
+<!ELEMENT Models (EulerBeamHuang|BendingRodSegments)+>
+<!ATTLIST Models distribution (rank0|round-robin) "rank0">
+
+<!ELEMENT Geometry EMPTY>
+<!ATTLIST Geometry length CDATA #REQUIRED nodes CDATA #REQUIRED>
+<!ELEMENT InitialCondition (Line)>
+<!ELEMENT Line ((Anchor|RandomAnchor), (Direction|RandomDirection))>
+<!-- Huang requires anchorEnd; rods allow only omission or left. -->
+<!ATTLIST Line anchorEnd (left|right) #IMPLIED>
+<!ELEMENT Anchor EMPTY>
+<!ATTLIST Anchor x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
+<!ELEMENT Direction EMPTY>
+<!ATTLIST Direction x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
+<!ELEMENT Material (BendingRigidity, LinearDensity, BendingDamping?)>
+<!-- Rod-only physical damping rigidity D [N m^2 s]; joint damping is D/h. Default zero. -->
+<!ELEMENT BendingDamping (#PCDATA)>
+<!ELEMENT BendingRigidity (#PCDATA)>
+<!ELEMENT LinearDensity (#PCDATA)>
+
+<!-- Example:
+  <EulerBeamHuang>
+    <Geometry length="1" nodes="11"/>
+    <InitialCondition>
+      <Line anchorEnd="left">
+        <Anchor x="0" y="0" z="0"/>
+        <Direction x="1" y="0" z="0"/>
+      </Line>
+    </InitialCondition>
+    <Material>
+      <BendingRigidity>0.01</BendingRigidity>
+      <LinearDensity>1</LinearDensity>
+    </Material>
+    <EulerBeamBoundary end="left" type="pinned"/>
+    <EulerBeamBoundary end="right" type="free"/>
+  </EulerBeamHuang>
+-->
+<!ELEMENT EulerBeamHuang (Geometry, InitialCondition, Material, EulerBeamBoundary, EulerBeamBoundary, Insertion?)>
+<!-- pinned maps to the beam solver's simple support. -->
+<!ELEMENT EulerBeamBoundary EMPTY>
+<!ATTLIST EulerBeamBoundary end (left|right) #REQUIRED type (free|pinned|clamped) #REQUIRED>
+
+<!-- Example:
+  <BendingRodSegments>
+    <Geometry length="1" nodes="11"/>
+    <InitialCondition>
+      <Line>
+        <Anchor x="0" y="0" z="0"/>
+        <Direction x="1" y="0" z="0"/>
+      </Line>
+    </InitialCondition>
+    <Material>
+      <BendingRigidity>0</BendingRigidity>
+      <LinearDensity>1</LinearDensity>
+    </Material>
+    <BendingRodBoundary end="left" type="pinned"/>
+    <BendingRodBoundary end="right" type="free"/>
+  </BendingRodSegments>
+-->
+<!ELEMENT BendingRodSegments (Geometry, InitialCondition, Material, BendingRodBoundary, BendingRodBoundary, ImplicitSolver?, Insertion?)>
+<!-- Current solver supports left pinned/right free or both free only. -->
+<!ELEMENT BendingRodBoundary EMPTY>
+<!ATTLIST BendingRodBoundary end (left|right) #REQUIRED type (pinned|free) #REQUIRED>
+<!ELEMENT ImplicitSolver EMPTY>
+<!ATTLIST ImplicitSolver spectralRadius CDATA "0.8" nonlinearTolerance CDATA "1e-9" maxIterations CDATA "20">
+
+<!-- Setup-only placement. Random choices require Insertion; InsertionDomain
+     is required exactly when insertion groups exist. Active dimensions determine
+     required z bounds and positivity of extents. These rules need reader checks. -->
+<!ELEMENT InsertionDomain (Min, Max)>
+<!ELEMENT RandomAnchor (Min, Max)>
+<!ELEMENT Min EMPTY>
+<!ATTLIST Min x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
+<!ELEMENT Max EMPTY>
+<!ATTLIST Max x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
+<!ELEMENT RandomDirection EMPTY>
+<!ELEMENT Insertion EMPTY>
+<!ATTLIST Insertion count CDATA #REQUIRED clearance CDATA #REQUIRED maxAttempts CDATA #REQUIRED>

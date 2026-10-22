@@ -73,4 +73,20 @@ std::vector<ShapePair> BroadPhaseLinkedCell::candidate_pairs() const
   return pairs;
 }
 
+std::vector<ShapePair>
+BroadPhaseLinkedCell::candidate_pairs(ShapeId first_candidate) const
+{
+  std::vector<ShapePair> pairs;
+  for (const auto& cell : cells_)
+    for (const auto candidate : cell.shapes) {
+      if (candidate < first_candidate) continue;
+      for (const auto obstacle : cell.shapes)
+        if (obstacle < first_candidate)
+          pairs.emplace_back(obstacle, candidate);
+    }
+  std::sort(pairs.begin(), pairs.end());
+  pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+  return pairs;
+}
+
 } // namespace ELFF::Contact

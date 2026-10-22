@@ -1,3 +1,5 @@
+#pragma once
+
 #include "library/io/output-common.h"
 
 // #include <stdio.h>

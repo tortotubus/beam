@@ -1,4 +1,5 @@
 #pragma once
+#include "elff/contact/ContactGeometryProvider.hpp"
 
 #include "elff/models/articulated/BendingRodMesh.hpp"
 
@@ -8,8 +9,13 @@ namespace ELFF::Models {
  * Edit a mesh and call apply_initial_condition to change the solver state;
  * editing the published mesh alone does not advance or reset the solver.
  */
-class BendingRod {
+class BendingRod : public Contact::ContactGeometryProvider {
 public:
+  /** @brief Borrow the current nodal polyline; reacquire after mesh updates. */
+  Contact::PolylineView contact_geometry() const override {
+    const auto& points = get_mesh().get_centerline();
+    return {points.data(), points.size()};
+  }
   using Vector = BendingRodMesh::Vector;
   enum class Boundary { Pinned, Free };
   virtual ~BendingRod() = default;

@@ -7,7 +7,6 @@
 
 #include <elff/io/CXX/vtkHDFPolyData.hpp>
 #include <elff/models/beam/EulerBeamHuang.hpp>
-#include <elff/models/beam/EulerBeamMoM.hpp>
 
 #include "EulerBeamGlowinskiCsv.hpp"
 
@@ -98,67 +97,5 @@ TEST(EulerBeamHuangTest, Huang)
     beam.solve(dt, load);
   }
 }
-
-TEST(EulerBeamHuangTest, Glowinski)
-{
-  GTEST_LOG_(INFO) << "CTEST_FULL_OUTPUT";
-
-  const real_t length = 32.6;
-  const real_t EI = 700.0;
-  const real_t mu = 7.67;
-  const real_t r_penalty = 1e5;
-  const std::array<real_t, 3> load = { 0.0, -9.81 * mu, 0.0 };
-
-  const real_t dt = 1e-2;
-  const real_t tf = 10.0;
-  const size_t Nt = static_cast<size_t>(std::ceil(tf / dt));
-  const size_t nodes = 61;
-
-  EulerBeam::EulerBeamBCs boundary_conditions = {
-    .end = { EulerBeam::left, EulerBeam::right },
-    .type = { EulerBeam::simple_bc, EulerBeam::simple_bc },
-    .vals = { {
-                .position = { 0.0, 0.0, 0.0 },
-              },
-              {
-                .position = { 20.0, 0.0, 0.0 },
-              } }
-  };
-
-  EulerBeamMoM static_beam(
-    length, EI, nodes, boundary_conditions, r_penalty);
-  static_beam.apply_initial_condition();
-
-  ELFF_LOG("Static Solve:");
-  static_beam.solve(load);
-
-  boundary_conditions.type[1] = EulerBeam::free_bc;
-
-  EulerBeamHuang beam(length, EI, mu, nodes, boundary_conditions);
-  beam.set_implicit_bending(true);
-  beam.apply_initial_condition(static_beam.get_mesh());
-
-  std::ofstream csv("glowinski_huang.csv");
-  ASSERT_TRUE(csv.good());
-  Benchmark::write_glowinski_csv_header(csv);
-
-  for (size_t ti = 0; ti < Nt; ++ti) {
-    const std::string filename = "glowinski_huang.vtkhdf";
-
-    if (ti == 0) {
-      vtkPolyData pd = beam.get_mesh().to_vtk_polydata();
-      vtkHDFPolyData hdf_pd(filename, pd);
-      hdf_pd.write_new_transient(true, ti * dt);
-    } else {
-      vtkPolyData pd = beam.get_mesh().to_vtk_polydata();
-      vtkHDFPolyData hdf_pd(filename, pd);
-      hdf_pd.append_transient(ti * dt);
-    }
-
-    Benchmark::write_glowinski_csv_frame(csv, ti, ti * dt, beam.get_mesh());
-    beam.solve(dt, load);
-  }
-}
-
 
 } // namespace ELFF

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Case SYSTEM "../../io/DTD/ELFF/ELFF-v2.dtd">
+<Case formatVersion="2">
+  <!-- Banaei inputs; the same expressions are used for one or many fibres. -->
+  <Parameters>
+    <Parameter name="rp" value="30"/>
+    <Parameter name="gamma" value="0.01"/>
+    <Parameter name="r" value="0.1"/>
+    <Parameter name="Ga" value="40"/>
+    <Parameter name="length" value="1"/>
+    <Parameter name="rho0" value="1"/>
+    <Parameter name="g" value="1"/>
+    <Parameter name="area" expression="pi*length*length/(4*rp*rp)"/>
+    <Parameter name="count" value="1000"/>
+    <Parameter name="nodes" value="67"/>
+    <Parameter name="anchorMinX" value="-14"/>
+    <Parameter name="anchorMaxX" value="14"/>
+    <Parameter name="anchorMinY" value="-14"/>
+    <Parameter name="anchorMaxY" value="14"/>
+    <Parameter name="anchorMinZ" value="-14"/>
+    <Parameter name="anchorMaxZ" value="14"/>
+    <Parameter name="clearance" value="0.1"/>
+    <Parameter name="maxAttempts" value="10000"/>
+    <Parameter name="domainSize" value="32"/>
+    <Parameter name="timeStep" value="0.001"/>
+    <Parameter name="endTime" value="10"/>
+    <Parameter name="minLevel" value="4"/>
+    <Parameter name="maxLevel" value="12"/>
+    <Parameter name="ibLevel" value="12"/>
+    <Parameter name="outputInterval" value="0.001"/>
+    <Parameter name="adaptRelativeTolerance" value="0.001"/>
+    <Parameter name="statsInterval" value="1"/>
+  </Parameters>
+
+  <!-- Preserve the existing single/many template formulas, including the
+       additional factor r in EI = gamma*r*submergedWeight*length^3. -->
+  <Nondimensionalization>
+    <Coefficient name="fibreLength" expression="length"/>
+    <Coefficient name="fluidDensity" expression="rho0"/>
+    <Coefficient name="linearDensity" expression="(1+r)*rho0*area"/>
+    <Coefficient name="bendingRigidity" expression="gamma*r*(r*rho0*area*g)*length*length*length"/>
+    <Coefficient name="dynamicViscosity" expression="rho0*sqrt(r*g*length*length*length)/Ga"/>
+    <Coefficient name="forceDensityY" expression="-r*rho0*area*g"/>
+    <Coefficient name="velocityTolerance" expression="adaptRelativeTolerance*sqrt(r*g*length)"/>
+  </Nondimensionalization>
+
+  <ELFF schemaVersion="2" dimensions="3" units="nondimensional"> 
+    <Models distribution="rank0">
+      <!-- <EulerBeamHuang>
+        <Geometry length="${coefficients.fibreLength}" nodes="${nodes}"/>
+        <InitialCondition>
+          <Line anchorEnd="left">
+            <Anchor x="${-coefficients.fibreLength/2}" y="0" z="0"/>
+            <Direction x="1" y="0" z="0"/>
+          </Line>
+        </InitialCondition>
+        <Material>
+          <BendingRigidity>${coefficients.bendingRigidity}</BendingRigidity>
+          <LinearDensity>${coefficients.linearDensity}</LinearDensity>
+        </Material>
+        <EulerBeamBoundary end="left" type="free"/>
+        <EulerBeamBoundary end="right" type="free"/> 
+      </EulerBeamHuang> -->
+      <BendingRodSegments>
+        <Geometry length="${coefficients.fibreLength}" nodes="${nodes}"/>
+        <InitialCondition>
+          <Line anchorEnd="left">
+            <Anchor x="${-coefficients.fibreLength/2}" y="0" z="0"/>
+            <Direction x="1" y="0" z="0"/>
+          </Line>
+        </InitialCondition>
+        <Material>
+          <BendingRigidity>${coefficients.bendingRigidity}</BendingRigidity>
+          <LinearDensity>${coefficients.linearDensity}</LinearDensity>
+          <BendingDamping>1e-5</BendingDamping>
+        </Material>
+        <BendingRodBoundary end="left" type="free"/>
+        <BendingRodBoundary end="right" type="free"/> 
+      </BendingRodSegments> 
+    </Models>
+  </ELFF>
+
+  <Basilisk schemaVersion="2" caseType="settling_fibre">
+    <Time step="${timeStep}" end="${endTime}"/>
+    <Fluid>
+      <FluidMaterial density="${coefficients.fluidDensity}" dynamicViscosity="${coefficients.dynamicViscosity}"/>
+      <FluidBoundaryCondition field="*" direction="right" type="periodic"/>
+      <FluidBoundaryCondition field="*" direction="top" type="periodic"/>
+      <FluidBoundaryCondition field="*" direction="front" type="periodic"/>
+    </Fluid>
+    <Grid type="octree">
+      <Origin x="${-domainSize/2}" y="${-domainSize/2}" z="${-domainSize/2}"/>
+      <Length x="${domainSize}" y="${domainSize}" z="${domainSize}"/>
+      <Depth>${minLevel}</Depth>
+      <AdaptWavelet minLevel="${minLevel}" maxLevel="${maxLevel}">
+        <VectorField name="u" tolerance="${coefficients.velocityTolerance}"/>
+      </AdaptWavelet>
+    </Grid>
+    <Restart/>
+    <ImmersedBoundary level="${ibLevel}">
+      <ForceCoupled>
+        <Iterations>2</Iterations>
+        <Relaxation>0.8</Relaxation>
+      </ForceCoupled>
+      <ImmersedBoundaryKernel type="Cosine"/>
+      <UniformForceDensity x="0" y="${coefficients.forceDensityY}" z="0"/>
+    </ImmersedBoundary>
+    <Output directory="settling_fibre_single_output">
+      <FluidOutput>
+        <SimulationTime step="${outputInterval}"/>
+        <ScalarField name="l2"/>
+        <ScalarField name="omega_z"/>
+        <ScalarField name="p"/>
+        <VectorField name="u"/>
+        <VectorField name="ibmf"/>
+      </FluidOutput>
+      <SolidOutput>
+        <SimulationTime step="${outputInterval}"/>
+        <IBVectorField name="eulvel"/>
+        <IBVectorField name="nforce"/>
+        <IBVectorField name="nvel"/>
+      </SolidOutput>
+      <Checkpoint/>
+    </Output>
+  </Basilisk>
+</Case>

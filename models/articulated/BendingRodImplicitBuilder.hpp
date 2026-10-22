@@ -1,5 +1,5 @@
 #pragma once
-#include "elff/models/articulated/BendingRodImplicitXML.hpp"
+#include "elff/models/articulated/BendingRodImplicitDefinition.hpp"
 #include "elff/models/articulated/IBBendingRodImplicit.hpp"
 #include <memory>
 

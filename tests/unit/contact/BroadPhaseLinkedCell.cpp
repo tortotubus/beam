@@ -70,6 +70,34 @@ TEST(BroadPhaseLinkedCellTest, ContainsEveryAllPairsOverlap)
     }
 }
 
+TEST(BroadPhaseLinkedCellTest, GroupPairsMatchFilteredAllPairs)
+{
+  BroadPhaseLinkedCell grid({0, 0, 0}, 1, {4, 4, 4});
+  std::mt19937 random(42);
+  std::uniform_real_distribution<double> position(0, 3);
+  // Scrambled insertion order and repeated IDs must not affect group membership.
+  for (ShapeId n = 0; n < 80; ++n) {
+    const ShapeId id = (n * 17) % 40;
+    const std::array<ELFF::real_t, 3> lo{
+        position(random), position(random), position(random)};
+    grid.insert(id, {lo, {lo[0] + 1, lo[1] + 1, lo[2] + 1}});
+  }
+  grid.insert(0, {{0, 0, 0}, {1, 1, 1}});
+  grid.insert(40, {{1, 1, 1}, {1, 1, 1}});
+  grid.insert(41, {{4, 4, 4}, {4, 4, 4}});
+  grid.insert(1, {{3, 3, 3}, {4, 4, 4}});
+  const auto all = grid.candidate_pairs();
+  for (ShapeId split : {0, 1, 20, 40, 42}) {
+    std::vector<ShapePair> expected;
+    for (const auto& pair : all)
+      if (pair.first < split && pair.second >= split)
+        expected.push_back(pair);
+    EXPECT_EQ(grid.candidate_pairs(split), expected);
+  }
+  grid.clear();
+  EXPECT_TRUE(grid.candidate_pairs(20).empty());
+}
+
 TEST(BroadPhaseLinkedCellTest, RejectsInvalidGridAndBounds)
 {
   const auto nan = std::numeric_limits<ELFF::real_t>::quiet_NaN();

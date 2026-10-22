@@ -131,7 +131,7 @@ Vector3<T> jointTorque(const Vector3<T> &a, const Vector3<T> &b,
 BendingRodImplicit::BendingRodImplicit(const BendingRodImplicitConfig &config)
     : BendingRod(checkedNodeCount(config), config.length), n_(config.links),
       length_(config.length), total_mass_(config.total_mass),
-      boundary_(config.boundary), gravity_(config.gravity), pin_(config.pin),
+      boundary_(config.boundary), pin_(config.pin),
       spectral_radius_(config.spectral_radius),
       tolerance_(config.nonlinear_tolerance),
       max_iterations_(config.max_iterations) {
@@ -144,12 +144,15 @@ BendingRodImplicit::BendingRodImplicit(const BendingRodImplicitConfig &config)
     ELFF_ABORT(
         "links, length, and total_mass must be positive");
   }
-  if (!std::isfinite(config.ei) || config.ei < 0.0 || !gravity_.allFinite() ||
+  if (!std::isfinite(config.ei) || config.ei < 0.0 ||
       !pin_.allFinite()) {
     ELFF_ABORT(
         "beam parameters must be finite and nonnegative");
   }
   h_ = length_ / static_cast<real_t>(n_);
+
+  validateNonnegative(config.damping_rigidity, "damping_rigidity");
+  validateNonnegative(config.damping_rigidity / h_, "derived joint damping");
 
   masses_ = configuredValues(config.masses, n_, total_mass_ / n_, "masses");
   total_mass_ = 0.0;
@@ -179,7 +182,7 @@ BendingRodImplicit::BendingRodImplicit(const BendingRodImplicitConfig &config)
   bending_stiffness_ = configuredValues(config.bending_stiffness, joints,
                                         config.ei / h_, "bending_stiffness");
   bending_damping_ =
-      configuredValues(config.bending_damping, joints, 0.0, "bending_damping");
+      configuredValues(config.bending_damping, joints, config.damping_rigidity / h_, "bending_damping");
   for (int i = 0; i < joints; ++i) {
     validateNonnegative(bending_stiffness_[i], "bending_stiffness");
     validateNonnegative(bending_damping_[i], "bending_damping");
@@ -277,17 +280,15 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, real_t dt,
   // the momentum residual directly, avoiding an inverse mass inside Newton.
   std::vector<Vec3> external(n_, Vec3::Zero());
   for (int i = 0; i < n_; ++i) {
-    for (int body = 0; body < n_; ++body)
-      external[i] += masses_[body] * gravity_ *
-                     ((i < body ? h_ : (i == body ? h_ / 2 : 0.0)) -
-                      (isFree() ? com_weights_[i] : 0.0));
     for (int node = 0; node < static_cast<int>(loads.size()); ++node)
       external[i] +=
           ((node > i ? h_ : 0.0) - (isFree() ? com_weights_[i] : 0.0)) *
           loads[node];
   }
   // Unknown x=dt^2*a_new keeps perturbations in position units.
+  int residual_evaluations = 0;
   auto residual = [&](const Eigen::VectorXd &x) -> Eigen::VectorXd {
+    ++residual_evaluations;
     const Eigen::VectorXd q = af * (predictor + beta * x);
     const Eigen::VectorXd v =
         (1.0 - af) * velocity + af * (velocity_predictor + gamma / dt * x);
@@ -335,10 +336,15 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, real_t dt,
   Eigen::VectorXd r = residual(x);
   const real_t threshold =
       tolerance_ * dt * (1.0 + velocity.lpNorm<Eigen::Infinity>());
+  const real_t initial_residual = r.lpNorm<Eigen::Infinity>();
+  int newton_updates = 0, backtracks = 0;
+  const char* failure_reason = "iteration limit";
   bool converged = false;
   for (int iteration = 0; iteration <= max_iterations_; ++iteration) {
-    if (!r.allFinite())
+    if (!r.allFinite()) {
+      failure_reason = "non-finite residual";
       break;
+    }
     if (r.lpNorm<Eigen::Infinity>() <= threshold) {
       converged = true;
       break;
@@ -407,8 +413,10 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, real_t dt,
       assemble(i, i - 1, i, child);
     }
     const Eigen::VectorXd delta = jacobian.partialPivLu().solve(-r);
-    if (!delta.allFinite())
+    if (!delta.allFinite()) {
+      failure_reason = "non-finite Newton correction";
       break;
+    }
     bool accepted = false;
     for (real_t scale = 1.0; scale >= 1.0 / 1024; scale *= 0.5) {
       const Eigen::VectorXd candidate = x + scale * delta;
@@ -417,15 +425,25 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, real_t dt,
         x = candidate;
         r = next;
         accepted = true;
+        ++newton_updates;
         break;
       }
+      ++backtracks;
     }
-    if (!accepted)
+    if (!accepted) {
+      failure_reason = "line search failed";
       break;
+    }
   }
   if (!converged) {
-    ELFF_ABORT("generalized-alpha Newton solve failed (residual "
-            << r.lpNorm<Eigen::Infinity>() << ", tolerance " << threshold
+    ELFF_ABORT("BendingRodImplicit Newton failed: " << failure_reason
+            << " (dt=" << dt << ", links=" << n_
+            << ", updates=" << newton_updates << "/" << max_iterations_
+            << ", residual_evaluations=" << residual_evaluations
+            << ", backtracks=" << backtracks
+            << ", initial_residual=" << initial_residual
+            << ", residual=" << r.lpNorm<Eigen::Infinity>()
+            << ", tolerance=" << threshold
             << "); reduce timestep");
   }
 
@@ -444,6 +462,13 @@ BendingRodImplicit::integrateState(const Eigen::VectorXd &state, real_t dt,
   }
   if (!result.allFinite() || !next_acceleration.allFinite())
     ELFF_ABORT("non-finite generalized-alpha state");
+  ELFF_LOG("BendingRodImplicit Newton converged: dt=" << dt << ", links=" << n_
+           << ", updates=" << newton_updates << "/" << max_iterations_
+           << ", residual_evaluations=" << residual_evaluations
+           << ", backtracks=" << backtracks
+           << ", initial_residual=" << initial_residual
+           << ", residual=" << r.lpNorm<Eigen::Infinity>()
+           << ", tolerance=" << threshold);
   acceleration_ = next_acceleration;
   previous_dt_ = dt;
   return result;
@@ -464,12 +489,11 @@ void BendingRodImplicit::advance(real_t dt, const std::vector<Vec3> &loads) {
 }
 
 void BendingRodImplicit::pack_state(ModelState &s) const {
-  s.ints = {1, n_, static_cast<int64_t>(boundary_), max_iterations_,
+  // Version 2 removes built-in gravity from the structural payload.
+  s.ints = {2, n_, static_cast<int64_t>(boundary_), max_iterations_,
             acceleration_.size() != 0 ? 1 : 0};
   s.bytes.clear();
   s.reals = {length_, spectral_radius_, tolerance_};
-  for (int i = 0; i < 3; ++i)
-    s.reals.push_back(gravity_[i]);
   for (int i = 0; i < 3; ++i)
     s.reals.push_back(pin_[i]);
   for (const auto *values :
@@ -485,7 +509,7 @@ void BendingRodImplicit::pack_state(ModelState &s) const {
 void BendingRodImplicit::unpack_state(const ModelState &s) {
   ModelState expected;
   BendingRodImplicit::pack_state(expected);
-  const size_t prefix = 9 + masses_.size() + inertias_.size() +
+  const size_t prefix = 6 + masses_.size() + inertias_.size() +
                         bending_stiffness_.size() + bending_damping_.size();
   if (s.ints.size() != 5 ||
       !std::equal(s.ints.begin(), s.ints.begin() + 4, expected.ints.begin()) ||
@@ -572,7 +596,6 @@ BendingRodImplicit::rhs(real_t /*time*/, const Eigen::VectorXd &state,
 
   if (isFree()) {
     derivative.head<3>() = parts.center_velocity;
-    derivative.segment<3>(velocityOffset()) = gravity_;
     for (const auto &force : nodal_forces)
       derivative.segment<3>(velocityOffset()) += force / total_mass_;
   }
@@ -636,14 +659,7 @@ real_t BendingRodImplicit::energy(const Eigen::VectorXd &state) const {
     elastic += 0.5 * bending_stiffness_[i - 1] * angle * angle;
   }
 
-  const Eigen::MatrixXd positions = nodes(state);
-  real_t potential = 0.0;
-  for (int i = 0; i < n_; ++i) {
-    const Vec3 center =
-        0.5 * (positions.row(i) + positions.row(i + 1)).transpose();
-    potential -= masses_[i] * gravity_.dot(center);
-  }
-  return kinetic + elastic + potential;
+  return kinetic + elastic;
 }
 
 void BendingRodImplicit::normalizeState(Eigen::VectorXd &state) const {
@@ -777,7 +793,7 @@ std::vector<Vec3> BendingRodImplicit::angularAcceleration(
     inertia[i].bottomRightCorner<3, 3>() = masses_[i] * Mat3::Identity();
 
     const Vec3 centripetal = omega[i].cross(omega[i].cross(center));
-    const Vec3 effective = masses_[i] * (centripetal - gravity_);
+    const Vec3 effective = masses_[i] * centripetal;
     bias[i].head<3>() =
         omega[i].cross(center_inertia * omega[i]) + center.cross(effective);
     bias[i].tail<3>() = effective;

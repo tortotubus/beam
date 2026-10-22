@@ -1,5 +1,4 @@
 list(APPEND SRCS
-  models/beam/IBEulerBeam.cpp
   models/ibm/IBForceCoupled.cpp
   models/ibm/IBMesh.cpp
   models/ibm/IBVelocityCoupled.cpp
@@ -10,7 +9,6 @@ list(APPEND SRCS
 )
 
 list(APPEND HDRS 
-  models/beam/IBEulerBeam.h
   models/ibm/IBForceCoupled.h
   models/ibm/IBMesh.h
   models/ibm/IBVelocityCoupled.h

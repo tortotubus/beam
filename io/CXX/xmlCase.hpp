@@ -4,6 +4,7 @@
 #include <array>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace ELFF::IO::CXX {
 
@@ -25,6 +26,10 @@ class XMLNode {
 public:
   explicit XMLNode(elff_xml_node_t node) : node_(node) {}
   XMLNode child(const char* name) const;
+  /** @brief Read finite numeric leaf text. */
+  double text_number() const;
+  /** @brief Return ordered element children with the requested name. */
+  std::vector<XMLNode> children(const char* name) const;
   std::string name() const;
   size_t line() const;
   double number(const char* attribute) const;

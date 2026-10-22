@@ -649,6 +649,40 @@ elff_xml_node_attribute_double(elff_xml_node_t node,
 #endif
 }
 
+elff_xml_status
+elff_xml_node_text_double(elff_xml_node_t node, double* value, elff_xml_error* error)
+{
+  elff_xml_error_clear(error);
+  if (!node || !value) return ELFF_XML_INVALID_ARGUMENT;
+#ifndef ELFF_USE_LIBXML2
+  return ELFF_XML_UNAVAILABLE;
+#else
+  xmlNodePtr raw = elff_xml_node_from_handle(node);
+  for (xmlNodePtr child = raw->children; child; child = child->next)
+    if (child->type == XML_ELEMENT_NODE) {
+      elff_xml_error_set(error, elff_xml_node_line_number(raw), 0,
+                         "Expected numeric text without child elements.");
+      return ELFF_XML_INVALID_VALUE;
+    }
+  xmlChar* text = xmlNodeGetContent(raw);
+  if (!text) return ELFF_XML_INTERNAL_ERROR;
+  const char* start = elff_xml_skip_space((const char*)text);
+  char* end = NULL;
+  errno = 0;
+  double parsed = strtod(start, &end);
+  int valid = start != end && errno != ERANGE && isfinite(parsed) &&
+              elff_xml_only_trailing_space(end);
+  xmlFree(text);
+  if (!valid) {
+    elff_xml_error_set(error, elff_xml_node_line_number(raw), 0,
+                       "Expected finite numeric text (resolve expressions before reading).");
+    return ELFF_XML_INVALID_VALUE;
+  }
+  *value = parsed;
+  return ELFF_XML_OK;
+#endif
+}
+
 const char*
 elff_xml_status_string(elff_xml_status status)
 {

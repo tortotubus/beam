@@ -56,6 +56,57 @@ TEST_F(ELFFCaseDTDTest, GeneratedArtifactMatchesEmbeddedSchema)
 
 #ifdef ELFF_USE_LIBXML2
 
+
+const std::string basilisk_settings = R"(
+<Basilisk schemaVersion="1" caseType="settling_fibre">
+  <Domain size="${L}" originX="0" originY="0"/>
+  <Time step="0.01" end="1"/>
+  <Fluid density="1" dynamicViscosity="0.01"><InletVelocity x="0" y="0"/></Fluid>
+  <Grid minLevel="3" maxLevel="6"/>
+  <ImmersedBoundary level="6"><UniformForceDensity x="0" y="-1"/></ImmersedBoundary>
+  <Settling velocityTolerance="0.001"/>
+  <Output directory="output" interval="0.1"/>
+</Basilisk>)";
+
+elff_xml_status validate_case(const std::string& xml, bool render = false) {
+  elff_xml_document_t source = nullptr, rendered = nullptr;
+  elff_xml_error error{};
+  auto status = elff_xml_document_load_memory(xml.data(), xml.size(), &source, &error);
+  if (status == ELFF_XML_OK && render)
+    status = elff_xml_case_render(source, &rendered, &error);
+  if (status == ELFF_XML_OK)
+    status = elff_xml_case_validate(render ? rendered : source, &error);
+  elff_xml_document_destroy(rendered);
+  elff_xml_document_destroy(source);
+  return status;
+}
+
+TEST_F(ELFFCaseDTDTest, UnifiedCaseSupportsBothSectionOrdersAndRendering) {
+  const std::string start = "<Case formatVersion='1'><Parameters>"
+    "<Parameter name='L' value='8'/></Parameters>";
+  for (bool render : {false, true}) {
+    EXPECT_EQ(validate_case(start + valid_elff_xml + basilisk_settings + "</Case>", render), ELFF_XML_OK);
+    EXPECT_EQ(validate_case(start + basilisk_settings + valid_elff_xml + "</Case>", render), ELFF_XML_OK);
+    EXPECT_EQ(validate_case(start + basilisk_settings + "</Case>", render), ELFF_XML_OK);
+    EXPECT_EQ(validate_case(start + valid_elff_xml + "</Case>", render), ELFF_XML_OK);
+  }
+}
+
+TEST_F(ELFFCaseDTDTest, UnifiedCaseRejectsMalformedBasiliskAndDuplicateSections) {
+  const std::string start = "<Case formatVersion='1'>";
+  EXPECT_EQ(validate_case(start + valid_elff_xml + valid_elff_xml + "</Case>"), ELFF_XML_INVALID_VALUE);
+  EXPECT_EQ(validate_case(start + "</Case>"), ELFF_XML_INVALID_VALUE);
+  for (const auto& change : {
+      std::pair<std::string, std::string>{" size=\"${L}\"", ""},
+      {"maxLevel", "maxLevell"},
+      {"<Output", "<Unknown/><Output"},
+      {"<Settling velocityTolerance=\"0.001\"/>", "<Settling/>"}}) {
+    auto settings = basilisk_settings;
+    settings.replace(settings.find(change.first), change.first.size(), change.second);
+    EXPECT_EQ(validate_case(start + valid_elff_xml + settings + "</Case>"), ELFF_XML_INVALID_VALUE);
+  }
+}
+
 elff_xml_dtd_status validate(const char* xml, char* diagnostic, size_t capacity)
 {
   const std::string& dtd = elff_case_dtd();
@@ -244,6 +295,9 @@ TEST_F(ELFFCaseDTDTest, ProvidesStableStatusStrings)
 
 TEST_F(ELFFCaseDTDTest, ReportsWhenLibXml2IsDisabled)
 {
+  char sentinel = 0;
+  EXPECT_EQ(elff_xml_case_validate(reinterpret_cast<elff_xml_document_t>(&sentinel), nullptr),
+            ELFF_XML_UNAVAILABLE);
   const std::string& dtd = elff_case_dtd();
 
   EXPECT_EQ(elff_xml_dtd_validate_memory(valid_elff_xml,

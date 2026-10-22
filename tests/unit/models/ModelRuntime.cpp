@@ -3,7 +3,7 @@
 
 #include "elff/models/capsule/CapsuleMeshBuilder.hpp"
 #include "elff/models/capsule/IBMCapsule.hpp"
-#include "elff/models/ModelRuntime.hpp"
+#include "elff/models/runtime/ModelRuntime.hpp"
 #include "elff/models/ibm/IBCoupling.hpp"
 
 #include <hdf5.h>

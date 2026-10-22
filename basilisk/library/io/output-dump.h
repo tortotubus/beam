@@ -1,3 +1,5 @@
+#pragma once
+
 /**
  * README: To use this framework, simply use @c restore_handler("my_folder") inside 
  * and your @c init event as well as @c checkpoint_hanlder("my_folder") in another
@@ -30,6 +32,7 @@ enum {
  */
 typedef struct {
   const char* filename;
+  bool required; /* Must exist before any checkpoint state is restored. */
   int dump_phase;
   checkpoint_function dump;
   int restore_phase;
@@ -300,7 +303,31 @@ int restore_handler (const char* basepath = NULL, scalar* slist = all) {
     snprintf (tname, 1024, "%s/dump.dt", basepath);
   }
 
-  if (file_exists (fname)) {
+  int present = file_exists(fname), any_present = present, complete = present;
+#if _MPI
+  MPI_Allreduce(&present, &any_present, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+#endif
+  if (any_present) {
+    if (!present) fprintf(ferr, "Missing required checkpoint: %s\n", fname);
+    for (int ci = 0; ci < checkpointers.n; ++ci) {
+      Checkpointer* c = &checkpointers.items[ci];
+      if (!c->restore || !c->required) continue;
+      char path[1024];
+      int length = snprintf(path, sizeof(path), "%s%s", fname,
+                            c->filename ? c->filename : "");
+      if (length < 0 || length >= sizeof(path) || !file_exists(path)) {
+        fprintf(ferr, "Missing required checkpoint: %s\n", path);
+        complete = 0;
+      }
+    }
+#if _MPI
+    MPI_Allreduce(MPI_IN_PLACE, &complete, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+#endif
+    if (!complete) {
+      fprintf(ferr, "Incomplete checkpoint; refusing to restore any simulation state.\n");
+      exit(1);
+    }
+
     if (pid () == 0) {
       fprintf (stderr, "Resuming simulation from checkpoint file %s\n", fname);
       fflush (stderr);

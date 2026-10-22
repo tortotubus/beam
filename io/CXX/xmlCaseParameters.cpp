@@ -226,12 +226,12 @@ struct Definition {
 };
 using Definitions = std::map<std::string, Definition>;
 Definitions read_section(elff_xml_node_t root, const char *section_name,
-                         const char *entry_name, bool optional) {
+                         const char *entry_name, bool coefficient) {
   elff_xml_error error{};
   elff_xml_node_t section = nullptr;
   auto status =
       elff_xml_node_unique_child(root, section_name, &section, &error);
-  if (optional && status == ELFF_XML_NOT_FOUND)
+  if (status == ELFF_XML_NOT_FOUND)
     return {};
   check(status, error);
   size_t count;
@@ -256,9 +256,9 @@ Definitions read_section(elff_xml_node_t root, const char *section_name,
         invalid("Expected a valid name; pi is reserved.");
       std::string value = attribute(node, "value", has_value);
       std::string expression = attribute(node, "expression", has_expression);
-      if (optional ? (!has_expression || has_value)
+      if (coefficient ? (!has_expression || has_value)
                    : (has_value == has_expression))
-        invalid(optional
+        invalid(coefficient
                     ? "Coefficient requires expression and no value."
                     : "Parameter requires exactly one of value or expression.");
       if (!definitions

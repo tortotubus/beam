@@ -1,6 +1,7 @@
 #include "elff/io/C/xmlCase.h"
 
 #include <math.h>
+#include "embeddedELFFDtd.hpp"
 
 elff_xml_status
 elff_xml_node_attribute_double_or(elff_xml_node_t node,
@@ -79,6 +80,36 @@ elff_xml_validation_status(elff_xml_dtd_status status)
     default:
       return ELFF_XML_INTERNAL_ERROR;
   }
+}
+
+elff_xml_status
+elff_xml_case_validate(elff_xml_document_t document, elff_xml_error* error)
+{
+  elff_xml_node_t root = NULL;
+  elff_xml_status status = elff_xml_document_root(document, "Case", &root, error);
+  char diagnostic[ELFF_XML_ERROR_MESSAGE_CAPACITY] = {0};
+  if (status != ELFF_XML_OK)
+    return status;
+  int version = 0;
+  status = elff_xml_node_attribute_int(root, "formatVersion", &version, error);
+  if (status != ELFF_XML_OK) return status;
+  if (version != 1 && version != 2) {
+    size_t line = 0;
+    elff_xml_node_line(root, &line, NULL);
+    elff_xml_error_set(error, line, 0, "Unsupported Case formatVersion.");
+    return ELFF_XML_INVALID_VALUE;
+  }
+  status = elff_xml_validation_status(elff_xml_dtd_validate_node(
+    root, (const char*)(version == 2 ? elff_embedded_elff_v2_dtd : elff_embedded_elff_v1_dtd),
+    version == 2 ? elff_embedded_elff_v2_dtd_size : elff_embedded_elff_v1_dtd_size,
+    diagnostic, sizeof(diagnostic)));
+  elff_xml_error_clear(error);
+  if (status != ELFF_XML_OK) {
+    size_t line = 0;
+    elff_xml_node_line(root, &line, NULL);
+    elff_xml_error_set(error, line, 0, diagnostic);
+  }
+  return status;
 }
 
 elff_xml_status

@@ -1,3 +1,5 @@
+#pragma once
+
 typedef int sig_atomic_t; // TODO: add to defaults.h
 
 @include<signal.h> 

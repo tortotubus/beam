@@ -1,4 +1,4 @@
-#include "elff/models/ModelRuntime.hpp"
+#include "elff/models/runtime/ModelRuntime.hpp"
 #include "elff/models/ibm/IBCoupling.hpp"
 #include "elff/models/articulated/IBBendingRodImplicit.hpp"
 #include <gtest/gtest.h>

@@ -107,6 +107,14 @@ elff_bundle_dtd(
 file(READ "${ELFF_V1_DTD_SOURCE}" ELFF_V1_DTD_HEX HEX)
 string(REGEX REPLACE "([0-9A-Fa-f][0-9A-Fa-f])" "0x\\1,"
   ELFF_V1_DTD_BYTES "${ELFF_V1_DTD_HEX}")
+set(ELFF_V2_DTD_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/generated/ELFF-v2.dtd")
+elff_bundle_dtd(
+  "${CMAKE_CURRENT_SOURCE_DIR}/io/DTD/ELFF/ELFF-v2.dtd"
+  "${ELFF_V2_DTD_SOURCE}"
+)
+file(READ "${ELFF_V2_DTD_SOURCE}" ELFF_V2_DTD_HEX HEX)
+string(REGEX REPLACE "([0-9A-Fa-f][0-9A-Fa-f])" "0x\\1,"
+  ELFF_V2_DTD_BYTES "${ELFF_V2_DTD_HEX}")
 configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/config/cmake/embeddedELFFDtd.hpp.in"
   "${CMAKE_CURRENT_BINARY_DIR}/generated/embeddedELFFDtd.hpp"
@@ -126,11 +134,14 @@ set(ELFF_DIRS
   general 
   io/C
   io/CXX 
+  io/case
+  io/case/models
   models
   models/articulated
   models/beam
   models/ibm 
   models/rigidbody
+  models/runtime
   models/spring
   mpi 
   fem
@@ -165,6 +176,24 @@ file(GLOB_RECURSE ELFF_PUBLIC_HEADERS
   "${CMAKE_CURRENT_SOURCE_DIR}/mpi/*.hpp"
 )
 list(SORT ELFF_PUBLIC_HEADERS)
+# Retire the copied placeholder in existing build/install trees.
+file(REMOVE "${ELFF_PUBLIC_INCLUDE_ROOT}/contact/ContactGeometryAdapter.hpp")
+foreach(RETIRED_HEADER IN ITEMS
+    models/runtime/ModelPlacement.hpp
+    models/ModelPlacement.hpp
+    models/articulated/BendingRodImplicitXML.hpp
+    models/InitialLineXML.hpp
+    models/beam/EulerBeamHuangXML.hpp
+    models/Model.hpp models/ModelRuntime.hpp
+    models/RuntimeComponent.hpp models/ModelInsertion.hpp
+    models/RandomStreams.hpp
+    models/beam/EulerBeamAugKKT.hpp models/beam/EulerBeamIndex1.hpp
+    models/beam/EulerBeamPenalty.hpp
+    models/beam/IBEulerBeamPenalty.hpp models/beam/IBEulerBeam.hpp
+    c/models/beam/IBEulerBeam.h c/models/beam/IBEulerBeamPenalty.h)
+  file(REMOVE "${ELFF_PUBLIC_INCLUDE_ROOT}/${RETIRED_HEADER}")
+endforeach()
+
 
 foreach(HEADER IN LISTS ELFF_PUBLIC_HEADERS)
   get_filename_component(ELFF_HEADER_DIR
@@ -373,13 +402,13 @@ install(DIRECTORY "${ELFF_BUILD_INCLUDE_DIR}/"
     PATTERN "*.hpp"
 )
 
-install(FILES "${ELFF_V1_DTD_SOURCE}"
+install(FILES "${ELFF_V1_DTD_SOURCE}" "${ELFF_V2_DTD_SOURCE}"
   DESTINATION "${CMAKE_INSTALL_DATADIR}/elff/dtd/ELFF"
   COMPONENT ELFF_Runtime
 )
 
 install(FILES
-  "${CMAKE_CURRENT_SOURCE_DIR}/basilisk/examples/cases/flapping_fibre.xml"
+  "${CMAKE_CURRENT_SOURCE_DIR}/basilisk/examples/flapping_fibre.xml"
   DESTINATION "${CMAKE_INSTALL_DATADIR}/elff/examples"
   COMPONENT ELFF_Runtime
 )

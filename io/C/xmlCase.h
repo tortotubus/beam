@@ -58,11 +58,11 @@ elff_xml_document_load_file(const char* path,
                             elff_xml_document_t* out_document,
                             elff_xml_error* error);
 
-/** Render numeric ${expression} attributes into an independent in-memory Case
+/** Render numeric ${expression} attributes and leaf text into an independent in-memory Case
  * document. Bare names and parameters.NAME query parameters; coefficients.NAME
  * queries output coefficients. Definitions are retained unchanged for provenance.
- * A Parameters section is required when using expressions. Expressions
- * must occupy the whole attribute (apart from whitespace). Source is unchanged.
+ * V1 requires Parameters when using expressions; v2 permits constant expressions. Expressions
+ * must occupy the whole value (apart from whitespace). Source is unchanged.
  * Legacy cases without definitions or expressions are copied unchanged.
  * On failure *out_document is null; callers own successful documents. */
 elff_xml_status elff_xml_case_render(elff_xml_document_t source,
@@ -139,6 +139,10 @@ elff_xml_node_attribute_double(elff_xml_node_t node,
                                double* value,
                                elff_xml_error* error);
 
+/** @brief Read finite numeric text from a leaf element; expressions must be resolved first. */
+elff_xml_status
+elff_xml_node_text_double(elff_xml_node_t node, double* value, elff_xml_error* error);
+
 /** Read a finite double, using default_value only when the attribute is absent. */
 elff_xml_status
 elff_xml_node_attribute_double_or(elff_xml_node_t node,
@@ -177,6 +181,14 @@ elff_xml_dtd_validate_memory(const char* xml,
                              size_t dtd_size,
                              char* diagnostic,
                              size_t diagnostic_capacity);
+
+/** @brief Validate the complete Case using the embedded DTD selected by formatVersion.
+ * Supports versions 1 and 2. Accepts source expressions or rendered values; numeric and contextual
+ * rules remain the responsibility of the parameter and section readers.
+ * Does not mutate the document or load external DTDs.
+ */
+elff_xml_status
+elff_xml_case_validate(elff_xml_document_t document, elff_xml_error* error);
 
 /** Validate only the selected node; its ancestors and siblings are ignored. */
 elff_xml_dtd_status

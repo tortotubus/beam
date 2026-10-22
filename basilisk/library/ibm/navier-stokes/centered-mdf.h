@@ -299,7 +299,7 @@ event interface_force_richardson (i++, last) {
         ibval (dforce.x) = 0.; // current force-density increment
       }
       double lsumw2 = 0.;
-      peskin_cosine_kernel_gather_dimensionless (node) {
+      ib_kernel_gather_dimensionless (node) {
         lsumw2 += sq (weight);
         foreach_dimension () {
           ibval (eulvel.x) += weight * uib.x[];
@@ -348,7 +348,7 @@ event interface_force_richardson (i++, last) {
 #endif
  
     foreach_ibnode () {
-      peskin_cosine_kernel_spread_dimensionless (node) {
+      ib_kernel_spread_dimensionless (node) {
         foreach_dimension () {
           dibmf.x[] += -weight * ibval (dforce.x) * ibval (nweight) / dv ();
         }
@@ -418,7 +418,7 @@ event projection (i++, last) {
       ibval (eulvel.x) = 0;
     }
     double lsumw2 = 0.;
-    peskin_cosine_kernel_gather_dimensionless (node) {
+    ib_kernel_gather_dimensionless (node) {
       lsumw2 += weight * weight;
       foreach_dimension () {
         ibval (eulvel.x) += weight * u.x[];

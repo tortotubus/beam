@@ -2,10 +2,8 @@
 #include <gtest/gtest.h>
 
 #include "elff/c/models/beam/IBEulerBeamADDM.h"
-#include "elff/c/models/beam/IBEulerBeam.h"
 #include "elff/c/models/beam/IBEulerBeamGGL.h"
 #include "elff/c/models/beam/IBEulerBeamHuang.h"
-#include "elff/c/models/beam/IBEulerBeamPenalty.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
 #include "elff/c/models/ModelRuntime.h"
 
@@ -34,13 +32,6 @@ expect_addm_constructs(ib_euler_beam_addm_t handle)
 }
 
 void
-expect_penalty_constructs(ib_euler_beam_penalty_t handle)
-{
-  ASSERT_NE(handle, nullptr);
-  EXPECT_GT(ib_force_coupled_get_number_of_nodes(handle), 0);
-}
-
-void
 expect_ggl_constructs(ib_euler_beam_ggl_t handle)
 {
   ASSERT_NE(handle, nullptr);
@@ -49,13 +40,6 @@ expect_ggl_constructs(ib_euler_beam_ggl_t handle)
 
 void
 expect_huang_constructs(ib_euler_beam_huang_t handle)
-{
-  ASSERT_NE(handle, nullptr);
-  EXPECT_GT(ib_force_coupled_get_number_of_nodes(handle), 0);
-}
-
-void
-expect_base_constructs(ib_euler_beam_t handle)
 {
   ASSERT_NE(handle, nullptr);
   EXPECT_GT(ib_force_coupled_get_number_of_nodes(handle), 0);
@@ -87,23 +71,11 @@ TEST(IBEulerBeamCAPITest, ConstructsSolversWithFullBoundaryConditionStruct)
   clamped_free.vals[0].position = { 0.0, 0.0, 0.0 };
   clamped_free.vals[0].slope = { 1.0, 0.0, 0.0 };
 
-  expect_base_constructs(ib_euler_beam_new(
-    ib_coupling_attach(runtime), s0, free_simple, length, EI, mu, nodes, r_penalty));
-  expect_base_constructs(ib_euler_beam_new_theta(
-    ib_coupling_attach(runtime), s0, free_simple, length, EI, mu, nodes, r_penalty, 0.2));
-
   expect_addm_constructs(ib_euler_beam_addm_new(
     ib_coupling_attach(runtime), s0, free_simple, length, EI, mu, nodes, r_penalty));
   expect_addm_constructs(ib_euler_beam_addm_new(
     ib_coupling_attach(runtime), s0, simple_simple, length, EI, mu, nodes, r_penalty));
   expect_addm_constructs(ib_euler_beam_addm_new(
-    ib_coupling_attach(runtime), s0, clamped_free, length, EI, mu, nodes, r_penalty));
-
-  expect_penalty_constructs(ib_euler_beam_penalty_new(
-    ib_coupling_attach(runtime), s0, free_simple, length, EI, mu, nodes, r_penalty));
-  expect_penalty_constructs(ib_euler_beam_penalty_new(
-    ib_coupling_attach(runtime), s0, simple_simple, length, EI, mu, nodes, r_penalty));
-  expect_penalty_constructs(ib_euler_beam_penalty_new(
     ib_coupling_attach(runtime), s0, clamped_free, length, EI, mu, nodes, r_penalty));
 
   expect_ggl_constructs(ib_euler_beam_ggl_new(

@@ -24,6 +24,29 @@ XMLNode XMLNode::child(const char* name) const
   return XMLNode(result);
 }
 
+double XMLNode::text_number() const
+{
+  elff_xml_error error{};
+  double result = 0;
+  check(elff_xml_node_text_double(node_, &result, &error), error);
+  return result;
+}
+
+std::vector<XMLNode> XMLNode::children(const char* name) const
+{
+  elff_xml_error error{};
+  size_t count = 0;
+  check(elff_xml_node_element_child_count(node_, &count, &error), error);
+  std::vector<XMLNode> result;
+  for (size_t i = 0; i < count; ++i) {
+    elff_xml_node_t child = nullptr;
+    check(elff_xml_node_element_child_at(node_, i, &child, &error), error);
+    XMLNode node(child);
+    if (node.name() == name) result.push_back(node);
+  }
+  return result;
+}
+
 std::string XMLNode::name() const
 {
   elff_xml_error error{};

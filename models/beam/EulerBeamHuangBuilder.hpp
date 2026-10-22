@@ -1,5 +1,7 @@
 #pragma once
 
+#include "elff/models/beam/EulerBeamHuangDefinition.hpp"
+#include "elff/io/case/ModelPlacement.hpp"
 #include "elff/config/config.hpp"
 #include "elff/general/error.hpp"
 #include "elff/models/beam/IBEulerBeamHuang.hpp"
@@ -10,6 +12,18 @@
 
 namespace ELFF {
 namespace Models {
+
+/** @brief Construct initialized Huang models from owned settings and resolved placement. */
+class EulerBeamHuangBuilder {
+public:
+  /** @brief Check settings and derived endpoints without constructing a model.
+   * @return A diagnostic on failure, or nullptr for valid inputs. */
+  static const char* validation_error(const EulerBeamHuangDefinition&,
+                                     const ELFF::IO::Case::InitialLineDefinition&) noexcept;
+  /** @brief Build the straight initial mesh and set boundary positions and slopes. */
+  static std::unique_ptr<IBEulerBeamHuang> build(
+      const EulerBeamHuangDefinition&, const ELFF::IO::Case::InitialLineDefinition&);
+};
 
 inline EulerBeamMesh
 make_huang_offset_initial_mesh(const std::array<real_t, 3>& anchor,
@@ -33,9 +47,7 @@ make_huang_direction_initial_mesh(const std::array<real_t, 3>& anchor,
                                   const std::array<real_t, 3>& direction,
                                   bool anchor_at_right = true)
 {
-  const real_t norm = std::sqrt(direction[0] * direction[0] +
-                                direction[1] * direction[1] +
-                                direction[2] * direction[2]);
+  const real_t norm = std::hypot(direction[0], direction[1], direction[2]);
   ELFF_VERIFY(std::isfinite(norm) && norm > 0.0,
               "EulerBeamHuang direction must be finite and nonzero.\n");
   const std::array<real_t, 3> tangent = {

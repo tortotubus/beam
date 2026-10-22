@@ -1,5 +1,5 @@
 #include "elff/c/models/ModelRuntime.h"
-#include "elff/models/ModelRuntime.hpp"
+#include "elff/models/runtime/ModelRuntime.hpp"
 using ELFF::Models::ModelRuntime;
 extern "C" {
 model_runtime_t model_runtime_new()

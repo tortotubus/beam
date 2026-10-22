@@ -37,6 +37,25 @@ using TestRod = RodHarness<BendingRodImplicit>;
 using TestIBRod = RodHarness<IBBendingRodImplicit>;
 
 
+// Distribute each segment's weight equally to its endpoints.
+std::vector<Vec3> weightLoads(const BendingRodImplicitConfig& config) {
+  std::vector<Vec3> loads(config.links + 1, Vec3::Zero());
+  for (int i = 0; i < config.links; ++i) {
+    const auto mass = config.masses.empty() ? config.total_mass / config.links : config.masses[i];
+    loads[i] += Vec3(0, -0.5 * mass * 9.81, 0);
+    loads[i + 1] += Vec3(0, -0.5 * mass * 9.81, 0);
+  }
+  return loads;
+}
+
+double loadedEnergy(const TestIBRod& rod, const std::vector<Vec3>& forces) {
+  const auto points = rod.nodes(rod.state());
+  double energy = rod.energy(rod.state());
+  for (size_t i = 0; i < forces.size(); ++i)
+    energy -= forces[i].dot(points.row(i).transpose());
+  return energy;
+}
+
 static_assert(std::is_abstract_v<BendingRod>);
 static_assert(std::is_base_of_v<BendingRod, BendingRodImplicit>);
 
@@ -53,7 +72,6 @@ TEST(BendingRodImplicitTest, CommonMeshAndPolymorphicUniformSolve)
   config.links = 3;
   config.length = 2;
   config.total_mass = 4;
-  config.gravity.setZero();
   config.boundary = Boundary::Free;
   BendingRodImplicit uniform(config), nonuniform(config);
   BendingRod &base = uniform;
@@ -133,6 +151,24 @@ TEST(BendingRodImplicitTest, InvalidInitialMeshesLeaveStateAndHistoryUnchanged)
   EXPECT_ROD_ERROR(rod.apply_initial_condition(BendingRodMesh(4, 2)));
 }
 
+TEST(BendingRodImplicitTest, NoExternalLoadsMeanNoAcceleration) {
+  for (auto boundary : {Boundary::Pinned, Boundary::Free}) {
+    BendingRodImplicitConfig config;
+    config.links = 3;
+    config.boundary = boundary;
+    TestRod rod(config);
+    const auto before = rod.state();
+    EXPECT_TRUE(rod.rhs(0, before).isZero(1e-14));
+    rod.advance(0.1);
+    EXPECT_TRUE(rod.state().isApprox(before, 1e-14));
+    ModelState checkpoint;
+    rod.pack_state(checkpoint);
+    EXPECT_EQ(checkpoint.ints[0], 2);
+    checkpoint.ints[0] = 1;
+    EXPECT_ROD_ERROR(rod.unpack_state(checkpoint));
+  }
+}
+
 TEST(BendingRodImplicitTest, PinnedSingleSegmentHasPendulumAcceleration)
 {
   BendingRodImplicitConfig config;
@@ -141,7 +177,7 @@ TEST(BendingRodImplicitTest, PinnedSingleSegmentHasPendulumAcceleration)
   config.pin = Vec3(1.0, 2.0, 3.0);
   TestRod rod(config);
   const auto state = rod.initialState();
-  const auto derivative = rod.rhs(0.0, state);
+  const auto derivative = rod.rhs(0.0, state, weightLoads(config));
   EXPECT_NEAR(derivative[5], -3.0 * 9.81 / (2.0 * config.length), 1e-12);
   EXPECT_TRUE(rod.nodes(state).row(0).transpose().isApprox(config.pin));
 }
@@ -158,12 +194,15 @@ TEST(BendingRodImplicitTest, FreeRodFallsWithoutChangingShape)
   const auto initial = rod.initialState({}, {}, center, velocity);
   const double duration = 0.1;
   rod.setState(initial);
-  for (int i = 0; i < 10; ++i) rod.advance(duration / 10);
+  for (int i = 0; i < 10; ++i) rod.advance(duration / 10, weightLoads(config));
   const auto final = rod.state();
   const Vec3 expected = center + duration * velocity +
-                        0.5 * duration * duration * config.gravity;
+                        0.5 * duration * duration * Vec3(0, -9.81, 0);
   EXPECT_TRUE(final.head<3>().isApprox(expected, 1e-10));
-  EXPECT_NEAR(rod.energy(initial), rod.energy(final), 1e-9);
+  // The solver reports kinetic plus elastic energy; external work is separate.
+  const double mass = 6.0;
+  EXPECT_NEAR(rod.energy(final) - rod.energy(initial),
+              mass * Vec3(0, -9.81, 0).dot(expected - center), 1e-9);
   const auto points = rod.nodes(final);
   Vec3 measured_center = Vec3::Zero();
   for (int i = 0; i < config.links; ++i) {
@@ -179,7 +218,6 @@ TEST(BendingRodImplicitTest, BendingRestoresAndDampingDissipates)
 {
   BendingRodImplicitConfig config;
   config.links = 2;
-  config.gravity.setZero();
   config.ei = 1.0;
   config.bending_damping = {0.2};
   TestRod rod(config);
@@ -192,6 +230,63 @@ TEST(BendingRodImplicitTest, BendingRestoresAndDampingDissipates)
   const Vec3 first = (positions.row(1) - positions.row(0)).normalized();
   const Vec3 second = (positions.row(2) - positions.row(1)).normalized();
   EXPECT_GT(first.dot(second), 1.0 / std::sqrt(1.04));
+}
+
+TEST(BendingRodImplicitTest, UniformDampingMatchesJointCoefficientsAndDissipates)
+{
+  BendingRodImplicitConfig config;
+  config.links = 2;
+  config.length = 2.;
+  config.ei = 0.;
+  config.spectral_radius = 1.; // Isolate physical damping from algorithmic damping.
+  config.damping_rigidity = 0.2;
+  TestRod uniform(config);
+  config.damping_rigidity = 0.;
+  config.bending_damping = {0.2};
+  TestRod explicit_joints(config);
+  const auto initial = uniform.initialState({Vec3::UnitX(), Vec3::UnitX()},
+                                            {Vec3::Zero(), Vec3(0, 0, 1)});
+  uniform.setState(initial);
+  explicit_joints.setState(initial);
+  const auto initial_energy = uniform.energy(initial);
+  for (int i = 0; i < 20; ++i) {
+    uniform.advance(0.001);
+    explicit_joints.advance(0.001);
+  }
+  EXPECT_TRUE(uniform.state().isApprox(explicit_joints.state(), 1e-13));
+  EXPECT_LT(uniform.energy(uniform.state()), initial_energy);
+  config.bending_damping.clear();
+  config.damping_rigidity = -1.;
+  EXPECT_ROD_ERROR(TestRod invalid(config));
+  config.damping_rigidity = std::numeric_limits<real_t>::infinity();
+  EXPECT_ROD_ERROR(TestRod invalid(config));
+}
+
+TEST(BendingRodImplicitTest, UniformDampingScalesWithLengthAndPreservesTranslation)
+{
+  BendingRodImplicitConfig config;
+  config.links = 4;
+  config.length = 2.;
+  config.boundary = Boundary::Free;
+  config.damping_rigidity = 0.1;
+  TestRod uniform(config);
+  config.damping_rigidity = 0.;
+  config.bending_damping.assign(3, 0.2);
+  TestRod joints(config);
+  ModelState a, b;
+  uniform.pack_state(a);
+  joints.pack_state(b);
+  EXPECT_EQ(a.reals, b.reals);
+  uniform.setState(uniform.initialState(std::vector<Vec3>(4, Vec3::UnitX()), {},
+                                        Vec3::Zero(), Vec3(1, 2, 3)));
+  const auto initial_energy = uniform.energy(uniform.state());
+  uniform.advance(0.01);
+  EXPECT_NEAR(uniform.energy(uniform.state()), initial_energy, 1e-12);
+  uniform.pack_state(a);
+  joints.unpack_state(a);
+  uniform.advance(0.005);
+  joints.advance(0.005);
+  EXPECT_TRUE(uniform.state().isApprox(joints.state(), 1e-13));
 }
 
 TEST(BendingRodImplicitTest, RejectsInvalidConfigurationAndState)
@@ -214,7 +309,6 @@ TEST(BendingRodImplicitTest, EndpointLoadsProduceCorrectTorque)
   config.links = 1;
   config.length = 2.0;
   config.total_mass = 3.0;
-  config.gravity.setZero();
   TestRod pinned(config);
   std::vector<Vec3> loads = {Vec3(0, 100, 0), Vec3(0, 4, 0)};
   const auto derivative = pinned.rhs(0, pinned.state(), loads);
@@ -299,7 +393,7 @@ TEST(BendingRodImplicitTest, CheckedCFailurePreservesStateAndMeshes)
   EXPECT_EQ(output.position, nullptr);
 #else
   EXPECT_DEATH(ib_force_coupled_get_next_checked(handle, force.data(), 4, 0.1,
-    &output, error, sizeof(error)), "generalized-alpha Newton solve failed");
+    &output, error, sizeof(error)), "BendingRodImplicit Newton failed: iteration limit.*updates=1/1");
 #endif
   rod.pack_state(after);
   EXPECT_EQ(before.ints, after.ints);
@@ -371,7 +465,6 @@ TEST(BendingRodImplicitTest, StiffBendingRemainsBoundedAndPreservesLengths)
   BendingRodImplicitConfig config;
   config.links = 8;
   config.ei = 100;
-  config.gravity.setZero();
   TestIBRod rod(config);
   std::vector<Vec3> tangents(config.links);
   for (int i = 0; i < config.links; ++i)
@@ -404,7 +497,6 @@ TEST(BendingRodImplicitTest, ForceCouplingAndRestart)
   BendingRodImplicitConfig config;
   config.links = 3;
   config.boundary = Boundary::Free;
-  config.gravity.setZero();
   TestIBRod rod(config), restored(config);
   IBForceCoupled &coupled = rod;
   std::vector<IBMesh::IBVertex> force(4, {0, 2, 0});
@@ -439,15 +531,15 @@ TEST(BendingRodImplicitTest, FullStepLargeSwingRemainsBounded)
   config.total_mass = 7.67 * config.length;
   config.ei = 700;
   TestIBRod rod(config);
-  std::vector<IBMesh::IBVertex> force(61, {0, 0, 0});
-  const double energy_scale = config.total_mass * config.gravity.norm() * config.length;
+  std::vector<IBMesh::IBVertex> force(61, {0, -7.67 * 9.81, 0});
+  const double energy_scale = config.total_mass * 9.81 * config.length;
   for (int i = 0; i < 1000; ++i) {
     SCOPED_TRACE(i);
     ASSERT_NO_THROW(rod.GetNext(force, 0.01));
     ASSERT_TRUE(rod.state().allFinite());
     // This is a boundedness check, not an energy-conservation claim for the
     // generalized-alpha scheme. Second-order accuracy is checked separately above.
-    ASSERT_LT(std::abs(rod.energy(rod.state())), 0.1 * energy_scale);
+    ASSERT_LT(std::abs(loadedEnergy(rod, weightLoads(config))), 0.1 * energy_scale);
   }
 }
 

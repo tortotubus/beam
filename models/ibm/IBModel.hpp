@@ -1,6 +1,6 @@
 #pragma once
 
-#include "elff/models/Model.hpp"
+#include "elff/models/runtime/Model.hpp"
 
 namespace ELFF::Models {
 /** @brief Marker interface for runtime-owned immersed-boundary models. */

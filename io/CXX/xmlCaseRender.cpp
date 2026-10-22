@@ -20,7 +20,7 @@ using Document = std::unique_ptr<elff_xml_document_handle,
 using Parameters = std::unique_ptr<elff_xml_parameters_handle,
                                    decltype(&elff_xml_parameters_destroy)>;
 #ifdef ELFF_USE_LIBXML2
-elff_xml_status render_attributes(xmlNode *root,
+elff_xml_status render_values(xmlNode *root,
                                   elff_xml_parameters_t parameters,
                                   elff_xml_error *error) {
   std::vector<xmlNode *> pending{root};
@@ -35,9 +35,16 @@ elff_xml_status render_attributes(xmlNode *root,
     for (xmlNode *child = node->children; child; child = child->next)
       if (child->type == XML_ELEMENT_NODE)
         pending.push_back(child);
-    for (xmlAttr *attr = node->properties; attr; attr = attr->next) {
+    std::vector<xmlAttr*> slots;
+    bool leaf = true;
+    for (xmlNode* child = node->children; child; child = child->next)
+      if (child->type == XML_ELEMENT_NODE) leaf = false;
+    if (leaf) slots.push_back(nullptr);
+    for (xmlAttr* attr = node->properties; attr; attr = attr->next)
+      slots.push_back(attr);
+    for (xmlAttr* attr : slots) {
       std::unique_ptr<xmlChar, decltype(xmlFree)> content(
-          xmlNodeListGetString(node->doc, attr->children, 1), xmlFree);
+          attr ? xmlNodeListGetString(node->doc, attr->children, 1) : xmlNodeGetContent(node), xmlFree);
       if (!content)
         continue;
       std::string source(reinterpret_cast<const char *>(content.get()));
@@ -52,7 +59,7 @@ elff_xml_status render_attributes(xmlNode *root,
       if (source.size() > 4099 || source.compare(first, 2, "${") != 0 ||
           source[last] != '}' || source.find('}', first) != last) {
         elff_xml_error_set(&detail, 0, 0,
-                           "Expected a whole-attribute ${expression}, without "
+                           "Expected a whole-value ${expression}, without "
                            "string interpolation.");
       } else if (!parameters) {
         elff_xml_error_set(&detail, 0, 0,
@@ -65,8 +72,9 @@ elff_xml_status render_attributes(xmlNode *root,
       if (status != ELFF_XML_OK) {
         std::string message =
             "<" + std::string(reinterpret_cast<const char *>(node->name)) +
-            "> attribute '" + reinterpret_cast<const char *>(attr->name) +
-            "' (" + source.substr(0, 128) + "): " + detail.message;
+            (attr ? "> attribute '" + std::string(reinterpret_cast<const char *>(attr->name)) + "'"
+                  : "> text") +
+            " (" + source.substr(0, 128) + "): " + detail.message;
         elff_xml_error_set(error, static_cast<size_t>(xmlGetLineNo(node)), 0,
                            message.c_str());
         return status;
@@ -75,7 +83,9 @@ elff_xml_status render_attributes(xmlNode *root,
       number.imbue(std::locale::classic());
       number << std::setprecision(std::numeric_limits<double>::max_digits10)
              << value;
-      if (!xmlSetNsProp(node, attr->ns, attr->name,
+      if (!attr) {
+        xmlNodeSetContent(node, BAD_CAST number.str().c_str());
+      } else if (!xmlSetNsProp(node, attr->ns, attr->name,
                         BAD_CAST number.str().c_str())) {
         elff_xml_error_set(error, xmlGetLineNo(node), 0,
                            "Unable to replace rendered attribute.");
@@ -107,9 +117,13 @@ elff_xml_case_render(elff_xml_document_t source,
     auto status = elff_xml_document_root(source, "Case", &root, error);
     if (status != ELFF_XML_OK)
       return status;
+    int version = 0;
+    elff_xml_error version_error{};
+    const bool v2 = elff_xml_node_attribute_int(root, "formatVersion", &version,
+                                               &version_error) == ELFF_XML_OK && version == 2;
     status = elff_xml_node_unique_child(root, "Parameters", &section, error);
     Parameters parameters(nullptr, elff_xml_parameters_destroy);
-    if (status == ELFF_XML_OK) {
+    if (status == ELFF_XML_OK || (v2 && status == ELFF_XML_NOT_FOUND)) {
       elff_xml_parameters_t context = nullptr;
       status = elff_xml_parameters_create(root, &context, error);
       if (status != ELFF_XML_OK)
@@ -136,7 +150,7 @@ elff_xml_case_render(elff_xml_document_t source,
     rendered->document = xmlCopyDoc(source->document, 1);
     if (!rendered->document)
       throw std::bad_alloc();
-    status = render_attributes(xmlDocGetRootElement(rendered->document),
+    status = render_values(xmlDocGetRootElement(rendered->document),
                                parameters.get(), error);
     if (status != ELFF_XML_OK)
       return status;

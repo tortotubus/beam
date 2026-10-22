@@ -10,7 +10,7 @@ extern "C" {
 typedef struct elff_xml_parameters_handle *elff_xml_parameters_t;
 
 /**
- * Explicitly read Parameters and optional Nondimensionalization children of
+ * Explicitly read optional Parameters and Nondimensionalization children of
  * Case. Parameters require name and exactly one of value/expression;
  * Coefficients require name and expression. Expressions reference parameters
  * only, with forward references allowed. Names use [A-Za-z_][A-Za-z0-9_]*; pi

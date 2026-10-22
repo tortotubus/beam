@@ -14,16 +14,13 @@ static bool ib_dump_header (FILE* fp, struct IBDumpHeader* header, IBscalar* lis
 static IBscalar ib_scalar_from_name (const char* name);
 static int ib_checkpoint_dump (const char* path, void* ctx);
 static int ib_checkpoint_restore (const char* path, void* ctx);
-/* Optional, explicit application recovery for a missing (not corrupt) sidecar. */
-static int (*ib_checkpoint_recover_missing) (void) = NULL;
-static bool ib_checkpoint_was_missing = false;
 
 void ib_dump (const char* file, IBscalar* list, FILE* fp, bool unbuffered, bool zero);
 bool ib_restore (const char* file, IBscalar* list, FILE* fp);
 
 event defaults (i = 0) {
   checkpointer_register ((Checkpointer) {
-    .filename = ".ib", .dump_phase = CKPT_PHASE_POST_DUMP,
+    .filename = ".ib", .required = true, .dump_phase = CKPT_PHASE_POST_DUMP,
     .dump = ib_checkpoint_dump, .restore_phase = CKPT_PHASE_POST_RESTORE,
     .restore = ib_checkpoint_restore, .ctx = NULL});
 }
@@ -133,11 +130,11 @@ trace bool ib_restore (const char* file = "dump.ib", IBscalar* list = NULL,
   int nn = 0;
   foreach_ibmesh () nn += mesh->nnode_global;
   struct IBDumpHeader header = {0};
-  int ok = 1, missing = 0;
+  int ok = 1;
   FILE* input = NULL;
   if (pid () == 0) {
     input = fp ? fp : (file ? fopen (file, "rb") : NULL);
-    if (!input) { ok = 0; missing = errno == ENOENT; }
+    if (!input) ok = 0;
     if (ok && fread (&header, sizeof (header), 1, input) != 1) ok = 0;
     if (ok && ((header.version != 1 && header.version != 2) ||
                header.nmeshes != ibmm.nm || header.nnodes != nn ||
@@ -145,9 +142,7 @@ trace bool ib_restore (const char* file = "dump.ib", IBscalar* list = NULL,
   }
 #if _MPI
   MPI_Bcast (&header, sizeof (header), MPI_BYTE, 0, MPI_COMM_WORLD);
-  MPI_Bcast (&missing, 1, MPI_INT, 0, MPI_COMM_WORLD);
 #endif
-  ib_checkpoint_was_missing = missing != 0;
   if (!ib_checkpoint_global_ok (ok)) {
     if (pid () == 0 && input && !fp) fclose (input);
     return false;
@@ -266,8 +261,6 @@ static int ib_checkpoint_dump (const char* path, void* ctx) {
 static int ib_checkpoint_restore (const char* path, void* ctx) {
   NOT_UNUSED (ctx);
   if (ib_restore (path, iball, NULL)) return 0;
-  if (ib_checkpoint_was_missing && ib_checkpoint_recover_missing)
-    return ib_checkpoint_recover_missing ();
   return -1;
 }
 

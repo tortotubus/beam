@@ -4,11 +4,9 @@
 #endif
 #endif
 
-#include "elff/c/models/beam/IBEulerBeam.h"
 #include "elff/c/models/beam/IBEulerBeamADDM.h"
 #include "elff/c/models/beam/IBEulerBeamGGL.h"
 #include "elff/c/models/beam/IBEulerBeamHuang.h"
-#include "elff/c/models/beam/IBEulerBeamPenalty.h"
 #include "elff/c/models/capsule/IBCapsule.h"
 #include "elff/c/models/ibm/IBForceCoupled.h"
 #include "elff/c/models/ibm/IBVelocityCoupled.h"
@@ -356,38 +354,6 @@ static inline int elff_register_model (int mesh_id, int mesh_gid,
 // ELFF EulerBernoulli Beam
 // ============================================================================
 
-IBMeshModel elff_euler_beam_new (double length,
-                                 double EI,
-                                 double mu,
-                                 int nodes,
-                                 double r_penalty,
-                                 ib_euler_beam_bcs_t bcs,
-                                 coord s0);
-
-IBMeshModel elff_euler_beam_new_theta (double length,
-                                       double EI,
-                                       double mu,
-                                       int nodes,
-                                       double r_penalty,
-                                       double theta,
-                                       ib_euler_beam_bcs_t bcs,
-                                       coord s0);
-
-IBMeshModel elff_euler_beam_penalty_new (double length,
-                                         double EI,
-                                         double mu,
-                                         int nodes,
-                                         double r_penalty,
-                                         ib_euler_beam_bcs_t bcs,
-                                         coord s0);
-IBMeshModel elff_euler_beam_penalty_new_theta (double length,
-                                               double EI,
-                                               double mu,
-                                               int nodes,
-                                               double r_penalty,
-                                               double theta,
-                                               ib_euler_beam_bcs_t bcs,
-                                               coord s0);
 IBMeshModel elff_euler_beam_ggl_new (double length,
                                      double EI,
                                      double mu,
@@ -505,72 +471,10 @@ IBMeshModel elff_pinned_rigid_body_sphere_new (double radius,
 /**
  * @brief
  */
-IBMeshModel elff_euler_beam_new (double length,
-                                 double EI,
-                                 double mu,
-                                 int nodes,
-                                 double r_penalty,
-                                 ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                 coord s0 = {0}) {
-  vertex_t v0 = {s0.x, s0.y, s0.z};
-  ib_euler_beam_t beam_ptr =
-    ib_euler_beam_new (elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
-
-  return elff_force_coupled_model (beam_ptr);
-}
 
 /**
  * @brief
  */
-IBMeshModel elff_euler_beam_new_theta (double length,
-                                       double EI,
-                                       double mu,
-                                       int nodes,
-                                       double r_penalty,
-                                       double theta,
-                                       ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                       coord s0 = {0}) {
-  vertex_t v0 = {s0.x, s0.y, s0.z};
-  ib_euler_beam_t beam_ptr = ib_euler_beam_new_theta (
-    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
-
-  return elff_force_coupled_model (beam_ptr);
-}
-
-/**
- * @brief
- */
-IBMeshModel elff_euler_beam_penalty_new (double length,
-                                         double EI,
-                                         double mu,
-                                         int nodes,
-                                         double r_penalty,
-                                         ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                         coord s0 = {0}) {
-  vertex_t v0 = {s0.x, s0.y, s0.z};
-  ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new (
-    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty);
-
-  return elff_force_coupled_model (beam_ptr);
-}
-
-/**
- * @brief
- */
-IBMeshModel elff_euler_beam_penalty_new_theta (double length,
-                                               double EI,
-                                               double mu,
-                                               int nodes,
-                                               double r_penalty,
-                                               double theta,
-                                               ib_euler_beam_bcs_t bcs = elff_euler_beam_bcs_default (),
-                                               coord s0 = {0}) {
-  vertex_t v0 = {s0.x, s0.y, s0.z};
-  ib_euler_beam_penalty_t beam_ptr = ib_euler_beam_penalty_new_theta (
-    elff_ib_coupling_get (), v0, bcs, length, EI, mu, nodes, r_penalty, theta);
-
-  return elff_force_coupled_model (beam_ptr);
-}
 
 /**
  * @brief

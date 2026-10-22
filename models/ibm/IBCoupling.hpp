@@ -1,5 +1,5 @@
 #pragma once
-#include "elff/models/ModelRuntime.hpp"
+#include "elff/models/runtime/ModelRuntime.hpp"
 #include "elff/models/ibm/IBForceCoupled.hpp"
 #include "elff/models/ibm/IBVelocityCoupled.hpp"
 #include "elff/c/models/ibm/IBCoupling.h"
@@ -43,6 +43,7 @@ public:
   int seal() override;
 
 private:
+  friend class ModelInsertion; // Reserve collective insertion storage before commit.
   struct Registration {
     ModelId id;
     ib_model_view_kind_t kind;

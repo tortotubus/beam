@@ -2,7 +2,7 @@
 
 #include "elff/models/articulated/BendingRod.hpp"
 #include <Eigen/Dense>
-#include "elff/models/Model.hpp"
+#include "elff/models/runtime/Model.hpp"
 
 namespace ELFF {
 namespace Models {
@@ -40,10 +40,6 @@ struct BendingRodImplicitConfig {
    */
   Boundary boundary = Boundary::Pinned;
   /**
-   * @brief Uniform gravitational acceleration \f(\mathbf{g}\f).
-   */
-  Vec3 gravity = Vec3(0.0, -9.81, 0.0);
-  /**
    * @brief Fixed position of node zero for a pinned rod; unused for a free rod.
    */
   Vec3 pin = Vec3::Zero();
@@ -61,7 +57,13 @@ struct BendingRodImplicitConfig {
    */
   std::vector<real_t> bending_stiffness;
   /**
-   * @brief Nonnegative rotational damping coefficients of the \f(n-1\f) joints; defaults to zero.
+   * @brief Uniform bending damping rigidity \f(D\geq0\f), in force-length squared-time units.
+   * Default joint damping is \f(D/h\f); zero disables physical damping.
+   * Explicit @ref bending_damping coefficients override this uniform value.
+   */
+  real_t damping_rigidity = 0.0;
+  /**
+   * @brief Nonnegative rotational damping coefficients of the \f(n-1\f) joints; defaults to @ref damping_rigidity divided by link length.
    */
   std::vector<real_t> bending_damping;
 
@@ -171,7 +173,7 @@ public:
    */
   virtual void unpack_state(const ModelState &s);
   /**
-   * @brief Return the current kinetic, bending and gravitational potential energy.
+   * @brief Return the current kinetic plus bending energy, excluding external-load potential.
    * @return Mechanical energy; excludes external-load work and dissipated energy.
    */
   real_t energy() const { return energy(state_); }
@@ -189,6 +191,10 @@ protected:
    * @return Updated structural state, without assigning @ref state_ or updating the mesh.
    * On success this method updates the mutable acceleration history and previous
    * timestep. On validation or convergence failure, that history is unchanged.
+   * Logs one convergence summary through ELFF_LOG: accepted Newton updates,
+   * residual evaluations, rejected line-search trials, and initial/final residual
+   * infinity norms against the timestep-scaled stopping tolerance. Zero updates
+   * means the initial guess already satisfies that tolerance.
    */
   Eigen::VectorXd integrateState(const Eigen::VectorXd &state, real_t dt,
                                 const std::vector<Vec3> &loads) const;
@@ -245,8 +251,8 @@ protected:
    * @param time Time argument, unused because the supplied loads are instantaneous.
    * @param state Structural state at which to evaluate the derivative.
    * @param nodal_forces Integrated nodal forces; empty means zero external load.
-   * @return State derivative including gravity, bending and damping. For a free rod,
-   * \f(\ddot{\mathbf{c}}=\mathbf{g}+M^{-1}\sum_j\mathbf{F}_j\f).
+   * @return State derivative including applied nodal forces, bending and damping. For a free rod,
+   * \f(\ddot{\mathbf{c}}=M^{-1}\sum_j\mathbf{F}_j\f).
    */
   Eigen::VectorXd rhs(real_t time, const Eigen::VectorXd &state,
                       const std::vector<Vec3> &nodal_forces = {}) const;
@@ -260,12 +266,8 @@ protected:
   /**
    * @brief Evaluate mechanical energy for a supplied structural state.
    * @param state Structural state at which to evaluate energy.
-   * @return \f(T+U_b+U_g\f), where \f(\mathbf{c}_i\f) denotes a link midpoint:
-   * \f[
-   *  T=\frac12\sum_i\left(m_i\|\dot{\mathbf{c}}_i\|^2
-   *    +I_i\|\boldsymbol{\omega}_i\|^2\right),\qquad
-   *  U_g=-\sum_i m_i\mathbf{g}\cdot\mathbf{c}_i.
-   * \f]
+   * @return Kinetic plus bending energy \f(T+U_b\f).
+   * External-load potential energy is not included.
    */
   real_t energy(const Eigen::VectorXd &state) const;
   /**
@@ -336,7 +338,7 @@ protected:
    * @param tangents Unit link tangents.
    * @param omega Transverse link angular velocities.
    * @param nodal_forces Integrated nodal forces; empty means zero external load.
-   * @return Angular acceleration of each link, accounting for gravity, joint
+   * @return Angular acceleration of each link, accounting for nodal forces, joint
    * forces and centripetal terms. The pinned base has two rotational freedoms;
    * the free base additionally has three translational freedoms.
    */
@@ -364,10 +366,6 @@ protected:
    * @brief Pinned or free translational boundary condition.
    */
   Boundary boundary_;
-  /**
-   * @brief Uniform gravitational acceleration \f(\mathbf{g}\f).
-   */
-  Vec3 gravity_;
   /**
    * @brief Fixed first-node position for a pinned rod.
    */

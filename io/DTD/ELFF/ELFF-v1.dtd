@@ -1,11 +1,44 @@
-<!-- Model schemas are included using native DTD parameter entities. -->
-<!ENTITY % EulerBeamHuang SYSTEM "../../../models/beam/EulerBeamHuang-v1.dtd">
-%EulerBeamHuang;
-<!ENTITY % BendingRodSegmentsImplicit SYSTEM "../../../models/articulated/BendingRodSegmentsImplicit-v1.dtd">
-%BendingRodSegmentsImplicit;
+<!-- Unified version-1 case schema. Shared element names are declared once.
+     Also supports validation of standalone ELFF or Basilisk subtrees.
+     Numeric expressions are CDATA; numeric/contextual checks belong to readers. -->
+<!ELEMENT Case (Parameters?, Nondimensionalization?, ((ELFF, Basilisk?)|(Basilisk, ELFF?)))>
+<!ATTLIST Case formatVersion (1) #REQUIRED>
+<!ELEMENT Parameters (Parameter*)>
+<!ELEMENT Parameter EMPTY>
+<!-- Exactly one of value/expression is enforced by the parameter reader. -->
+<!ATTLIST Parameter name CDATA #REQUIRED value CDATA #IMPLIED expression CDATA #IMPLIED>
+<!ELEMENT Nondimensionalization (Coefficient*)>
+<!ELEMENT Coefficient EMPTY>
+<!ATTLIST Coefficient name CDATA #REQUIRED expression CDATA #REQUIRED>
+
+<!ELEMENT Basilisk (Domain, Time, Fluid, Grid, ImmersedBoundary?, Settling?, Output)>
+<!ATTLIST Basilisk schemaVersion (1) #REQUIRED caseType CDATA #REQUIRED>
+<!ELEMENT Domain EMPTY>
+<!ATTLIST Domain size CDATA #REQUIRED originX CDATA #REQUIRED originY CDATA #REQUIRED originZ CDATA "0">
+<!ELEMENT Time EMPTY>
+<!ATTLIST Time step CDATA #REQUIRED end CDATA #REQUIRED>
+<!ELEMENT Fluid (InletVelocity)>
+<!ATTLIST Fluid density CDATA #REQUIRED dynamicViscosity CDATA #REQUIRED>
+<!ELEMENT InletVelocity EMPTY>
+<!ATTLIST InletVelocity x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
+<!ELEMENT Grid EMPTY>
+<!ATTLIST Grid minLevel CDATA #REQUIRED maxLevel CDATA #REQUIRED>
+<!ELEMENT ImmersedBoundary (UniformForceDensity?)>
+<!ATTLIST ImmersedBoundary level CDATA #REQUIRED>
+<!ELEMENT UniformForceDensity EMPTY>
+<!ATTLIST UniformForceDensity x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
+<!ELEMENT Settling EMPTY>
+<!ATTLIST Settling
+  velocityTolerance CDATA #REQUIRED
+  forceRelaxation CDATA "0.8"
+  richardsonIterations CDATA "2"
+  implicitBending CDATA "1"
+  statsInterval CDATA "1">
+<!ELEMENT Output EMPTY>
+<!ATTLIST Output directory CDATA #REQUIRED interval CDATA #REQUIRED>
 
 <!-- ELFF-owned portion of a version-1 simulation case. -->
-<!ELEMENT ELFF (Models)>
+<!ELEMENT ELFF (InsertionDomain?, Models)>
 <!ATTLIST ELFF
   schemaVersion (1) #REQUIRED
   dimensions (2|3) #REQUIRED
@@ -13,3 +46,60 @@
 
 <!ELEMENT Models (EulerBeamHuang|BendingRodSegmentsImplicit)+>
 <!ATTLIST Models distribution (rank0|round-robin) "rank0">
+
+<!-- Global declarations shared by ELFF model schemas. Declare each element once. -->
+<!ELEMENT Geometry EMPTY>
+<!ATTLIST Geometry
+  length CDATA #REQUIRED
+  nodes CDATA #REQUIRED>
+
+<!ELEMENT Material EMPTY>
+<!ATTLIST Material
+  bendingRigidity CDATA #REQUIRED
+  linearDensity CDATA #REQUIRED>
+
+<!ELEMENT InitialLine ((Anchor|RandomAnchor), (Direction|RandomDirection))>
+<!-- Parsers require anchorEnd for Huang and allow only omission or left for rods. -->
+<!ATTLIST InitialLine anchorEnd (left|right) #IMPLIED>
+
+<!ELEMENT Anchor EMPTY>
+<!ATTLIST Anchor
+  x CDATA #REQUIRED
+  y CDATA #REQUIRED
+  z CDATA "0">
+
+<!ELEMENT Direction EMPTY>
+<!ATTLIST Direction
+  x CDATA #REQUIRED
+  y CDATA #REQUIRED
+  z CDATA "0">
+
+<!-- XML contract for EulerBeamHuang; semantic checks live in EulerBeamHuangXML.cpp. -->
+<!ELEMENT EulerBeamHuang
+  (Geometry, Material, InitialLine, BoundaryConditions, Insertion?)>
+
+<!ELEMENT BoundaryConditions EMPTY>
+<!ATTLIST BoundaryConditions
+  left (free|simple|clamped) #REQUIRED
+  right (free|simple|clamped) #REQUIRED>
+
+<!ELEMENT BendingRodSegmentsImplicit
+  (Geometry, Material, InitialLine, RodBoundary, ImplicitSolver?, Insertion?)>
+<!ELEMENT RodBoundary EMPTY>
+<!ATTLIST RodBoundary type (pinned|free) #REQUIRED>
+<!ELEMENT ImplicitSolver EMPTY>
+<!ATTLIST ImplicitSolver
+  spectralRadius CDATA "0.8"
+  nonlinearTolerance CDATA "1e-9"
+  maxIterations CDATA "20">
+
+<!-- Setup-only placement. Contextual restrictions are checked by parsers. -->
+<!ELEMENT InsertionDomain (Min, Max)>
+<!ELEMENT RandomAnchor (Min, Max)>
+<!ELEMENT Min EMPTY>
+<!ATTLIST Min x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
+<!ELEMENT Max EMPTY>
+<!ATTLIST Max x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
+<!ELEMENT RandomDirection EMPTY>
+<!ELEMENT Insertion EMPTY>
+<!ATTLIST Insertion count CDATA #REQUIRED clearance CDATA #REQUIRED maxAttempts CDATA #REQUIRED>

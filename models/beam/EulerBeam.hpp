@@ -1,4 +1,5 @@
 #pragma once
+#include "elff/contact/ContactGeometryProvider.hpp"
 
 #include "elff/config/config.hpp"
 #include "elff/models/beam/EulerBeamMesh.hpp"
@@ -24,8 +25,13 @@ namespace Models {
  * - Spatial discretization (mesh)
  * - Dimension (2D or 3D)
  */
-class EulerBeam {
+class EulerBeam : public Contact::ContactGeometryProvider {
 public:
+  /** @brief Borrow the current nodal polyline; reacquire after mesh updates. */
+  Contact::PolylineView contact_geometry() const override {
+    const auto& points = get_mesh().get_centerline();
+    return {points.data(), points.size()};
+  }
   /**
    * @brief Boundary-condition types for Euler–Bernoulli / elastica beams.
    *

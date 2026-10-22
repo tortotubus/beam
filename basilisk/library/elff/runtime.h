@@ -18,7 +18,6 @@
 
 static model_runtime_t elff_runtime = NULL;
 static ib_coupling_t elff_ib_coupling = NULL;
-static bool elff_checkpoint_restored = false;
 static ib_model_view_array_t elff_model_views = {0};
 
 // ============================================================================
@@ -72,7 +71,7 @@ static inline model_runtime_t elff_runtime_get () {
     static bool registered = false;
     if (!registered) {
       checkpointer_register (
-        (Checkpointer) {.filename = ".elff",
+        (Checkpointer) {.filename = ".elff", .required = true,
                         .dump_phase = CKPT_PHASE_POST_DUMP,
                         .dump = elff_checkpoint_dump,
                         .restore_phase = CKPT_PHASE_POST_RESTORE,
@@ -126,7 +125,7 @@ static inline int elff_init_case (const char* case_path, elff_xml_document_t doc
   static bool registered = false;
   if (!registered) {
     checkpointer_register (
-      (Checkpointer) {.filename = ".elff",
+      (Checkpointer) {.filename = ".elff", .required = true,
                       .dump_phase = CKPT_PHASE_POST_DUMP,
                       .dump = elff_checkpoint_dump,
                       .restore_phase = CKPT_PHASE_POST_RESTORE,
@@ -283,7 +282,6 @@ static inline int elff_restore (const char* fname) {
   // Refresh the adapters' cached mesh, then rebuild sparse support on the
   // restored fluid grid before the IB sidecar restores coupling fields.
   ibmeshmanager_sync_model_outputs ();
-  elff_checkpoint_restored = true;
   return 0;
 }
 

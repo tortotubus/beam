@@ -59,8 +59,33 @@ TEST(EulerBeamGGLTest, Glowinski)
   ASSERT_TRUE(csv.good());
   Benchmark::write_glowinski_csv_header(csv);
 
+  std::ofstream snapshots("glowinski_ggl_centerlines_5_10.csv");
+  std::ofstream gp("glowinski_ggl_5_10.gp");
+  ASSERT_TRUE(snapshots.good());
+  ASSERT_TRUE(gp.good());
+  snapshots << std::setprecision(17) << "# time,x,y,z\n";
+  gp << R"gnuplot(if (!exists("csv_file")) csv_file = "glowinski_ggl_centerlines_5_10.csv"
+if (!exists("plot_output")) plot_output = "glowinski_ggl_5_10.tex"
+set datafile separator comma
+set terminal cairolatex pdf size 4.8in,3.2in color colortext font ",10"
+set output plot_output
+set xlabel "$x$"
+set ylabel "$y$"
+set size ratio -1
+set grid
+unset key
+set cblabel "$t$ (s)"
+set cbrange [5:10]
+plot for [i=0:20] csv_file index i using 2:3:1 with lines lc palette
+)gnuplot";
+  gp.close();
+  ASSERT_TRUE(gp.good());
+  const size_t first_snapshot = static_cast<size_t>(std::lround(5.0 / dt));
+  const size_t snapshot_stride = static_cast<size_t>(std::lround(0.25 / dt));
+  size_t snapshot_count = 0;
+
   ELFF_LOG("Dynamic Solve:");
-  for (size_t ti = 0; ti < Nt; ++ti) {
+  for (size_t ti = 0; ti <= Nt; ++ti) {
     const std::string filename = "glowinski_ggl.vtkhdf";
     vtkPolyData pd = dynamic_beam.get_mesh().to_vtk_polydata();
     vtkHDFPolyData hdf_pd(filename, pd);
@@ -73,8 +98,18 @@ TEST(EulerBeamGGLTest, Glowinski)
 
     Benchmark::write_glowinski_csv_frame(
       csv, ti, ti * dt, dynamic_beam.get_mesh());
-    dynamic_beam.solve(dt, load);
+    if (ti >= first_snapshot && (ti - first_snapshot) % snapshot_stride == 0) {
+      for (const auto &point : dynamic_beam.get_mesh().get_centerline())
+        snapshots << ti * dt << ',' << point[0] << ',' << point[1]
+                  << ',' << point[2] << '\n';
+      snapshots << "\n\n";
+      ++snapshot_count;
+    }
+    if (ti < Nt) dynamic_beam.solve(dt, load);
   }
+  snapshots.close();
+  ASSERT_TRUE(snapshots.good());
+  EXPECT_EQ(snapshot_count, 21u);
 }
 
 TEST(EulerBeamGGLTest, Huang)

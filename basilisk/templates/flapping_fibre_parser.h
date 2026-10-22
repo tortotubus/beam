@@ -1,49 +1,49 @@
 #pragma once
-#include "library/io/input-case.h"
 
-/* flapping_fibre owns runtime initialization and its model requirements.
- * Include after library/elff/elff.h in this case's Basilisk translation unit.
- * Common settings are composed explicitly, not aliased to another case type.
- */
-typedef struct FlappingFibreCase {
-  BasiliskCaseConfiguration basilisk;
+/** @brief Flapping-specific initialization layered on the common v2 reader. */
+typedef struct {
+  BasiliskXMLCase basilisk;
+  double initial_velocity;
 } FlappingFibreCase;
 
-static int flapping_fibre_case_init (const char *path, FlappingFibreCase *configuration)
-{
+/** @brief Read v2 configuration, agree on parsing success, and construct models.
+ * inletSpeed is an optional resolved coefficient; its default is one.
+ * Shared XML settings and named values remain owned until case cleanup.
+ */
+static int flapping_fibre_case_init (const char* path, FlappingFibreCase* configuration) {
+  basilisk_xml_case_defaults(&configuration->basilisk);
+  configuration->initial_velocity = 1.;
   elff_xml_document_t document = NULL;
   elff_xml_error error = {0};
-  elff_xml_status status = configuration ? basilisk_case_load (
-    path, pid() == 0, &document, &configuration->basilisk, &error) : ELFF_XML_INVALID_ARGUMENT;
-  if (!configuration)
-    elff_xml_error_set (&error, 0, 0, "Case configuration is required.");
-  int success = status == ELFF_XML_OK;
-#if _MPI && defined(ELFF_USE_MPI)
-  int all_success = 0;
-  MPI_Allreduce (&success, &all_success, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
-#else
-  int all_success = success;
-#endif
-  if (!all_success) {
-    if (!success)
-      fprintf (stderr, "flapping_fibre XML error (line %zu): %s\n", error.line, error.message);
-    elff_xml_document_destroy (document);
+  int success = elff_xml_case_load_rendered_file(path, pid() == 0, &document, &error) == ELFF_XML_OK;
+  if (success) success = !basilisk_xml_case_read(document, "flapping_fibre",
+                                                &configuration->basilisk, &error);
+  if (success) {
+    elff_xml_status status = basilisk_xml_coefficient(&configuration->basilisk,
+      "inletSpeed", &configuration->initial_velocity, &error);
+    success = status == ELFF_XML_OK || status == ELFF_XML_NOT_FOUND;
+    if (status == ELFF_XML_NOT_FOUND) elff_xml_error_clear(&error);
+  }
+  if (!generic_case_agree(success)) {
+    if (!success) fprintf(stderr, "flapping_fibre XML error (line %zu): %s\n", error.line, error.message);
+    elff_xml_document_destroy(document);
+    basilisk_xml_case_destroy(&configuration->basilisk);
     return 1;
   }
-  // Both readers consume this same document; runtime construction copies
-  // what it needs, so no borrowed node survives document destruction.
   model_runtime_error runtime_error = {0};
-  int rc = elff_init_document (document, &runtime_error);
-  elff_xml_document_destroy (document);
-  if (rc != 0) {
-    fprintf (stderr, "ELFF model %zu (line %ld): %s\n",
-             runtime_error.model_index, runtime_error.line, runtime_error.message);
-    return rc;
+  int status = elff_init_document(document, &runtime_error);
+  elff_xml_document_destroy(document);
+  if (status) {
+    fprintf(stderr, "ELFF model %zu (line %ld): %s\n",
+            runtime_error.model_index, runtime_error.line, runtime_error.message);
+    basilisk_xml_case_destroy(&configuration->basilisk);
+    return status;
   }
-  ib_model_view_array_t models = elff_models ();
-  if (!models.count) {
-    fprintf (stderr, "flapping_fibre requires at least one model in <ELFF><Models>.\n");
-    elff_deinit ();
+  ib_model_view_array_t models = elff_models();
+  if (!models.count || models.count > INT_MAX) {
+    fprintf(stderr, "flapping_fibre requires a nonempty model population fitting mesh indices.\n");
+    elff_deinit();
+    basilisk_xml_case_destroy(&configuration->basilisk);
     return 1;
   }
   return 0;
