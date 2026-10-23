@@ -1,6 +1,7 @@
 #pragma once
 
 #include "elff/models/rigidbody/RigidBody3DModel.hpp"
+#include "elff/contact/ContactGeometryProvider.hpp"
 
 namespace ELFF {
 namespace Models {
@@ -12,9 +13,14 @@ namespace Models {
  * trapezoidal line quadrature. The supplied diameter is used only for mass
  * properties so that the 3D inertia tensor is nonsingular.
  */
-class RigidBodyFibre : public RigidBody3DModel
+class RigidBodyFibre : public RigidBody3DModel, public Contact::ContactGeometryProvider
 {
 public:
+  /** @brief Borrow the world-space centreline for insertion clearance checks. */
+  Contact::PolylineView contact_geometry() const override {
+    const auto& points = mesh().world_points();
+    return {points.data(), points.size()};
+  }
   RigidBodyFibre(real_t length,
                  real_t diameter,
                  size_t nodes,

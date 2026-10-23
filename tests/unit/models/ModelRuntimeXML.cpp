@@ -6,6 +6,10 @@
 #include "elff/c/models/ModelRuntime.h"
 #include "elff/config/_config.hpp"
 
+#include "elff/io/C/xmlCase.h"
+#include "elff/models/rigidbody/IBRigidBodyFibre.hpp"
+#include <cmath>
+#include <vector>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -173,6 +177,91 @@ TEST(ModelRuntimeXMLTest, ReturnedRuntimeIsAlreadySealed)
               ib_coupling_attach(runtime), origin, bcs, 1.0, 1.0, 1.0, 4),
             nullptr);
   model_runtime_delete(runtime);
+}
+
+
+class RigidFibreXMLTest : public ::testing::Test {
+protected:
+  model_runtime_t runtime = nullptr;
+  model_runtime_error error{};
+  ~RigidFibreXMLTest() override { model_runtime_delete(runtime); }
+  int load(const std::string& models, const std::string& domain = "", int dimension = 3) {
+    const std::string xml = "<Case formatVersion='2' dimension='" + std::to_string(dimension) +
+      "'><ELFF>" + domain + "<Models distribution='round-robin'>" + models + "</Models></ELFF></Case>";
+    elff_xml_document_t document = nullptr;
+    elff_xml_error diagnostic{};
+    if (elff_xml_document_load_memory(xml.data(), xml.size(), &document, &diagnostic) != ELFF_XML_OK) return -1;
+    const int result = model_runtime_create_from_case_document(document, &runtime, &error);
+    elff_xml_document_destroy(document);
+    return result;
+  }
+  std::string fibre() {
+    return "<RigidBodyFibre><RigidFibreGeometry length='2' diameter='0.2' nodes='5'/>"
+      "<RigidFibreMaterial><LinearDensity>3</LinearDensity></RigidFibreMaterial>"
+      "<RigidBodyInitialCondition><Center x='0' y='0' z='0'/>"
+      "<Orientation w='2' x='0' y='0' z='2'/><Velocity x='1' y='2' z='3'/>"
+      "<AngularVelocity x='0' y='0' z='1'/></RigidBodyInitialCondition></RigidBodyFibre>";
+  }
+};
+
+TEST_F(RigidFibreXMLTest, ConstructsFibreWithOrientationVelocityAndMeasures) {
+  ASSERT_EQ(load(fibre()), 0) << error.message;
+  ib_model_view_array_t views{};
+  ASSERT_EQ(ib_coupling_get_model_views(ib_coupling_attach(runtime), &views), 0);
+  ASSERT_EQ(views.count, 1u);
+  auto* fibre = dynamic_cast<ELFF::Models::IBRigidBodyFibre*>(
+      static_cast<ELFF::Models::IBForceCoupled*>(views.data[0].handle));
+  ASSERT_NE(fibre, nullptr);
+  EXPECT_NEAR(fibre->total_mass(), 6, 1e-12);
+  auto mesh = ib_force_coupled_get_current(views.data[0].handle);
+  ASSERT_EQ(mesh.n, 5);
+  ELFF::real_t measure = 0;
+  for (int i = 0; i < mesh.n; ++i) measure += mesh.measure[i];
+  EXPECT_NEAR(measure, 2, 1e-12);
+  EXPECT_NEAR(mesh.position[0].x, 0, 1e-12);
+  EXPECT_NEAR(mesh.position[0].y, -1, 1e-12);
+  EXPECT_NEAR(mesh.velocity[0].x, 2, 1e-12);
+  EXPECT_NEAR(mesh.velocity[0].y, 2, 1e-12);
+  EXPECT_NEAR(mesh.velocity[0].z, 3, 1e-12);
+  ib_mesh_free(&mesh);
+}
+
+TEST_F(RigidFibreXMLTest, RejectsInvalidInputsBeforeConstruction) {
+  for (const auto& change : std::vector<std::pair<std::string, std::string>>{
+      {"length='2'", "length='0'"}, {"length='2'", "length='1e200'"},
+      {"diameter='0.2'", "diameter='0'"}, {"diameter='0.2'", "diameter='1e-10'"},
+      {"nodes='5'", "nodes='1'"}, {"<LinearDensity>3", "<LinearDensity>-1"},
+      {"x='0'", "x='nan'"}}) {
+    auto xml = fibre();
+    xml.replace(xml.find(change.first), change.first.size(), change.second);
+    EXPECT_NE(load(xml), 0) << change.second;
+    EXPECT_EQ(runtime, nullptr);
+  }
+  auto xml = fibre();
+  xml.replace(xml.find("w='2'"), 5, "w='0'");
+  xml.replace(xml.find("z='2'"), 5, "z='0'");
+  EXPECT_NE(load(xml), 0);
+  EXPECT_EQ(runtime, nullptr);
+  EXPECT_NE(load(fibre(), "", 2), 0);
+  EXPECT_EQ(runtime, nullptr);
+}
+
+TEST_F(RigidFibreXMLTest, InsertsRepeatedRigidFibres) {
+  auto xml = fibre();
+  const std::string center = "<Center x='0' y='0' z='0'/>";
+  xml.replace(xml.find(center), center.size(),
+      "<RandomCenter><Min x='3' y='-3' z='-3'/><Max x='4' y='3' z='3'/></RandomCenter>");
+  EXPECT_NE(load(xml), 0); // Random placement requires an insertion group.
+  xml.insert(xml.find("</RigidBodyFibre>"), "<Insertion count='3' clearance='0.1' maxAttempts='100'/>");
+  ASSERT_EQ(load(fibre() + xml,
+      "<InsertionDomain><Min x='-5' y='-5' z='-5'/><Max x='5' y='5' z='5'/></InsertionDomain>"), 0)
+      << error.message;
+  ib_model_view_array_t views{};
+  ASSERT_EQ(ib_coupling_get_model_views(ib_coupling_attach(runtime), &views), 0);
+  ASSERT_EQ(views.count, 4u);
+  EXPECT_EQ(ib_force_coupled_get_number_of_nodes(views.data[0].handle), 5);
+  for (size_t i = 1; i < views.count; ++i)
+    EXPECT_EQ(ib_force_coupled_get_number_of_nodes(views.data[i].handle), 5);
 }
 
 #else

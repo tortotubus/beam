@@ -53,33 +53,37 @@
 
 <!-- Basilisk Grid.
      type must match a backend compiled into the executable.
-     Length gives extents; ordinary square/cubic Basilisk grids require equal
-     positive extents in active dimensions. Depth is the initial refinement level.
+     Length is the positive Basilisk size (the x extent).
+     Dimensions gives positive integer multigrid multipliers, defaulting to one;
+     nz is required in 3D when Dimensions is present. Tree grids require unit
+     multipliers. At Depth d, axis i has ni * 2^d cells and physical extent
+     Length * ni / nx. Depth is the initial refinement level.
      AdaptWavelet requires an adaptive backend, minLevel <= maxLevel and a
      positive tolerance for every ScalarField or VectorField; these are semantic checks.
 
      Example:
      <Grid type="multigrid3D">
        <Origin x="0" y="0" z="0"/>
-       <Length x="8" y="8" z="8"/>
+       <Length>8</Length>
        <Depth>5</Depth>
      </Grid>
 
      <Grid type="octree">
        <Origin x="0" y="0" z="0"/>
-       <Length x="8" y="8" z="8"/>
+       <Length>8</Length>
        <Depth>5</Depth>
        <AdaptWavelet minLevel="3" maxLevel="8">
          <VectorField name="u" tolerance="0.001"/>
        </AdaptWavelet>
      </Grid>
 -->
-<!ELEMENT Grid (Origin?, Length?, Depth?, AdaptWavelet?)>
+<!ELEMENT Grid (Origin?, Length?, Depth?, Dimensions?, AdaptWavelet?)>
 <!ATTLIST Grid type (multigrid|multigrid3D|quadtree|octree) #REQUIRED>
 <!ELEMENT Origin EMPTY>
 <!ATTLIST Origin x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
-<!ELEMENT Length EMPTY>
-<!ATTLIST Length x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #IMPLIED>
+<!ELEMENT Length (#PCDATA)>
+<!ELEMENT Dimensions EMPTY>
+<!ATTLIST Dimensions nx CDATA #REQUIRED ny CDATA #REQUIRED nz CDATA #IMPLIED>
 <!ELEMENT Depth (#PCDATA)>
 
 <!-- Restart restores the complete simulation, including fluid and model state.
@@ -180,7 +184,7 @@
      number; the reader enforces left/right uniqueness and supported combinations. -->
 
 <!ELEMENT ELFF (InsertionDomain?, Models)>
-<!ELEMENT Models (EulerBeamHuang|BendingRodSegments)+>
+<!ELEMENT Models (EulerBeamHuang|BendingRodSegments|RigidBodyFibre)+>
 <!ATTLIST Models distribution (rank0|round-robin) "rank0">
 
 <!ELEMENT Geometry EMPTY>
@@ -257,3 +261,26 @@
 <!ELEMENT RandomDirection EMPTY>
 <!ELEMENT Insertion EMPTY>
 <!ATTLIST Insertion count CDATA #REQUIRED clearance CDATA #REQUIRED maxAttempts CDATA #REQUIRED>
+
+<!-- Force-coupled rigid fibres, restricted to dimension=3.
+     LinearDensity is mass per length.
+     Center is the centre of mass. Orientation is a body-to-world quaternion
+     (w,x,y,z), normalized by the reader; omission means identity.
+     Velocity is in world coordinates; AngularVelocity is in body coordinates.
+     Omitted velocities are zero. RandomCenter requires Insertion and uses the
+     existing polyline insertion clearance checks. Fibre markers lie along
+     the body x axis; diameter sets its cylindrical rotational inertia. -->
+<!ELEMENT RigidBodyFibre (RigidFibreGeometry, RigidFibreMaterial, RigidBodyInitialCondition, Insertion?)>
+<!ELEMENT RigidFibreGeometry EMPTY>
+<!ATTLIST RigidFibreGeometry length CDATA #REQUIRED diameter CDATA #REQUIRED nodes CDATA #REQUIRED>
+<!ELEMENT RigidFibreMaterial (LinearDensity)>
+<!ELEMENT RigidBodyInitialCondition ((Center|RandomCenter), Orientation?, Velocity?, AngularVelocity?)>
+<!ELEMENT Center EMPTY>
+<!ATTLIST Center x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #REQUIRED>
+<!ELEMENT RandomCenter (Min, Max)>
+<!ELEMENT Orientation EMPTY>
+<!ATTLIST Orientation w CDATA #REQUIRED x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #REQUIRED>
+<!ELEMENT Velocity EMPTY>
+<!ATTLIST Velocity x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #REQUIRED>
+<!ELEMENT AngularVelocity EMPTY>
+<!ATTLIST AngularVelocity x CDATA #REQUIRED y CDATA #REQUIRED z CDATA #REQUIRED>

@@ -8,6 +8,7 @@
 #include "elff/models/articulated/BendingRodImplicitBuilder.hpp"
 #include "elff/models/beam/EulerBeamHuangBuilder.hpp"
 #include "elff/models/runtime/ModelRuntime.hpp"
+#include "elff/models/rigidbody/IBRigidBodyFibre.hpp"
 #include "elff/models/runtime/ModelInsertion.hpp"
 #include "elff/models/ibm/IBCoupling.hpp"
 #include "elff/general/error.hpp"
@@ -31,7 +32,13 @@ using namespace ELFF;
 
 namespace {
 
-using ModelRuntimeModelDefinition = std::variant<EulerBeamHuangDefinition, BendingRodImplicitDefinition>;
+struct RigidFibreDefinition {
+  real_t length = 0, diameter = 0, linear_density = 0;
+  int nodes = 0;
+  std::array<real_t, 3> velocity{}, angular_velocity{};
+  std::array<real_t, 4> orientation{1, 0, 0, 0};
+};
+using ModelRuntimeModelDefinition = std::variant<EulerBeamHuangDefinition, BendingRodImplicitDefinition, RigidFibreDefinition>;
 
 enum class ModelDistribution { Rank0, RoundRobin };
 
@@ -118,6 +125,68 @@ std::uint64_t positive_count(const IO::CXX::XMLNode& node, const char* name) {
   return value;
 }
 
+// Rigid fibres share the insertion sampler, with its anchor interpreted as COM.
+RigidFibreDefinition parse_rigid_fibre(const IO::CXX::XMLNode& node,
+                                     ModelTemplate& entry, unsigned dimensions) {
+  if (dimensions != 3) node.invalid("Rigid fibres require Case dimension=3.");
+  RigidFibreDefinition body;
+  const auto geometry = node.child("RigidFibreGeometry");
+  body.nodes = geometry.integer("nodes");
+  if (body.nodes < 2 || body.nodes > std::numeric_limits<int>::max()/6)
+    geometry.invalid("Invalid rigid-body marker count.");
+  auto positive = [](const IO::CXX::XMLNode& source, real_t value) {
+    if (!std::isfinite(value) || value <= 0)
+      source.invalid("Rigid-body dimensions, density and derived mass/inertia must be finite and positive.");
+    return value;
+  };
+  body.length = positive(geometry, geometry.number("length"));
+  body.diameter = positive(geometry, geometry.number("diameter"));
+  body.linear_density = positive(node, node.child("RigidFibreMaterial").child("LinearDensity").text_number());
+  const real_t mass = body.length*body.linear_density;
+  const real_t radius = body.diameter/2;
+  const real_t axial = mass*radius*radius/2;
+  const real_t transverse = mass*(3*radius*radius + body.length*body.length)/12;
+  const real_t measure = body.length/(2*(body.nodes - 1));
+  positive(node, mass); positive(node, axial); positive(node, transverse); positive(node, measure);
+  // The solver inverts the inertia tensor during initialization.
+  positive(node, 1/axial); positive(node, 1/transverse);
+  const real_t determinant = axial*transverse*transverse;
+  if (!std::isfinite(determinant) || determinant <= real_t(1e-15))
+    node.invalid("Rigid-body inertia determinant must exceed the solver threshold 1e-15.");
+  const auto initial = node.child("RigidBodyInitialCondition");
+  auto vector = [](const IO::CXX::XMLNode& source) {
+    source.number("z");
+    const auto values = source.xyz();
+    std::array<real_t, 3> result{};
+    for (size_t d = 0; d < 3; ++d) {
+      result[d] = values[d];
+      if (!std::isfinite(result[d])) source.invalid("Rigid-body vectors must be finite and representable.");
+    }
+    return result;
+  };
+  if (auto center = IO::Case::optional_xml_child(initial, "Center"))
+    entry.line.fixed.anchor = vector(*center);
+  else {
+    const auto random = initial.child("RandomCenter");
+    if (!entry.insertion) random.invalid("RandomCenter requires Insertion.");
+    entry.line.anchors = IO::Case::parse_placement_box(random, 3, false);
+    entry.line.fixed.anchor = entry.line.anchors->min;
+  }
+  if (auto velocity = IO::Case::optional_xml_child(initial, "Velocity")) body.velocity = vector(*velocity);
+  if (auto omega = IO::Case::optional_xml_child(initial, "AngularVelocity")) body.angular_velocity = vector(*omega);
+  if (auto orientation = IO::Case::optional_xml_child(initial, "Orientation")) {
+    const char* components[] = {"w", "x", "y", "z"};
+    real_t norm = 0;
+    for (size_t d = 0; d < 4; ++d) {
+      body.orientation[d] = orientation->number(components[d]);
+      norm = std::hypot(norm, body.orientation[d]);
+    }
+    if (!std::isfinite(norm) || norm <= 0) orientation->invalid("Orientation must be a finite nonzero quaternion.");
+    for (auto& value : body.orientation) value /= norm;
+  }
+  return body;
+}
+
 bool parse_runtime_definition(elff_xml_node_t root, elff_xml_node_t elff,
                               ModelRuntimeDefinition& definition,
                               model_runtime_error* error)
@@ -177,7 +246,8 @@ bool parse_runtime_definition(elff_xml_node_t root, elff_xml_node_t elff,
         error, i, xml_error, "Unable to read an ordered model element.");
     if (std::strcmp(name, "EulerBeamHuang") != 0 &&
         std::strcmp(name, "BendingRodSegmentsImplicit") != 0 &&
-        std::strcmp(name, "BendingRodSegments") != 0) {
+        std::strcmp(name, "BendingRodSegments") != 0 &&
+        std::strcmp(name, "RigidBodyFibre") != 0) {
       size_t line = 0;
       elff_xml_node_line(model, &line, nullptr);
       set_error(error,
@@ -207,7 +277,9 @@ bool parse_runtime_definition(elff_xml_node_t root, elff_xml_node_t elff,
       }
       const bool huang = std::strcmp(name, "EulerBeamHuang") == 0;
       const auto dimensions = definition.domain ? definition.dimensions : 3;
-      if (huang) {
+      if (std::strcmp(name, "RigidBodyFibre") == 0) {
+        entry.model = parse_rigid_fibre(node, entry, definition.dimensions);
+      } else if (huang) {
         auto beam = IO::Case::EulerBeamHuangXML::parse(node);
         entry.line = IO::Case::EulerBeamHuangXML::parse_placement(
             node, beam, dimensions, bool(entry.insertion));
@@ -220,7 +292,7 @@ bool parse_runtime_definition(elff_xml_node_t root, elff_xml_node_t elff,
         for (size_t d = 0; d < 3; ++d)
           if (entry.line.anchors->min[d] < definition.domain->min[d] ||
               entry.line.anchors->max[d] > definition.domain->max[d])
-            IO::Case::initial_line_xml(node).child("RandomAnchor").invalid("Sampling box must be inside InsertionDomain.");
+            node.invalid("Sampling box must be inside InsertionDomain.");
       const auto added = entry.insertion ? entry.insertion->count : 1;
       if (added > std::numeric_limits<size_t>::max() - total_models)
         node.invalid("Expanded model count overflows runtime IDs.");
@@ -283,6 +355,12 @@ std::vector<char> signature(const ModelRuntimeDefinition& definition) {
     if (const auto* beam = std::get_if<EulerBeamHuangDefinition>(&entry.model)) {
       add(beam->length); add(beam->nodes); add(beam->bending_rigidity); add(beam->linear_density);
       for (auto x : beam->boundary_conditions.type) add(x);
+    } else if (const auto* body = std::get_if<RigidFibreDefinition>(&entry.model)) {
+      add(body->length); add(body->diameter);
+      add(body->linear_density); add(body->nodes);
+      for (auto x : body->velocity) add(x);
+      for (auto x : body->angular_velocity) add(x);
+      for (auto x : body->orientation) add(x);
     } else {
       const auto& rod = std::get<BendingRodImplicitDefinition>(entry.model).config;
       add(rod.length); add(rod.links); add(rod.total_mass); add(rod.ei); add(rod.boundary);
@@ -321,6 +399,10 @@ bool agree_definition(ModelRuntime& runtime, const ModelRuntimeDefinition& defin
 std::unique_ptr<IBModel> construct(const ModelTemplate& entry, const ELFF::IO::Case::InitialLineDefinition& line) {
   if (const auto* beam = std::get_if<EulerBeamHuangDefinition>(&entry.model))
     return EulerBeamHuangBuilder::build(*beam, line);
+  if (const auto* body = std::get_if<RigidFibreDefinition>(&entry.model)) {
+    return std::make_unique<IBRigidBodyFibre>(body->length, body->diameter, body->nodes, body->linear_density,
+        line.anchor, body->velocity, body->orientation, body->angular_velocity);
+  }
   auto rod = std::get<BendingRodImplicitDefinition>(entry.model);
   for (size_t d = 0; d < 3; ++d) { rod.config.pin[d] = line.anchor[d]; rod.direction[d] = line.direction[d]; }
   rod.anchor_at_right = line.anchor_at_right;
@@ -372,8 +454,12 @@ bool build_runtime(ModelRuntime& runtime, const ModelRuntimeDefinition& definiti
       const auto& entry = definition.models[i];
       if (bool(entry.insertion) != (phase == 1)) continue;
       const auto* beam = std::get_if<EulerBeamHuangDefinition>(&entry.model);
-      const auto type = beam ? ModelType::EulerBeamHuang : ModelType::BendingRodImplicit;
-      const int nodes = beam ? static_cast<int>(beam->nodes) : std::get<BendingRodImplicitDefinition>(entry.model).config.links + 1;
+      const auto* body = std::get_if<RigidFibreDefinition>(&entry.model);
+      const auto type = beam ? ModelType::EulerBeamHuang : body
+          ? ModelType::RigidBodyFibre
+          : ModelType::BendingRodImplicit;
+      const int nodes = beam ? static_cast<int>(beam->nodes) : body ? body->nodes
+          : std::get<BendingRodImplicitDefinition>(entry.model).config.links + 1;
       auto owner = [&] { return definition.distribution == ModelDistribution::RoundRobin
           ? static_cast<int>(runtime.size() % static_cast<size_t>(runtime.ranks())) : 0; };
       if (!entry.insertion) {
