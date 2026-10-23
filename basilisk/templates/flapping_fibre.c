@@ -12,7 +12,8 @@ typedef struct {
 /** @brief Default nondimensional flapping domain, inlet and fluid controls. */
 static int flapping_fibre_defaults (BasiliskXMLCase* c) {
   basilisk_xml_case_defaults(c);
-  for (int d = 0; d < dimension; ++d) { c->grid_size[d] = 16.; c->grid_origin[d] = -8.; }
+  c->grid_size = 16.;
+  for (int d = 0; d < dimension; ++d) c->grid_origin[d] = -8.;
   c->grid_origin[0] = -2.;
   c->grid_initial_level = c->grid_min_level = 6;
   c->grid_max_level = 10; c->ib_level = 11;

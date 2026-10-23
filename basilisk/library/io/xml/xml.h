@@ -74,7 +74,8 @@ typedef struct {
   BasiliskXMLField *fluid_fields, *solid_fields;
   size_t fluid_field_count, solid_field_count;
   elff_xml_parameters_t named_values;
-  double grid_size[3], grid_origin[3];
+  double grid_size, grid_origin[3];
+  int grid_dimensions[3];
   int grid_initial_level, grid_min_level, grid_max_level, ib_level;
   bool periodic_axis[3];
   double time_max_dt, time_end;
@@ -393,8 +394,9 @@ static bool generic_schedule_valid (BasiliskOutputSchedule schedule) {
 
 static void basilisk_xml_case_defaults (BasiliskXMLCase* c) {
   memset (c, 0, sizeof (*c));
+  c->grid_size = 1.;
   for (int d = 0; d < 3; ++d)
-    c->grid_size[d] = 1.;
+    c->grid_dimensions[d] = 1;
   c->grid_initial_level = c->grid_min_level = 4;
   c->grid_max_level = c->ib_level = 6;
   c->time_max_dt = 0.001;
@@ -749,6 +751,7 @@ static int basilisk_xml_validate_configuration (const BasiliskXMLCase* c, elff_x
     isfinite (c->time_max_dt) && c->time_max_dt > 0 && isfinite (c->time_end) &&
     c->time_end > 0 && isfinite (c->fluid_density) && c->fluid_density > 0 &&
     isfinite (c->dynamic_viscosity) && c->dynamic_viscosity >= 0 &&
+    isfinite (c->grid_size) && c->grid_size > 0 &&
     c->grid_min_level >= 0 && c->grid_max_level >= c->grid_min_level &&
     c->grid_max_level < 30 && c->grid_initial_level >= c->grid_min_level &&
     c->grid_initial_level <= c->grid_max_level && c->ib_level >= c->grid_min_level &&
@@ -756,9 +759,13 @@ static int basilisk_xml_validate_configuration (const BasiliskXMLCase* c, elff_x
     c->force_relaxation > 0 && c->force_relaxation <= 1 &&
     generic_schedule_valid (c->fluid_output) && generic_schedule_valid (c->solid_output);
   for (int d = 0; d < dimension; ++d)
-    valid = valid && isfinite (c->grid_size[d]) && c->grid_size[d] > 0 &&
-            c->grid_size[d] == c->grid_size[0] && isfinite (c->grid_origin[d]) &&
-            isfinite (c->force_density[d]);
+    valid = valid && c->grid_dimensions[d] > 0 &&
+            c->grid_dimensions[d] <= (INT_MAX - 2*GHOSTS)/(1 << c->grid_initial_level) &&
+            isfinite (c->grid_origin[d]) && isfinite (c->force_density[d]);
+#if TREE
+  for (int d = 0; d < dimension; ++d)
+    valid = valid && c->grid_dimensions[d] == 1;
+#endif
   if (c->adapt_enable) {
     if (!c->adapt_fields || !c->adapt_tolerances ||
         c->adapt_tolerance_count != (size_t) list_len (c->adapt_fields))
@@ -798,7 +805,11 @@ static int generic_ibm_case_run (const BasiliskXMLCase* configuration) {
                  : "invalid grid, material, schedule or coupling settings");
     return 1;
   }
-  size (c->grid_size[0]);
+  size (c->grid_size);
+#if !TREE
+  dimensions (nx = c->grid_dimensions[0], ny = c->grid_dimensions[1],
+              nz = c->grid_dimensions[2]);
+#endif
   origin (c->grid_origin[0], c->grid_origin[1], c->grid_origin[2]);
   if (c->periodic_axis[0])
     periodic (right);
@@ -810,7 +821,7 @@ static int generic_ibm_case_run (const BasiliskXMLCase* configuration) {
   if (c->periodic_axis[2])
     periodic (front);
 #endif
-  N = 1 << c->grid_initial_level;
+  N = (1 << c->grid_initial_level)*c->grid_dimensions[0];
   DT = c->time_max_dt;
   generic_end_time = c->time_end;
   // Disabled output must not impose extra timesteps.
@@ -1148,10 +1159,21 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
     XML_ATTR(elff_xml_node_attribute_double(node, "z", &c->grid_origin[2], error));
   }
   XML_CHECK(basilisk_xml_optional(grid, "Length", &node, error));
+  if (node)
+    XML_READ(elff_xml_node_text_double(node, &c->grid_size, error));
+  XML_CHECK(basilisk_xml_optional(grid, "Dimensions", &node, error));
   if (node) {
-    XML_ATTR(elff_xml_node_attribute_double(node, "x", &c->grid_size[0], error));
-    XML_ATTR(elff_xml_node_attribute_double(node, "y", &c->grid_size[1], error));
-    XML_ATTR(elff_xml_node_attribute_double(node, "z", &c->grid_size[2], error));
+    XML_READ(elff_xml_node_attribute_int(node, "nx", &c->grid_dimensions[0], error));
+    XML_READ(elff_xml_node_attribute_int(node, "ny", &c->grid_dimensions[1], error));
+#if dimension == 3
+    XML_READ(elff_xml_node_attribute_int(node, "nz", &c->grid_dimensions[2], error));
+#else
+    XML_ATTR(elff_xml_node_attribute_int(node, "nz", &c->grid_dimensions[2], error));
+    if (c->grid_dimensions[2] != 1) {
+      basilisk_xml_case_destroy(&parsed);
+      return basilisk_xml_error(error, 0, "Dimensions.nz must be 1 in two dimensions.");
+    }
+#endif
   }
   XML_CHECK(basilisk_xml_optional(grid, "Depth", &node, error));
   if (node) {

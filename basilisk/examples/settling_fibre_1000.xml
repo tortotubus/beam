@@ -1,46 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Case SYSTEM "../../io/DTD/ELFF/ELFF-v2.dtd">
-<Case formatVersion="2" dimension="3">
-  <!-- Banaei inputs; the same expressions are used for one or many fibres. -->
+<Case formatVersion="2" dimension="3"> 
   <Parameters>
     <Parameter name="rp" value="30"/>
     <Parameter name="gamma" value="0.01"/>
     <Parameter name="r" value="0.1"/>
     <Parameter name="Ga" value="40"/>
-    <Parameter name="length" value="1"/>
-    <Parameter name="rho0" value="1"/>
-    <Parameter name="g" value="1"/>
-    <Parameter name="area" expression="pi*length*length/(4*rp*rp)"/>
-
+    <Parameter name="area" expression="pi/(4*rp*rp)"/> 
     <Parameter name="count" value="1000"/>
     <Parameter name="nodes" value="67"/>
-    <Parameter name="anchorMinX" value="-14"/>
-    <Parameter name="anchorMaxX" value="14"/>
-    <Parameter name="anchorMinY" value="-14"/>
-    <Parameter name="anchorMaxY" value="14"/>
-    <Parameter name="anchorMinZ" value="-14"/>
-    <Parameter name="anchorMaxZ" value="14"/>
     <Parameter name="clearance" value="0.1"/>
     <Parameter name="maxAttempts" value="10000"/>
-    <Parameter name="domainSize" value="32"/>
-    <Parameter name="timeStep" value="0.001"/>
-    <Parameter name="endTime" value="10"/>
+    <Parameter name="domainSize" value="32"/> 
+    <Parameter name="timeStep" value="0.00031622776601683794"/>
+    <Parameter name="endTime" value="3.1622776601683795"/>
     <Parameter name="minLevel" value="4"/>
     <Parameter name="maxLevel" value="12"/>
     <Parameter name="ibLevel" value="12"/>
-    <Parameter name="outputInterval" value="0.1"/>
+    <Parameter name="outputInterval" value="0.031622776601683798"/>
     <Parameter name="adaptRelativeTolerance" value="0.001"/>
     <Parameter name="statsInterval" value="1"/>
-
-    <!-- Preserve the existing single/many template formulas, including the
-         additional factor r in EI = gamma*r*submergedWeight*length^3. -->
-    <Parameter name="fibreLength" expression="length"/>
-    <Parameter name="fluidDensity" expression="rho0"/>
-    <Parameter name="linearDensity" expression="(1+r)*rho0*area"/>
-    <Parameter name="bendingRigidity" expression="gamma*r*(r*rho0*area*g)*length*length*length"/>
-    <Parameter name="dynamicViscosity" expression="rho0*sqrt(r*g*length*length*length)/Ga"/>
-    <Parameter name="forceDensityY" expression="-r*rho0*area*g"/>
-    <Parameter name="velocityTolerance" expression="adaptRelativeTolerance*sqrt(r*g*length)"/>
+    <Parameter name="linearDensity" expression="(1+r)*area"/>
+    <Parameter name="bendingRigidity" expression="gamma*r*area"/>
+    <Parameter name="dynamicViscosity" expression="1/Ga"/>
+    <Parameter name="forceDensityY" expression="-area"/>
   </Parameters>
 
   <ELFF>
@@ -50,12 +33,12 @@
     </InsertionDomain>
     <Models distribution="round-robin">
       <EulerBeamHuang>
-        <Geometry length="${parameters.fibreLength}" nodes="${nodes}"/>
+        <Geometry length="1" nodes="${nodes}"/>
         <InitialCondition>
           <Line anchorEnd="left">
             <RandomAnchor>
-              <Min x="${anchorMinX}" y="${anchorMinY}" z="${anchorMinZ}"/>
-              <Max x="${anchorMaxX}" y="${anchorMaxY}" z="${anchorMaxZ}"/>
+              <Min x="${-domainSize/2}" y="${-domainSize/2}" z="${-domainSize/2}"/>
+              <Max x="${domainSize/2}" y="${domainSize/2}" z="${domainSize/2}"/>
             </RandomAnchor>
             <Direction x="1" y="0" z="0"/>
           </Line>
@@ -74,17 +57,20 @@
   <Basilisk caseType="settling_fibre">
     <Time step="${timeStep}" end="${endTime}"/>
     <Fluid>
-      <FluidMaterial><Density>${parameters.fluidDensity}</Density><DynamicViscosity>${parameters.dynamicViscosity}</DynamicViscosity></FluidMaterial>
+      <FluidMaterial>
+        <Density>1</Density>
+        <DynamicViscosity>${parameters.dynamicViscosity}</DynamicViscosity>
+      </FluidMaterial>
       <FluidBoundaryCondition field="*" direction="right" type="periodic"/>
       <FluidBoundaryCondition field="*" direction="top" type="periodic"/>
       <FluidBoundaryCondition field="*" direction="front" type="periodic"/>
     </Fluid>
     <Grid type="octree">
       <Origin x="${-domainSize/2}" y="${-domainSize/2}" z="${-domainSize/2}"/>
-      <Length x="${domainSize}" y="${domainSize}" z="${domainSize}"/>
+      <Length>${domainSize}</Length>
       <Depth>${minLevel}</Depth>
       <AdaptWavelet minLevel="${minLevel}" maxLevel="${maxLevel}" enable="true">
-        <VectorField name="u" tolerance="${parameters.velocityTolerance}"/>
+        <VectorField name="u" tolerance="${adaptRelativeTolerance}"/>
       </AdaptWavelet>
     </Grid>
     <Restart enable="true"/>

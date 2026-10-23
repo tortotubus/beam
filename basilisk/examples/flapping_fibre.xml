@@ -1,34 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Case SYSTEM "../../io/DTD/ELFF/ELFF-v2.dtd">
 <Case formatVersion="2" dimension="2">
-  <!-- Dimensionless inputs: fibre length, inlet speed and fluid density are 1. -->
+  <!-- Huang, Shin & Sung (2007), Fig. 13; doi:10.1016/j.jcp.2007.07.002. -->
   <Parameters>
     <Parameter name="Re" value="200"/>
-    <Parameter name="massRatio" value="1.5"/>
-    <Parameter name="bendingStiffness" value="0.001"/>
-    <Parameter name="streamwiseForceDensity" value="0.75"/>
-    <!-- Geometry, discretization and run controls. -->
-    <Parameter name="beamNodes" value="65"/>
-    <Parameter name="domainSize" value="16"/>
-    <Parameter name="timeStep" value="0.0003"/>
-    <Parameter name="endTime" value="50"/>
-    <Parameter name="minLevel" value="6"/>
-    <Parameter name="maxLevel" value="10"/>
-    <Parameter name="ibLevel" value="11"/>
-    <Parameter name="outputInterval" value="0.05"/>
-
-    <Parameter name="fibreLength" expression="1"/>
-    <Parameter name="fluidDensity" expression="1"/>
-    <Parameter name="inletSpeed" expression="1"/>
-    <Parameter name="dynamicViscosity" expression="1/Re"/>
-    <Parameter name="linearDensity" expression="massRatio"/>
-    <Parameter name="bendingRigidity" expression="bendingStiffness"/>
-    <Parameter name="forceDensityX" expression="streamwiseForceDensity"/>
-  </Parameters>
+    <Parameter name="gamma" value="0.001"/>
+    <Parameter name="rho" value="1.5"/>
+    <Parameter name="Fr" value="0.5"/>
+  </Parameters> 
   <ELFF>
     <Models distribution="rank0">
-      <!-- <EulerBeamHuang>
-        <Geometry length="${parameters.fibreLength}" nodes="${parameters.beamNodes}"/>
+      <BendingRodSegments>
+        <Geometry length="1" nodes="65"/>
         <InitialCondition>
           <Line anchorEnd="right">
             <Anchor x="0" y="0" z="0"/>
@@ -36,35 +19,20 @@
           </Line>
         </InitialCondition>
         <Material>
-          <BendingRigidity>${parameters.bendingRigidity}</BendingRigidity>
-          <LinearDensity>${parameters.linearDensity}</LinearDensity>
+          <BendingRigidity>${rho*gamma}</BendingRigidity>
+          <LinearDensity>${rho}</LinearDensity>
         </Material>
-        <EulerBeamBoundary end="left" type="free"/>
-        <EulerBeamBoundary end="right" type="pinned"/>
-      </EulerBeamHuang> -->
-      <BendingRodSegments>
-        <Geometry length="${parameters.fibreLength}" nodes="${parameters.beamNodes}"/>
-        <InitialCondition>
-          <Line anchorEnd="left">
-            <Anchor x="0" y="0" z="0"/>
-            <Direction x="0.9510565163" y="0.3090169944" z="0"/>
-          </Line>
-        </InitialCondition>
-        <Material>
-          <BendingRigidity>${parameters.bendingRigidity}</BendingRigidity>
-          <LinearDensity>${parameters.linearDensity}</LinearDensity>
-        </Material>
-        <BendingRodBoundary end="left" type="pinned"/>
-        <BendingRodBoundary end="right" type="free"/>
+        <BendingRodBoundary end="left" type="free"/>
+        <BendingRodBoundary end="right" type="pinned"/>
       </BendingRodSegments>
     </Models>
   </ELFF>
   <Basilisk caseType="flapping_fibre">
-    <Time step="${parameters.timeStep}" end="${parameters.endTime}"/>
+    <Time step="0.0003" end="50"/>
     <Fluid>
-      <FluidMaterial><Density>${parameters.fluidDensity}</Density><DynamicViscosity>${parameters.dynamicViscosity}</DynamicViscosity></FluidMaterial>
+      <FluidMaterial><Density>1</Density><DynamicViscosity>${1/Re}</DynamicViscosity></FluidMaterial>
       <FluidBoundaryCondition field="u.x" direction="left" type="dirichlet">
-        <Value>${parameters.inletSpeed}</Value>
+        <Value>1</Value>
       </FluidBoundaryCondition>
       <FluidBoundaryCondition field="u.y" direction="left" type="dirichlet">
         <Value>0</Value>
@@ -86,32 +54,32 @@
       </FluidBoundaryCondition>
     </Fluid>
     <Grid type="quadtree">
-      <Origin x="-2" y="${-parameters.domainSize/2}" z="0"/>
-      <Length x="${parameters.domainSize}" y="${parameters.domainSize}"/>
-      <Depth>${parameters.minLevel}</Depth>
-      <AdaptWavelet minLevel="${parameters.minLevel}" maxLevel="${parameters.maxLevel}" enable="true">
+      <Origin x="-2" y="-8" z="0"/>
+      <Length>16</Length>
+      <Depth>6</Depth>
+      <AdaptWavelet minLevel="6" maxLevel="10" enable="true">
         <VectorField name="u" tolerance="0.005"/>
       </AdaptWavelet>
     </Grid>
     <Restart enable="true"/>
-    <ImmersedBoundary level="${parameters.ibLevel}">
+    <ImmersedBoundary level="11">
       <ForceCoupled>
         <Iterations>2</Iterations>
         <Relaxation>1</Relaxation>
       </ForceCoupled>
       <ImmersedBoundaryKernel type="Cosine"/>
-      <UniformForceDensity x="${parameters.forceDensityX}" y="0" z="0"/>
+      <UniformForceDensity x="${rho*Fr}" y="0" z="0"/>
     </ImmersedBoundary>
     <Output directory="flapping_fibre_output">
       <FluidOutput enable="true">
-        <SimulationTime step="${parameters.outputInterval}"/>
+        <SimulationTime step="0.05"/>
         <ScalarField name="omega"/>
         <ScalarField name="p"/>
         <VectorField name="u"/>
         <VectorField name="ibmf"/>
       </FluidOutput>
       <SolidOutput enable="true">
-        <SimulationTime step="${parameters.outputInterval}"/>
+        <SimulationTime step="0.05"/>
         <IBVectorField name="eulvel"/>
         <IBVectorField name="nforce"/>
         <IBVectorField name="nvel"/>

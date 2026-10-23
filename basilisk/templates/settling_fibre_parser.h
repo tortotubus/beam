@@ -9,8 +9,9 @@ typedef struct SettlingFibreCase {
 /** @brief Default triply periodic Banaei settling configuration in simulation units. */
 static int settling_fibre_defaults (BasiliskXMLCase* c) {
   basilisk_xml_case_defaults(c);
+  c->grid_size = 32.;
   for (int d = 0; d < 3; ++d) {
-    c->grid_size[d] = 32.; c->grid_origin[d] = -16.; c->periodic_axis[d] = true;
+    c->grid_origin[d] = -16.; c->periodic_axis[d] = true;
   }
   c->grid_initial_level = c->grid_min_level = 4;
   c->grid_max_level = c->ib_level = 12;
