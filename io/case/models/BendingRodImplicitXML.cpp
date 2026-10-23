@@ -34,6 +34,7 @@ BendingRodImplicitDefinition parse_bending_rod_implicit_xml(elff_xml_node_t raw,
   if (!v2 && model.name() != "BendingRodSegmentsImplicit")
     model.invalid("Expected <BendingRodSegments>.");
   BendingRodImplicitDefinition result;
+  result.anchor_at_right = placement.anchor_at_right;
   result.source_line = static_cast<long>(model.line());
   auto &config = result.config;
   const auto geometry = model.child("Geometry");
@@ -76,6 +77,8 @@ BendingRodImplicitDefinition parse_bending_rod_implicit_xml(elff_xml_node_t raw,
     const auto boundaries = model.children("BendingRodBoundary");
     if (boundaries.size() != 2) model.invalid("Expected two BendingRodBoundary elements.");
     bool seen[2] = {};
+    int pins = 0;
+    config.boundary = Boundary::Free;
     for (const auto& boundary : boundaries) {
       const auto end = boundary.string("end");
       if (end != "left" && end != "right") boundary.invalid("Invalid rod boundary end.");
@@ -83,9 +86,12 @@ BendingRodImplicitDefinition parse_bending_rod_implicit_xml(elff_xml_node_t raw,
       if (seen[i]) boundary.invalid("Duplicate rod boundary end.");
       seen[i] = true;
       const auto type = boundary.string("type");
-      if (type != "free" && !(i == 0 && type == "pinned"))
-        boundary.invalid("Rod supports left pinned/right free or both free.");
-      if (i == 0) config.boundary = type == "pinned" ? Boundary::Pinned : Boundary::Free;
+      if (type != "free" && type != "pinned")
+        boundary.invalid("Rod boundary must be pinned or free.");
+      if (type == "pinned") {
+        if (++pins > 1) boundary.invalid("Rod supports at most one pinned endpoint.");
+        config.boundary = i == 0 ? Boundary::Pinned : Boundary::PinnedRight;
+      }
     }
   } else {
     const auto boundary = model.child("RodBoundary");

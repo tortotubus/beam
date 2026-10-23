@@ -59,6 +59,55 @@ double loadedEnergy(const TestIBRod& rod, const std::vector<Vec3>& forces) {
 static_assert(std::is_abstract_v<BendingRod>);
 static_assert(std::is_base_of_v<BendingRod, BendingRodImplicit>);
 
+TEST(BendingRodImplicitTest, RightPinPreservesPublicNodeOrderAndCheckpointHistory)
+{
+  BendingRodImplicitConfig left_config;
+  left_config.links = 3;
+  left_config.length = 1.5;
+  left_config.total_mass = 6;
+  left_config.masses = {1, 2, 3};
+  left_config.bending_stiffness = {0.2, 0.4};
+  left_config.bending_damping = {0.01, 0.02};
+  left_config.pin = Vec3(2, 3, 4);
+  auto right_config = left_config;
+  right_config.boundary = Boundary::PinnedRight;
+  std::reverse(right_config.masses.begin(), right_config.masses.end());
+  std::reverse(right_config.bending_stiffness.begin(), right_config.bending_stiffness.end());
+  std::reverse(right_config.bending_damping.begin(), right_config.bending_damping.end());
+  TestIBRod left(left_config), right(right_config), restored(right_config);
+  BendingRodMesh lm(4, 1.5), rm(4, 1.5);
+  for (size_t i = 0; i < 4; ++i) {
+    lm.get_centerline(i) = {2 + 0.5*i, 3, 4};
+    lm.get_centerline_velocity(i) = {0, 0.05*i, 0};
+    rm.get_centerline(3-i) = lm.get_centerline(i);
+    rm.get_centerline_velocity(3-i) = lm.get_centerline_velocity(i);
+  }
+  left.apply_initial_condition(lm);
+  right.apply_initial_condition(rm);
+  std::vector<BendingRod::Vector> loads = {{0, 0, 0}, {0, -0.3, 0.1},
+                                         {0, -0.1, 0.2}, {0, -0.8, 0.3}};
+  auto reverse_loads = loads;
+  std::reverse(reverse_loads.begin(), reverse_loads.end());
+  for (real_t dt : {0.001, 0.0015, 0.0008}) {
+    left.solve(dt, loads);
+    right.solve(dt, reverse_loads);
+    for (size_t i = 0; i < 4; ++i)
+      for (size_t d = 0; d < 3; ++d) {
+        EXPECT_NEAR(left.get_mesh().get_centerline(i)[d], right.get_mesh().get_centerline(3-i)[d], 1e-12);
+        EXPECT_NEAR(left.get_mesh().get_centerline_velocity(i)[d], right.get_mesh().get_centerline_velocity(3-i)[d], 1e-12);
+      }
+    EXPECT_EQ(right.get_mesh().get_centerline(3), (BendingRod::Vector{2, 3, 4}));
+    EXPECT_EQ(right.get_mesh().get_centerline_velocity(3), (BendingRod::Vector{0, 0, 0}));
+  }
+  ModelState checkpoint;
+  right.pack_state(checkpoint);
+  restored.unpack_state(checkpoint);
+  right.solve(0.0012, reverse_loads);
+  restored.solve(0.0012, reverse_loads);
+  EXPECT_EQ(right.get_mesh().get_centerline(), restored.get_mesh().get_centerline());
+  EXPECT_EQ(right.get_mesh().get_centerline_velocity(), restored.get_mesh().get_centerline_velocity());
+}
+
 TEST(BendingRodImplicitTest, CommonMeshAndPolymorphicUniformSolve)
 {
   BendingRodMesh initial(4, 2);

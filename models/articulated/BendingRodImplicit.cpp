@@ -45,7 +45,8 @@ using Basis = Eigen::Matrix<real_t, 3, 2>;
 size_t checkedNodeCount(const BendingRodImplicitConfig &config) {
   if (config.links < 1 || config.links > INT_MAX / 6 - 1 ||
       (config.boundary != Boundary::Pinned &&
-       config.boundary != Boundary::Free))
+       config.boundary != Boundary::Free &&
+       config.boundary != Boundary::PinnedRight))
     ELFF_ABORT("invalid implicit rod link count or boundary");
   return static_cast<size_t>(config.links) + 1;
 }
@@ -186,6 +187,15 @@ BendingRodImplicit::BendingRodImplicit(const BendingRodImplicitConfig &config)
   for (int i = 0; i < joints; ++i) {
     validateNonnegative(bending_stiffness_[i], "bending_stiffness");
     validateNonnegative(bending_damping_[i], "bending_damping");
+  }
+
+  // Articulated mechanics run from the pin outward. Public material arrays
+  // and mesh nodes remain ordered from the left endpoint to the right endpoint.
+  if (boundary_ == Boundary::PinnedRight) {
+    std::reverse(masses_.begin(), masses_.end());
+    std::reverse(inertias_.begin(), inertias_.end());
+    std::reverse(bending_stiffness_.begin(), bending_stiffness_.end());
+    std::reverse(bending_damping_.begin(), bending_damping_.end());
   }
 
   com_weights_.resize(n_);
@@ -483,7 +493,11 @@ void BendingRodImplicit::advance(real_t dt, const std::vector<Vec3> &loads) {
       ELFF_ABORT("endpoint forces must be finite");
   if (dt == 0)
     return;
-  Eigen::VectorXd next = integrateState(state_, dt, loads);
+  std::vector<Vec3> internal_loads;
+  if (boundary_ == Boundary::PinnedRight)
+    internal_loads.assign(loads.rbegin(), loads.rend());
+  Eigen::VectorXd next = integrateState(
+      state_, dt, boundary_ == Boundary::PinnedRight ? internal_loads : loads);
   state_.swap(next);
   update_mesh();
 }
@@ -622,6 +636,8 @@ Eigen::MatrixXd BendingRodImplicit::nodes(const Eigen::VectorXd &state) const {
     positions.row(i + 1) =
         positions.row(i) + (h_ * parts.tangents[i]).transpose();
   }
+  if (boundary_ == Boundary::PinnedRight)
+    positions = positions.colwise().reverse().eval();
   return positions;
 }
 
@@ -883,7 +899,8 @@ BendingRodImplicit::velocities(const Eigen::VectorXd &state) const {
                : Vec3::Zero();
   Eigen::MatrixXd result(n_ + 1, 3);
   for (int i = 0; i <= n_; ++i)
-    result.row(i) = (velocities[i] + shift).transpose();
+    result.row(boundary_ == Boundary::PinnedRight ? n_ - i : i) =
+        (velocities[i] + shift).transpose();
   return result;
 }
 
@@ -931,6 +948,10 @@ void BendingRodImplicit::apply_initial_condition(
         std::max(position_scale, positions[i].cwiseAbs().maxCoeff());
     velocity_scale =
         std::max(velocity_scale, velocity[i].cwiseAbs().maxCoeff());
+  }
+  if (boundary_ == Boundary::PinnedRight) {
+    std::reverse(positions.begin(), positions.end());
+    std::reverse(velocity.begin(), velocity.end());
   }
   const real_t tolerance = 64 * std::numeric_limits<real_t>::epsilon();
   if (!isFree() && ((positions[0] - pin_).norm() > tolerance * position_scale ||

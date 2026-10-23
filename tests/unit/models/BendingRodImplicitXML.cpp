@@ -109,7 +109,8 @@ TEST(BendingRodImplicitXMLTest, ControlsAndSemanticFailuresWithoutDtd)
 TEST(BendingRodImplicitXMLTest, SharedInitialLinePreservesAnchorSemantics)
 {
   EXPECT_NO_THROW(parse(changed("<InitialLine>", "<InitialLine anchorEnd='left'>")));
-  for (const auto &end : {"right", "unknown"}) {
+  EXPECT_NO_THROW(parse(changed("<InitialLine>", "<InitialLine anchorEnd='right'>")));
+  for (const auto &end : {"unknown"}) {
     EXPECT_THROW(parse(changed("<InitialLine>",
       std::string("<InitialLine anchorEnd='") + end + "'>")), XMLError);
   }
@@ -326,6 +327,39 @@ TEST(XMLV2Test, MixedModelsRenderConstructAndOwnDefinitions)
   ib_model_view_array_t views{};
   ASSERT_EQ(ib_coupling_get_model_views(ib_coupling_get(raw), &views), 0);
   EXPECT_EQ(views.count, 2u);
+}
+
+TEST(XMLV2Test, RodAnchorAndPinnedEndAreIndependent)
+{
+  for (bool anchor_right : {false, true})
+    for (int pin : {-1, 0, 1}) {
+      auto xml = rod_v2;
+      xml.replace(xml.find("<Line>"), 6, anchor_right ? "<Line anchorEnd='right'>" : "<Line anchorEnd='left'>");
+      const auto begin = xml.find("<BendingRodBoundary");
+      const auto end = xml.find("</BendingRodSegments>");
+      xml.replace(begin, end-begin,
+        std::string("<BendingRodBoundary end='left' type='") + (pin == 0 ? "pinned" : "free") +
+        "'/><BendingRodBoundary end='right' type='" + (pin == 1 ? "pinned" : "free") + "'/>");
+      auto doc = render_v2(case_v2(xml));
+      // Construct through the runtime as well as the standalone builder.
+      model_runtime_t runtime = nullptr;
+      model_runtime_error error{};
+      ASSERT_EQ(model_runtime_create_from_case_document(doc.get(), &runtime, &error), 0) << error.message;
+      Runtime owner(runtime, model_runtime_delete);
+      elff_xml_node_t elff = nullptr, models = nullptr, raw = nullptr;
+      ASSERT_EQ(elff_xml_node_unique_child(root(doc.get(), "Case"), "ELFF", &elff, nullptr), ELFF_XML_OK);
+      ASSERT_EQ(elff_xml_node_unique_child(elff, "Models", &models, nullptr), ELFF_XML_OK);
+      ASSERT_EQ(elff_xml_node_unique_child(models, "BendingRodSegments", &raw, nullptr), ELFF_XML_OK);
+      auto rod = build_bending_rod_implicit(ELFF::IO::Case::parse_bending_rod_implicit_xml(raw));
+      for (size_t i = 0; i < 3; ++i)
+        EXPECT_NEAR(rod->get_mesh().get_centerline(i)[0], 0.4 + 0.1*(anchor_right ? 2-i : i), 1e-14);
+      const auto initial = rod->get_mesh().get_centerline();
+      rod->solve(0.001, std::vector<BendingRod::Vector>(3, {0, 1, 0}));
+      if (pin >= 0) {
+        EXPECT_EQ(rod->get_mesh().get_centerline(pin == 0 ? 0 : 2), initial[pin == 0 ? 0 : 2]);
+        EXPECT_EQ(rod->get_mesh().get_centerline_velocity(pin == 0 ? 0 : 2), (BendingRod::Vector{0, 0, 0}));
+      }
+    }
 }
 
 TEST(XMLV2Test, RejectsInvalidBoundariesAndOldMaterialNames)

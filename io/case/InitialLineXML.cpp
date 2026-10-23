@@ -54,8 +54,8 @@ InitialLineTemplate parse_initial_line_template(const XMLNode& model, bool huang
   catch (const XMLError& error) {
     if (huang || error.status() != ELFF_XML_NOT_FOUND) throw;
   }
-  if (end != "left" && !(huang && end == "right"))
-    line.invalid("Invalid anchorEnd: Huang requires left or right; rods allow only left or omission.");
+  if (end != "left" && end != "right")
+    line.invalid("anchorEnd must be left or right.");
   result.fixed.anchor_at_right = end == "right";
   auto anchor = optional_xml_child(line, "Anchor");
   auto random_anchor = optional_xml_child(line, "RandomAnchor");

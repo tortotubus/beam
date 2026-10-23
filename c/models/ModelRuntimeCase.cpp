@@ -323,6 +323,7 @@ std::unique_ptr<IBModel> construct(const ModelTemplate& entry, const ELFF::IO::C
     return EulerBeamHuangBuilder::build(*beam, line);
   auto rod = std::get<BendingRodImplicitDefinition>(entry.model);
   for (size_t d = 0; d < 3; ++d) { rod.config.pin[d] = line.anchor[d]; rod.direction[d] = line.direction[d]; }
+  rod.anchor_at_right = line.anchor_at_right;
   return build_bending_rod_implicit(rod);
 }
 

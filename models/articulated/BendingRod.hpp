@@ -17,7 +17,7 @@ public:
     return {points.data(), points.size()};
   }
   using Vector = BendingRodMesh::Vector;
-  enum class Boundary { Pinned, Free };
+  enum class Boundary { Pinned, Free, PinnedRight };
   virtual ~BendingRod() = default;
   virtual void solve(real_t dt);
   virtual void solve(real_t dt, Vector uniform_load);

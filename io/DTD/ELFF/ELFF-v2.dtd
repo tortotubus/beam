@@ -187,7 +187,7 @@
 <!ATTLIST Geometry length CDATA #REQUIRED nodes CDATA #REQUIRED>
 <!ELEMENT InitialCondition (Line)>
 <!ELEMENT Line ((Anchor|RandomAnchor), (Direction|RandomDirection))>
-<!-- Huang requires anchorEnd; rods allow only omission or left. -->
+<!-- Both models accept left or right; Huang requires anchorEnd and rods default to left. -->
 <!ATTLIST Line anchorEnd (left|right) #IMPLIED>
 <!ELEMENT Anchor EMPTY>
 <!ATTLIST Anchor x CDATA #REQUIRED y CDATA #REQUIRED z CDATA "0">
@@ -239,7 +239,7 @@
   </BendingRodSegments>
 -->
 <!ELEMENT BendingRodSegments (Geometry, InitialCondition, Material, BendingRodBoundary, BendingRodBoundary, ImplicitSolver?, Insertion?)>
-<!-- Current solver supports left pinned/right free or both free only. -->
+<!-- The rod supports one pinned endpoint (either end) or both free. -->
 <!ELEMENT BendingRodBoundary EMPTY>
 <!ATTLIST BendingRodBoundary end (left|right) #REQUIRED type (pinned|free) #REQUIRED>
 <!ELEMENT ImplicitSolver EMPTY>

@@ -56,7 +56,7 @@
   linearDensity CDATA #REQUIRED>
 
 <!ELEMENT InitialLine ((Anchor|RandomAnchor), (Direction|RandomDirection))>
-<!-- Parsers require anchorEnd for Huang and allow only omission or left for rods. -->
+<!-- Both models accept left or right; Huang requires anchorEnd and rods default to left. -->
 <!ATTLIST InitialLine anchorEnd (left|right) #IMPLIED>
 
 <!ELEMENT Anchor EMPTY>

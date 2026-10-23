@@ -36,11 +36,11 @@ struct BendingRodImplicitConfig {
    */
   real_t ei = 0.0;
   /**
-   * @brief Fix node zero for Pinned; allow center-of-mass translation for Free.
+   * @brief Fix the left node for Pinned or right node for PinnedRight; Free allows translation.
    */
   Boundary boundary = Boundary::Pinned;
   /**
-   * @brief Fixed position of node zero for a pinned rod; unused for a free rod.
+   * @brief Fixed position of the selected pinned endpoint; unused for a free rod.
    */
   Vec3 pin = Vec3::Zero();
 
@@ -107,7 +107,7 @@ struct BendingRodImplicitConfig {
  * \f]
  * The model includes transverse rotational inertia and optional joint damping,
  * but no axial extension or torsional degree of freedom. A pinned boundary
- * fixes node zero while leaving the first link free to rotate. A free boundary
+ * fixes the selected endpoint while leaving its adjacent link free to rotate. A free boundary
  * adds center-of-mass position and velocity to the state.
  *
  * Time integration uses a generalized-alpha step in local two-dimensional
@@ -135,8 +135,8 @@ public:
   /**
    * @brief Construct a straight rod at rest and initialize the material operators.
    * @param config Geometry, material, boundary and generalized-alpha controls.
-   * The initial tangents point along the positive x-axis. Node zero is at the
-   * configured pin for a pinned rod; the center of mass is at the origin for a
+   * The internal tangents point along the positive x-axis, away from the pin.
+   * The selected endpoint is at the configured pin for a pinned rod; the center of mass is at the origin for a
    * free rod. Use apply_initial_condition() to prescribe another initial mesh.
    */
   explicit BendingRodImplicit(const BendingRodImplicitConfig &config);
@@ -155,7 +155,7 @@ public:
    * @param mesh Mesh with the same node count and length as the solver.
    * The mesh must have finite data, link lengths \f(h\f), and velocities
    * satisfying \f(\mathbf{t}_i\cdot(\mathbf{v}_{i+1}-\mathbf{v}_i)=0\f).
-   * For a pinned rod, node zero must remain at the pin with zero velocity.
+   * For a pinned rod, the selected endpoint must remain at the pin with zero velocity.
    * Initialization resets the acceleration history and previous timestep.
    */
   void apply_initial_condition(const BendingRodMesh& mesh) override;
@@ -218,6 +218,8 @@ protected:
   virtual void setState(const Eigen::VectorXd &state);
   /**
    * @brief Return \f(6n\f) for a pinned rod or \f(6n+6\f) for a free rod.
+   * Right-pinned states index links from the pin toward the free end; public
+   * meshes and applied nodal loads retain left-to-right indexing.
    */
   int stateSize() const;
   /**
@@ -367,7 +369,7 @@ protected:
    */
   Boundary boundary_;
   /**
-   * @brief Fixed first-node position for a pinned rod.
+   * @brief Fixed pinned-end position; internal coordinates are ordered from this end.
    */
   Vec3 pin_;
   /**
@@ -387,7 +389,7 @@ protected:
    */
   std::vector<real_t> bending_damping_;
   /**
-   * @brief Tangent weights locating the center of mass relative to node zero.
+   * @brief Tangent weights locating the center of mass relative to internal node zero.
    * \f[ c_i=\frac{h}{M}\left(\frac{m_i}{2}+\sum_{j=i+1}^{n-1}m_j\right),
    * \qquad \mathbf{c}=\mathbf{x}_0+\sum_i c_i\mathbf{t}_i. \f]
    */
