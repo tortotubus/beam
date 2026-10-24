@@ -1,7 +1,6 @@
 { pkgs ? import <nixpkgs> {} }:
 let
-  tortotubusSrc = builtins.fetchTarball "https://github.com/tortotubus/nur-packages/archive/refs/heads/main.tar.gz";
-  tortotubusOverlay = import (tortotubusSrc + "/overlay.nix");
-  pkgs' = import <nixpkgs> { overlays = [ tortotubusOverlay ]; };
+  basiliskSrc = builtins.fetchTarball
+    "https://github.com/tortotubus/pacific-basilisk/archive/17bf4c16f91abb6bfb0013501cabb80a645720df.tar.gz";
 in
-pkgs'.callPackage ./elff.nix { }
+pkgs.callPackage ./elff.nix { inherit basiliskSrc; }

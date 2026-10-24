@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "basilisk": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1787010851,
+        "narHash": "sha256-YivX6lsVQo6McmwFAFAZYRDBJ8cL0Q10fuVhfXMBKIU=",
+        "owner": "tortotubus",
+        "repo": "pacific-basilisk",
+        "rev": "17bf4c16f91abb6bfb0013501cabb80a645720df",
+        "type": "github"
+      },
+      "original": {
+        "owner": "tortotubus",
+        "repo": "pacific-basilisk",
+        "rev": "17bf4c16f91abb6bfb0013501cabb80a645720df",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1769018530,
@@ -18,28 +35,8 @@
     },
     "root": {
       "inputs": {
-        "nixpkgs": "nixpkgs",
-        "tortotubus": "tortotubus"
-      }
-    },
-    "tortotubus": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1769304801,
-        "narHash": "sha256-1NMwXKqbldMads2JHF+65/Bc8mQdAtegj8jklpxk/VY=",
-        "owner": "tortotubus",
-        "repo": "nur-packages",
-        "rev": "2e2800fc2ff4d7acb837ff581dc6b84eb511c46c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "tortotubus",
-        "repo": "nur-packages",
-        "type": "github"
+        "basilisk": "basilisk",
+        "nixpkgs": "nixpkgs"
       }
     }
   },
