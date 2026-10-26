@@ -7,18 +7,20 @@
   };
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-  inputs.tortotubus.url = "github:tortotubus/nur-packages";
-  inputs.tortotubus.inputs.nixpkgs.follows = "nixpkgs";
+  inputs.basilisk = {
+    url = "github:tortotubus/pacific-basilisk/17bf4c16f91abb6bfb0013501cabb80a645720df";
+    flake = false;
+  };
 
-  outputs = { self, nixpkgs, tortotubus}:
+  outputs = { self, nixpkgs, basilisk }:
     let
       systems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
     in
     {
       overlays.default = final: prev: {
-        elff = final.callPackage ./elff.nix { 
-          pacific = tortotubus.packages.${final.system}.pacific;
+        elff = final.callPackage ./elff.nix {
+          basiliskSrc = basilisk;
         };
       };
 
@@ -48,7 +50,6 @@
               gdb
               strace
               ninja
-              ncurses
               doxygen
               apptainer
               criterion

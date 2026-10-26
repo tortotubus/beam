@@ -10,7 +10,8 @@
   eigen,
   hdf5-mpi,
   libxml2,
-  pacific,
+  ncurses,
+  basiliskSrc,
   criterion,
   gcovr,
   makeWrapper,
@@ -30,7 +31,6 @@ stdenv.mkDerivation {
     gnumake
     pkg-config
     criterion
-    pacific
     makeWrapper
   ];
 
@@ -39,6 +39,7 @@ stdenv.mkDerivation {
     eigen
     (hdf5-mpi.override { mpi = openmpi; })
     libxml2
+    ncurses
     openmpi
   ];
 
@@ -50,9 +51,17 @@ stdenv.mkDerivation {
     openmpi
   ];
 
+  # Flake Git snapshots do not include submodule worktrees. Populate the
+  # submodule path from the separately pinned source before configuring CMake.
+  postPatch = ''
+    mkdir -p third_party/basilisk/basilisk_submodule
+    cp -R ${basiliskSrc}/. third_party/basilisk/basilisk_submodule/
+  '';
+
   cmakeFlags = [
     "-DCMAKE_BUILD_TYPE=Release"
-    "-DBUILD_BASILISK_EXAMPLES=OFF"
+    "-DELFF_USE_SUBMODULES=ON"
+    "-DBUILD_BASILISK_EXAMPLES=ON"
   ];
 
   shellHook = ''

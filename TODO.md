@@ -7,3 +7,4 @@
 * Improve/centralize DTD for <basilisk> 
 * <ELFF> multiple models with non-overlapping placement
 * Collision model
+* Output VTKHDF from ELFF for active models
