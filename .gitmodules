@@ -13,3 +13,9 @@
 [submodule "third_party/libxml2/libxml2_submodule"]
 	path = third_party/libxml2/libxml2_submodule
 	url = https://github.com/GNOME/libxml2.git
+[submodule "third_party/amrex/amrex_submodule"]
+	path = third_party/amrex/amrex_submodule
+	url = https://github.com/AMReX-Codes/amrex.git
+[submodule "third_party/amrex_hydro/amrex_hydro_submodule"]
+	path = third_party/amrex_hydro/amrex_hydro_submodule
+	url = https://github.com/AMReX-Fluids/AMReX-Hydro.git
