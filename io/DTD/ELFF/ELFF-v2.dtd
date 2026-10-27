@@ -165,10 +165,16 @@
          <SimulationTime step="1"/>
          <VectorField name="ibmf"/>
        </Checkpoint>
+       <Logging>
+         <Perf enable="true"/>
+       </Logging>
      </Output>
 -->
-<!ELEMENT Output (FluidOutput?, SolidOutput?, Checkpoint?)>
+<!ELEMENT Output (FluidOutput?, SolidOutput?, Checkpoint?, Logging?)>
 <!ATTLIST Output directory CDATA #REQUIRED>
+<!ELEMENT Logging (Perf)>
+<!ELEMENT Perf EMPTY>
+<!ATTLIST Perf enable (true|false) #REQUIRED>
 <!ELEMENT FluidOutput (SimulationTime?, (ScalarField|VectorField)*)>
 <!ATTLIST FluidOutput enable (true|false) #REQUIRED>
 <!ELEMENT SolidOutput (SimulationTime?, (IBScalarField|IBVectorField)*)>
