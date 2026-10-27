@@ -109,6 +109,7 @@ int main (int argc, char **argv) {
   if (argc > 8) {
     if (pid() == 0) fprintf(stderr,
       "Usage: %s [minlevel [end_time [sigma [correlation_time [seed [maxlevel [output_interval]]]]]]]\n", argv[0]);
+    free_solver();
     return 2;
   }
   double level = argc > 1 ? numeric_argument(argv[1]) : minlevel;
@@ -116,6 +117,7 @@ int main (int argc, char **argv) {
   if (level < 3 || level > 12 || floor(level) != level ||
       maximum < level || maximum > 12 || floor(maximum) != maximum) {
     if (pid() == 0) fprintf(stderr, "Require integer 3 <= minlevel <= maxlevel <= 12.\n");
+    free_solver();
     return 2;
   }
   minlevel = (int)level; maxlevel = (int)maximum;
@@ -129,6 +131,7 @@ int main (int argc, char **argv) {
     unsigned long long seed = strtoull(argv[5], &end, 10);
     if (errno || end == argv[5] || *end || argv[5][0] == '-') {
       if (pid() == 0) fprintf(stderr, "Seed must be an unsigned integer.\n");
+      free_solver();
       return 2;
     }
     forcing_seed = (uint64_t)seed;
@@ -143,11 +146,12 @@ int main (int argc, char **argv) {
   if (end_time <= 0. || output_interval <= 0. || ep_init(&forcing, L0, forcing_time, forcing_sigma,
                                forcing_seed, pid() == 0)) {
     if (pid() == 0) fprintf(stderr, "Require end_time > 0, output_interval > 0, correlation_time > 0 and sigma >= 0.\n");
+    free_solver();
     return 2;
   }
   broadcast_forcing();
   run();
-  return 0;
+  // Fall through so qcc's generated free_solver() runs on every rank.
 }
 
 /** @brief Start the fluid at rest; the OU coefficients start stationary. */

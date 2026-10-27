@@ -69,9 +69,13 @@ static void settling_fibre_stats (int iteration, double time) {
 int main (int argc, char **argv) {
   if (argc != 2) {
     if (pid() == 0) fprintf (stderr, "Usage: settling_fibre case.xml\n");
+    free_solver ();
     return 1;
   }
-  if (settling_fibre_case_init (argv[1], &settling_configuration)) return 1;
+  if (settling_fibre_case_init (argv[1], &settling_configuration)) {
+    free_solver ();
+    return 1;
+  }
   BasiliskXMLCase *configuration = &settling_configuration.basilisk;
   stats_interval = settling_configuration.stats_interval;
   base_path = configuration->output_directory;
@@ -86,6 +90,8 @@ int main (int argc, char **argv) {
   int status = generic_ibm_case_run (configuration);
   elff_deinit ();
   basilisk_xml_case_destroy (configuration);
+  // qcc appends cleanup after this return, so invoke it explicitly on all ranks.
+  free_solver ();
   return status;
 }
 

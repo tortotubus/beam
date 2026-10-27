@@ -110,8 +110,10 @@ static void flapping_prepare_output(void) { vorticity(u, omega); }
 
 int main(int argc, char **argv) {
   const char *path = argc > 1 ? argv[1] : "flapping_fibre.xml";
-  if (flapping_fibre_case_init(path, &case_configuration))
+  if (flapping_fibre_case_init(path, &case_configuration)) {
+    free_solver();
     return 1;
+  }
 
   BasiliskXMLCase *c = &case_configuration.basilisk;
   base_path = c->output_directory;
@@ -126,6 +128,8 @@ int main(int argc, char **argv) {
 
   elff_deinit();
   basilisk_xml_case_destroy(c);
+  // qcc appends cleanup after this return, so invoke it explicitly on all ranks.
+  free_solver();
   return status;
 }
 

@@ -84,6 +84,7 @@ typedef struct {
   size_t bc_count;
   char output_directory[256];
   bool checkpoint_enable, restore_enable;
+  bool perf_enable;
   BasiliskOutputSchedule fluid_output, solid_output;
   scalar* fluid_scalars;
   vector* fluid_vectors;
@@ -823,6 +824,15 @@ static int generic_ibm_case_run (const BasiliskXMLCase* configuration) {
 #endif
   N = (1 << c->grid_initial_level)*c->grid_dimensions[0];
   DT = c->time_max_dt;
+  perf_enable = c->perf_enable;
+  if (perf_enable) {
+    snprintf (perf_path, sizeof (perf_path), "%s/perfs", c->output_directory);
+    int ready = pid () != 0 || create_path (c->output_directory) == 0;
+    if (!generic_case_agree (ready)) {
+      if (!ready) perror (c->output_directory);
+      return 1;
+    }
+  }
   generic_end_time = c->time_end;
   // Disabled output must not impose extra timesteps.
   generic_fluid_start = c->fluid_output.enabled ? c->fluid_output.start : HUGE;
@@ -1313,6 +1323,12 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
   XML_CHECK (basilisk_xml_optional(b, "Output", &output, error));
   if (output) XML_ATTR (elff_xml_node_attribute_string (
     output, "directory", c->output_directory, sizeof (c->output_directory), NULL, error));
+  elff_xml_node_t logging = NULL;
+  XML_CHECK (basilisk_xml_optional (output, "Logging", &logging, error));
+  if (logging) {
+    XML_READ (elff_xml_node_unique_child (logging, "Perf", &node, error));
+    XML_CHECK (basilisk_xml_enabled (node, &c->perf_enable, error));
+  }
   XML_CHECK (basilisk_xml_optional (output, "FluidOutput", &node, error));
   XML_CHECK (basilisk_xml_schedule (node, c->time_end, &c->fluid_output, error));
   XML_CHECK (basilisk_xml_output_fields (

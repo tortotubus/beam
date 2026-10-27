@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE Case SYSTEM "../../io/DTD/ELFF/ELFF-v2.dtd">
-
 <Case formatVersion="2" dimension="3">
   <Parameters>
     <Parameter name="rp" value="30"/>
@@ -84,6 +82,6 @@
         <IBVectorField name="nvel"/>
       </SolidOutput>
       <Checkpoint enable="true"/>
-    </Output>
+    <Logging><Perf enable="true"/></Logging></Output>
   </Basilisk>
 </Case>

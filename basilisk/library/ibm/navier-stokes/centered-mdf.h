@@ -32,6 +32,11 @@ bool stokes = false;
 face vector mu_alpha[], mu_beta[];
 mgstats mgp = {0}, mgpf = {0}, mgu_a = {0}, mgu_b = {0};
 
+/** @brief Enable per-iteration performance output on rank zero. */
+bool perf_enable = false;
+/** @brief Performance file path, set to the output directory by XML cases. */
+char perf_path[512] = "perfs";
+
 double alpha_split = 0.5;
 double beta_split = 0.5;
 double ib_force_relaxation = 1.0;
@@ -130,11 +135,39 @@ event defaults (i = 0) {
 
 event default_display (i = 0) display ("squares (color = 'u.x', spread = -1);");
 
+/** @brief Log solver statistics and the latest completed-step throughput.
+ * Columns: t, dt, mgp.i, mgp.nrelax, mgpf.i, mgpf.nrelax, mgu_a.i,
+ * mgu_a.nrelax, mgu_b.i, mgu_b.nrelax, grid->tn, perf.t, perf.speed,
+ * npe, perf.ispeed. Like Basilisk's perfs.h, samples are taken before
+ * the current step advances; the first sample has zero timing statistics.
+ */
+event perfs (i++) {
+  if (perf_enable && pid () == 0) {
+    static FILE * fp = NULL;
+    if (!fp) {
+      fp = fopen (perf_path, "w");
+      if (!fp) {
+        perror (perf_path);
+#if _MPI
+        MPI_Abort (MPI_COMM_WORLD, 1);
+#endif
+        exit (1);
+      }
+    }
+    if (i == 0)
+      fprintf (fp, "t,dt,mgp.i,mgp.nrelax,mgpf.i,mgpf.nrelax,"
+                   "mgu_a.i,mgu_a.nrelax,mgu_b.i,mgu_b.nrelax,"
+                   "grid->tn,perf.t,perf.speed,npe,perf.ispeed\n");
+    fprintf (fp, "%g,%g,%d,%d,%d,%d,%d,%d,%d,%d,%ld,%g,%g,%d,%g\n",
+             t, dt, mgp.i, mgp.nrelax, mgpf.i, mgpf.nrelax,
+             mgu_a.i, mgu_a.nrelax, mgu_b.i, mgu_b.nrelax,
+             grid->tn, perf.t, perf.speed, npe (), perf.ispeed);
+    fflush (fp);
+  }
+}
+
 double dtmax;
-
-// event init_ib (i = 0) {
-
-// }
+ 
 
 event init (i = 0) {
 
