@@ -2,34 +2,61 @@
 <!DOCTYPE Case SYSTEM "../../io/DTD/ELFF/ELFF-v2.dtd">
 
 <Case formatVersion="2" dimension="3">
-  <Parameters>
-    <Parameter name="rp" value="30"/>
-    <Parameter name="gamma" value="0.01"/>
-    <Parameter name="r" value="0.1"/>
-    <Parameter name="Ga" value="40"/>
-    <Parameter name="area" expression="pi/(4*rp*rp)"/>
-    <Parameter name="nodes" value="67"/>
-    <Parameter name="domainSize" value="32"/>
-    <Parameter name="timeStep" value="0.001"/>
-    <Parameter name="endTime" value="10"/>
-    <Parameter name="minLevel" value="4"/>
-    <Parameter name="maxLevel" value="12"/>
-    <Parameter name="ibLevel" value="12"/>
-    <Parameter name="outputInterval" value="0.001"/>
-    <Parameter name="adaptRelativeTolerance" value="0.001"/>
-    <Parameter name="statsInterval" value="1"/>
-    <Parameter name="linearDensity" expression="(1+r)*area"/>
-    <Parameter name="bendingRigidity" expression="gamma*r*area"/>
-    <Parameter name="dynamicViscosity" expression="1/Ga"/>
-    <Parameter name="forceDensityY" expression="-area"/>
-  </Parameters>
+<Parameters>
+  <!-- Fundamental physical parameters -->
+  <Parameter name="rho0" value="1"/>
+  <Parameter name="g" value="1"/>
+  <Parameter name="length" value="1"/>
+  <Parameter name="rp" value="30"/>
+  <Parameter name="gamma" value="0.01"/>
+  <Parameter name="r" value="0.1"/>
+  <Parameter name="Ga" value="40"/>
+
+  <!-- Derived physical parameters -->
+  <Parameter name="diameter" expression="length/rp"/>
+  <Parameter name="area" expression="pi*diameter*diameter/4"/>
+  <Parameter name="linearDensityDifference" expression="r*rho0*area"/>
+  <Parameter name="linearDensity" expression="(1+r)*rho0*area"/>
+  <Parameter name="submergedWeightPerLength" expression="linearDensityDifference*g"/>
+  <Parameter name="bendingRigidity" expression="gamma*r*submergedWeightPerLength*length*length*length"/>
+  <Parameter name="forceDensityY" expression="-submergedWeightPerLength"/>
+  <Parameter name="kinematicViscosity" expression="sqrt(r*g*length*length*length)/Ga"/>
+  <Parameter name="dynamicViscosity" expression="rho0*kinematicViscosity"/>
+  <Parameter name="velocityScale" expression="sqrt(r*g*length)"/>
+
+  <!-- Numerical controls -->
+  <Parameter name="nodes" value="67"/>
+  <Parameter name="domainSize" value="16"/>
+  <Parameter name="timeStep" value="0.001"/>
+  <Parameter name="endTime" value="500"/>
+  <Parameter name="minLevel" value="4"/>
+  <Parameter name="maxLevel" value="11"/>
+  <Parameter name="ibLevel" value="11"/>
+  <Parameter name="outputInterval" value="0.1"/>
+  <Parameter name="adaptRelativeTolerance" value="0.001"/>
+  <Parameter name="statsInterval" value="1"/>
+
   <ELFF>
     <Models distribution="rank0"> 
-      <BendingRodSegments>
-        <Geometry length="1" nodes="${nodes}"/>
+      <EulerBeamHuang>
         <InitialCondition>
           <Line anchorEnd="left">
-            <Anchor x="-0.5" y="0" z="0"/>
+            <Anchor x="${-length/2}" y="0" z="0"/>
+            <Direction x="1" y="0" z="0"/>
+          </Line>
+        </InitialCondition>
+        <Material>
+          <BendingRigidity>${bendingRigidity}</BendingRigidity>
+          <LinearDensity>${linearDensity}</LinearDensity>
+        </Material>
+        <EulerBeamBoundary end="left" type="free"/>
+        <EulerBeamBoundary end="right" type="free"/>
+      </EulerBeamHuang>
+      <!-- <BendingRodSegments>
+        <Geometry length="${length}" nodes="${nodes}"/>
+        <InitialCondition>
+          <Line anchorEnd="left">
+            <Anchor x="${-length/2}" y="0" z="0"/>
             <Direction x="1" y="0" z="0"/>
           </Line>
         </InitialCondition>
@@ -40,13 +67,16 @@
         </Material>
         <BendingRodBoundary end="left" type="free"/>
         <BendingRodBoundary end="right" type="free"/>
-      </BendingRodSegments>
+      </BendingRodSegments> -->
     </Models>
   </ELFF>
   <Basilisk caseType="settling_fibre">
     <Time step="${timeStep}" end="${endTime}"/>
     <Fluid>
-      <FluidMaterial><Density>1</Density><DynamicViscosity>${dynamicViscosity}</DynamicViscosity></FluidMaterial>
+      <FluidMaterial>
+        <Density>${rho0}</Density>
+        <DynamicViscosity>${dynamicViscosity}</DynamicViscosity>
+      </FluidMaterial>
       <FluidBoundaryCondition field="*" direction="right" type="periodic"/>
       <FluidBoundaryCondition field="*" direction="top" type="periodic"/>
       <FluidBoundaryCondition field="*" direction="front" type="periodic"/>
@@ -66,7 +96,7 @@
         <Relaxation>0.8</Relaxation>
       </ForceCoupled>
       <ImmersedBoundaryKernel type="Cosine"/>
-      <UniformForceDensity x="0" y="${parameters.forceDensityY}" z="0"/>
+      <UniformForceDensity x="0" y="${forceDensityY}" z="0"/>
     </ImmersedBoundary>
     <Output directory="settling_fibre_gamma_0.01">
       <FluidOutput enable="false">

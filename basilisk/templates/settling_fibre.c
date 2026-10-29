@@ -24,45 +24,78 @@ static void settling_fibre_prepare_output () {
 }
 
 static void settling_fibre_stats (int iteration, double time) {
-  // Position and velocity sums are weighted by nodal measure, not replicas.
-  size_t count = (size_t) ibmm.nm * 7;
+  enum {
+    Y_FIRST_SUM,
+    Y_FIRST_COUNT,
+    Y_LAST_SUM,
+    Y_LAST_COUNT,
+    FORCE_X,
+    FORCE_Y,
+    FORCE_Z,
+    STATS_STRIDE
+  };
+  size_t count = (size_t) ibmm.nm * STATS_STRIDE;
+  double *minimum_y = malloc ((size_t) ibmm.nm * sizeof (double));
   double *values = calloc (count, sizeof (double));
-  if (!values) { fprintf (stderr, "Unable to allocate fibre statistics.\n"); exit (1); }
+  if (!minimum_y || !values) {
+    free (minimum_y);
+    free (values);
+    fprintf (stderr, "Unable to allocate fibre statistics.\n");
+    exit (1);
+  }
+  for (int m = 0; m < ibmm.nm; ++m)
+    minimum_y[m] = HUGE_VAL;
+  // Count each MPI-owned node once. nforce is a force density, so nweight
+  // supplies the nodal measure needed to integrate the total fibre force.
   foreach_ibnode_per_ibmesh () {
 #if _MPI
     if (node->pid != pid ()) continue;
 #endif
-    double *v = values + 7*mesh_id;
+    double *v = values + STATS_STRIDE*mesh_id;
+    double y = ibval (npos.y);
     double w = ibval (nweight);
-    v[0] += w;
-    v[1] += w*ibval (npos.x); v[2] += w*ibval (npos.y);
-    v[4] += w*ibval (nvel.x); v[5] += w*ibval (nvel.y);
-#if dimension > 2
-    v[3] += w*ibval (npos.z); v[6] += w*ibval (nvel.z);
-#endif
+    if (y < minimum_y[mesh_id]) minimum_y[mesh_id] = y;
+    if (node->node_lid == 0) {
+      v[Y_FIRST_SUM] += y;
+      v[Y_FIRST_COUNT] += 1.;
+    }
+    if (node->node_lid == mesh->nnode_global - 1) {
+      v[Y_LAST_SUM] += y;
+      v[Y_LAST_COUNT] += 1.;
+    }
+    v[FORCE_X] += w*ibval (nforce.x);
+    v[FORCE_Y] += w*ibval (nforce.y);
+    v[FORCE_Z] += w*ibval (nforce.z);
   }
 #if _MPI
+  MPI_Allreduce (MPI_IN_PLACE, minimum_y, ibmm.nm, MPI_DOUBLE, MPI_MIN,
+                 MPI_COMM_WORLD);
   MPI_Allreduce (MPI_IN_PLACE, values, (int)count, MPI_DOUBLE, MPI_SUM,
                  MPI_COMM_WORLD);
 #endif
   if (pid () == 0) {
     create_path (base_path);
     char filename[4096];
-    snprintf (filename, sizeof(filename), "%s/fibre-centres.csv", base_path);
+    snprintf (filename, sizeof(filename), "%s/fibre-diagnostics.csv", base_path);
     FILE *fp = fopen (filename, iteration == 0 ? "w" : "a");
     if (!fp) { perror (filename); exit (1); }
     if (iteration == 0)
-      fprintf (fp, "i,t,fibre_id,center_x,center_y,center_z,velocity_x,velocity_y,velocity_z,measure\n");
+      fprintf (fp, "i,t,mesh_id,y_min,y_first_node,y_last_node,total_force_x,total_force_y,total_force_z\n");
     for (int m = 0; m < ibmm.nm; ++m) {
-      double *v = values + 7*m;
-      double inv = v[0] > 0. ? 1./v[0] : 0.;
-      fprintf (fp, "%d,%.17g,%d,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n",
-               iteration, time, m, v[1]*inv, v[2]*inv, v[3]*inv,
-               v[4]*inv, v[5]*inv, v[6]*inv, v[0]);
+      double *v = values + STATS_STRIDE*m;
+      double y_first = v[Y_FIRST_COUNT] > 0. ?
+        v[Y_FIRST_SUM]/v[Y_FIRST_COUNT] : NAN;
+      double y_last = v[Y_LAST_COUNT] > 0. ?
+        v[Y_LAST_SUM]/v[Y_LAST_COUNT] : NAN;
+      double y_min = minimum_y[m] < HUGE_VAL ? minimum_y[m] : NAN;
+      fprintf (fp, "%d,%.17g,%d,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n",
+               iteration, time, m, y_min, y_first, y_last,
+               v[FORCE_X], v[FORCE_Y], v[FORCE_Z]);
     }
     fclose (fp);
     fprintf (stderr, "settling i=%d t=%g fibres=%d\n", iteration, time, ibmm.nm);
   }
+  free (minimum_y);
   free (values);
 }
 
