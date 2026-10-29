@@ -32,6 +32,7 @@ static void settling_fibre_stats (int iteration, double time) {
     FORCE_X,
     FORCE_Y,
     FORCE_Z,
+    EXTERNAL_POWER,
     STATS_STRIDE
   };
   size_t count = (size_t) ibmm.nm * STATS_STRIDE;
@@ -45,8 +46,10 @@ static void settling_fibre_stats (int iteration, double time) {
   }
   for (int m = 0; m < ibmm.nm; ++m)
     minimum_y[m] = HUGE_VAL;
-  // Count each MPI-owned node once. nforce is a force density, so nweight
-  // supplies the nodal measure needed to integrate the total fibre force.
+  // Count each MPI-owned node once. At this point in the event sequence,
+  // nforce is the total external force density used to advance the fibre:
+  // the previous IBM reaction plus the imposed body-force density. nweight
+  // supplies the nodal measure for force and power integration.
   foreach_ibnode_per_ibmesh () {
 #if _MPI
     if (node->pid != pid ()) continue;
@@ -66,6 +69,9 @@ static void settling_fibre_stats (int iteration, double time) {
     v[FORCE_X] += w*ibval (nforce.x);
     v[FORCE_Y] += w*ibval (nforce.y);
     v[FORCE_Z] += w*ibval (nforce.z);
+    v[EXTERNAL_POWER] += w*(ibval (nforce.x)*ibval (nvel.x) +
+                            ibval (nforce.y)*ibval (nvel.y) +
+                            ibval (nforce.z)*ibval (nvel.z));
   }
 #if _MPI
   MPI_Allreduce (MPI_IN_PLACE, minimum_y, ibmm.nm, MPI_DOUBLE, MPI_MIN,
@@ -80,7 +86,7 @@ static void settling_fibre_stats (int iteration, double time) {
     FILE *fp = fopen (filename, iteration == 0 ? "w" : "a");
     if (!fp) { perror (filename); exit (1); }
     if (iteration == 0)
-      fprintf (fp, "i,t,mesh_id,y_min,y_first_node,y_last_node,total_force_x,total_force_y,total_force_z\n");
+      fprintf (fp, "i,t,mesh_id,y_min,y_first_node,y_last_node,external_force_x,external_force_y,external_force_z,external_power\n");
     for (int m = 0; m < ibmm.nm; ++m) {
       double *v = values + STATS_STRIDE*m;
       double y_first = v[Y_FIRST_COUNT] > 0. ?
@@ -88,9 +94,9 @@ static void settling_fibre_stats (int iteration, double time) {
       double y_last = v[Y_LAST_COUNT] > 0. ?
         v[Y_LAST_SUM]/v[Y_LAST_COUNT] : NAN;
       double y_min = minimum_y[m] < HUGE_VAL ? minimum_y[m] : NAN;
-      fprintf (fp, "%d,%.17g,%d,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n",
+      fprintf (fp, "%d,%.17g,%d,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g,%.17g\n",
                iteration, time, m, y_min, y_first, y_last,
-               v[FORCE_X], v[FORCE_Y], v[FORCE_Z]);
+               v[FORCE_X], v[FORCE_Y], v[FORCE_Z], v[EXTERNAL_POWER]);
     }
     fclose (fp);
     fprintf (stderr, "settling i=%d t=%g fibres=%d\n", iteration, time, ibmm.nm);
