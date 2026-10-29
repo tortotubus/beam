@@ -11,7 +11,6 @@
   <Parameter name="gamma" value="0.01"/>
   <Parameter name="r" value="0.1"/>
   <Parameter name="Ga" value="40"/>
-
   <!-- Derived physical parameters -->
   <Parameter name="diameter" expression="length/rp"/>
   <Parameter name="area" expression="pi*diameter*diameter/4"/>
@@ -23,7 +22,6 @@
   <Parameter name="kinematicViscosity" expression="sqrt(r*g*length*length*length)/Ga"/>
   <Parameter name="dynamicViscosity" expression="rho0*kinematicViscosity"/>
   <Parameter name="velocityScale" expression="sqrt(r*g*length)"/>
-
   <!-- Numerical controls -->
   <Parameter name="nodes" value="67"/>
   <Parameter name="domainSize" value="16"/>
@@ -35,10 +33,11 @@
   <Parameter name="outputInterval" value="0.1"/>
   <Parameter name="adaptRelativeTolerance" value="0.001"/>
   <Parameter name="statsInterval" value="1"/>
-
+</Parameters>
   <ELFF>
     <Models distribution="rank0"> 
       <EulerBeamHuang>
+        <Geometry length="${length}" nodes="${nodes}"/>
         <InitialCondition>
           <Line anchorEnd="left">
             <Anchor x="${-length/2}" y="0" z="0"/>
