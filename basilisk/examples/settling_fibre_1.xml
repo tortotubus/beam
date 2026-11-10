@@ -8,7 +8,7 @@
   <Parameter name="g" value="1"/>
   <Parameter name="length" value="1"/>
   <Parameter name="rp" value="30"/>
-  <Parameter name="gamma" value="0.01"/>
+  <Parameter name="gamma" value="0.1"/>
   <Parameter name="r" value="0.1"/>
   <Parameter name="Ga" value="40"/>
   <!-- Derived physical parameters -->
@@ -25,13 +25,13 @@
   <!-- Numerical controls -->
   <Parameter name="nodes" value="67"/>
   <Parameter name="domainSize" value="16"/>
-  <Parameter name="timeStep" value="0.001"/>
+  <Parameter name="timeStep" value="0.005"/>
   <Parameter name="endTime" value="500"/>
   <Parameter name="minLevel" value="4"/>
   <Parameter name="maxLevel" value="11"/>
   <Parameter name="ibLevel" value="11"/>
-  <Parameter name="outputInterval" value="0.1"/>
-  <Parameter name="adaptRelativeTolerance" value="0.001"/>
+  <Parameter name="outputIterationInterval" value="100"/>
+  <Parameter name="adaptTolerance" expression="1e-4*velocityScale"/>
   <Parameter name="statsInterval" value="1"/>
 </Parameters>
   <ELFF>
@@ -39,7 +39,7 @@
       <EulerBeamHuang>
         <Geometry length="${length}" nodes="${nodes}"/>
         <InitialCondition>
-          <Line anchorEnd="left">
+          <Line anchorEnd="right">
             <Anchor x="${-length/2}" y="0" z="0"/>
             <Direction x="1" y="0" z="0"/>
           </Line>
@@ -70,7 +70,7 @@
     </Models>
   </ELFF>
   <Basilisk caseType="settling_fibre">
-    <Time step="${timeStep}" end="${endTime}"/>
+    <Time step="${timeStep}" end="${endTime}" endMode="after-step"/>
     <Fluid>
       <FluidMaterial>
         <Density>${rho0}</Density>
@@ -85,10 +85,10 @@
       <Length>${domainSize}</Length>
       <Depth>${minLevel}</Depth>
       <AdaptWavelet minLevel="${minLevel}" maxLevel="${maxLevel}" enable="true">
-        <VectorField name="u" tolerance="${adaptRelativeTolerance}"/>
+        <VectorField name="u" tolerance="${adaptTolerance}"/>
       </AdaptWavelet>
     </Grid>
-    <Restart enable="true"/>
+    <Restart enable="false"/>
     <ImmersedBoundary level="${ibLevel}">
       <ForceCoupled>
         <Iterations>2</Iterations>
@@ -97,9 +97,9 @@
       <ImmersedBoundaryKernel type="Cosine"/>
       <UniformForceDensity x="0" y="${forceDensityY}" z="0"/>
     </ImmersedBoundary>
-    <Output directory="settling_fibre_gamma_0.01">
-      <FluidOutput enable="false">
-        <SimulationTime step="${outputInterval}"/>
+    <Output directory="gamma_0.1">
+      <FluidOutput enable="true">
+        <IterationSchedule step="${outputIterationInterval}"/>
         <ScalarField name="l2"/>
         <ScalarField name="omega_z"/>
         <ScalarField name="p"/>
@@ -107,7 +107,7 @@
         <VectorField name="ibmf"/>
       </FluidOutput>
       <SolidOutput enable="true">
-        <SimulationTime step="${outputInterval}"/>
+        <IterationSchedule step="${outputIterationInterval}"/>
         <IBVectorField name="eulvel"/>
         <IBVectorField name="nforce"/>
         <IBVectorField name="nvel"/>

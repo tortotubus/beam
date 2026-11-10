@@ -121,6 +121,7 @@ TEST(EulerBeamHuangBuilderTest, BuildsWithoutXml)
   placement.direction = {0, 2, 0};
   ASSERT_EQ(EulerBeamHuangBuilder::validation_error(definition, placement), nullptr);
   auto beam = EulerBeamHuangBuilder::build(definition, placement);
+  EXPECT_TRUE(beam->get_implicit_bending());
   EXPECT_DOUBLE_EQ(beam->get_mesh().get_centerline(4)[1], 4);
   EXPECT_DOUBLE_EQ(beam->get_mesh().get_slope(0)[1], 1);
   placement.direction = {0, 0, 0};

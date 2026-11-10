@@ -16,7 +16,7 @@ EulerBeamHuang::EulerBeamHuang(real_t length,
   , tol_inner(1e-12)
   , last_dt(0.0)
   , initial_velocity_pending(true)
-  , implicit_bending(false)
+  , implicit_bending(true)
   , X_init(MatX3::Zero(static_cast<Index>(nodes), 3))
   , X_n(MatX3::Zero(static_cast<Index>(nodes), 3))
   , X_nm1(MatX3::Zero(static_cast<Index>(nodes), 3))

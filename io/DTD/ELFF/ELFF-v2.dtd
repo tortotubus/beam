@@ -20,12 +20,17 @@
 
 <!-- Run duration and output schedules are distinct.
      Time.step is the timestep control; schedule.step is an output interval.
+     The default exact end mode aligns the final timestep with Time.end.
+     after-step preserves the unconstrained timestep sequence and stops on the
+     first event cycle for which simulation time exceeds Time.end.
      WallTime values are wall-clock seconds. Schedule end is optional.
      MPI wall-clock triggers must be agreed across ranks. -->
 <!ELEMENT Time EMPTY>
-<!ATTLIST Time step CDATA #IMPLIED end CDATA #IMPLIED>
+<!ATTLIST Time step CDATA #IMPLIED end CDATA #IMPLIED endMode (exact|after-step) "exact">
 <!ELEMENT SimulationTime EMPTY>
 <!ATTLIST SimulationTime step CDATA #REQUIRED end CDATA #IMPLIED>
+<!ELEMENT IterationSchedule EMPTY>
+<!ATTLIST IterationSchedule step CDATA #REQUIRED start CDATA "0" end CDATA #IMPLIED>
 <!ELEMENT WallTime EMPTY>
 <!ATTLIST WallTime step CDATA #REQUIRED end CDATA #IMPLIED>
 
@@ -166,12 +171,16 @@
          <VectorField name="ibmf"/>
        </Checkpoint>
      </Output>
+
+     IterationSchedule is an alternative to SimulationTime for fluid and solid
+     output.  It does not register a time event and therefore does not clip the
+     solver timestep.  start and end are inclusive iteration numbers.
 -->
 <!ELEMENT Output (FluidOutput?, SolidOutput?, Checkpoint?)>
 <!ATTLIST Output directory CDATA #REQUIRED>
-<!ELEMENT FluidOutput (SimulationTime?, (ScalarField|VectorField)*)>
+<!ELEMENT FluidOutput ((SimulationTime|IterationSchedule)?, (ScalarField|VectorField)*)>
 <!ATTLIST FluidOutput enable (true|false) #REQUIRED>
-<!ELEMENT SolidOutput (SimulationTime?, (IBScalarField|IBVectorField)*)>
+<!ELEMENT SolidOutput ((SimulationTime|IterationSchedule)?, (IBScalarField|IBVectorField)*)>
 <!ATTLIST SolidOutput enable (true|false) #REQUIRED>
 <!ELEMENT Checkpoint (SimulationTime?, (ScalarField|VectorField|IBScalarField|IBVectorField)*)>
 <!ATTLIST Checkpoint enable (true|false) #REQUIRED>
