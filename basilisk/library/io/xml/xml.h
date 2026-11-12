@@ -44,10 +44,24 @@ typedef struct {
   size_t source_line;
 } BasiliskBC;
 
-/** @brief Simulation-time output cadence. Disabled schedules create no time events. */
+/** @brief How an output cadence is measured. */
+typedef enum {
+  BASILISK_OUTPUT_SIMULATION_TIME,
+  BASILISK_OUTPUT_ITERATIONS
+} BasiliskOutputScheduleKind;
+
+/** @brief Whether Time.end clips the final timestep or is checked after each step. */
+typedef enum {
+  BASILISK_END_EXACT,
+  BASILISK_END_AFTER_STEP
+} BasiliskEndMode;
+
+/** @brief Time- or iteration-based output cadence. */
 typedef struct {
   bool enabled;
+  BasiliskOutputScheduleKind kind;
   double start, interval, end;
+  int iteration_start, iteration_interval, iteration_end;
 } BasiliskOutputSchedule;
 
 /** @brief An owned output field name, bound after solver initialization. */
@@ -79,6 +93,7 @@ typedef struct {
   int grid_initial_level, grid_min_level, grid_max_level, ib_level;
   bool periodic_axis[3];
   double time_max_dt, time_end;
+  BasiliskEndMode time_end_mode;
   double fluid_density, dynamic_viscosity;
   BasiliskBC* bcs;
   size_t bc_count;
@@ -240,6 +255,41 @@ scalar generic_rho[];
     }                                                                                    \
     break;
 
+static void generic_write_solid_output (int iteration, double time) {
+  output_hdf_pd (generic_case.solid_scalars,
+                 generic_case.solid_vectors,
+                 generic_case.output_directory,
+                 iteration,
+                 time);
+}
+
+static void generic_write_fluid_output (int iteration, double time) {
+  if (generic_case.prepare_fluid_output)
+    generic_case.prepare_fluid_output ();
+#if TREE
+  output_hdf_htg (generic_case.fluid_scalars,
+                  generic_case.fluid_vectors,
+                  generic_case.output_directory,
+                  iteration,
+                  time);
+#else
+  output_hdf_imagedata (generic_case.fluid_scalars,
+                        generic_case.fluid_vectors,
+                        generic_case.output_directory,
+                        iteration,
+                        time);
+#endif
+}
+
+static bool generic_iteration_output_due (BasiliskOutputSchedule schedule,
+                                           int iteration,
+                                           double time) {
+  return schedule.enabled && schedule.kind == BASILISK_OUTPUT_ITERATIONS &&
+         iteration >= schedule.iteration_start &&
+         iteration <= schedule.iteration_end && time <= generic_case.time_end &&
+         (iteration - schedule.iteration_start)%schedule.iteration_interval == 0;
+}
+
 /**
  * Events
  */
@@ -314,27 +364,26 @@ event advance_interface (i++) {
 
 event case_output_solids (t = generic_solid_start; t += generic_solid_interval;
                           t <= generic_solid_end) {
-  if (generic_case.solid_output.enabled)
-    output_hdf_pd (generic_case.solid_scalars,
-                   generic_case.solid_vectors,
-                   generic_case.output_directory);
+  if (generic_case.solid_output.enabled &&
+      generic_case.solid_output.kind == BASILISK_OUTPUT_SIMULATION_TIME)
+    generic_write_solid_output (i, t);
 }
 
 event case_output_fluid (t = generic_fluid_start; t += generic_fluid_interval;
                          t <= generic_fluid_end) {
-  if (generic_case.fluid_output.enabled) {
-    if (generic_case.prepare_fluid_output)
-      generic_case.prepare_fluid_output ();
-#if TREE
-    output_hdf_htg (generic_case.fluid_scalars,
-                    generic_case.fluid_vectors,
-                    generic_case.output_directory);
-#else
-    output_hdf_imagedata (generic_case.fluid_scalars,
-                          generic_case.fluid_vectors,
-                          generic_case.output_directory);
-#endif
-  }
+  if (generic_case.fluid_output.enabled &&
+      generic_case.fluid_output.kind == BASILISK_OUTPUT_SIMULATION_TIME)
+    generic_write_fluid_output (i, t);
+}
+
+event case_output_solids_iterations (i++) {
+  if (generic_iteration_output_due (generic_case.solid_output, i, t))
+    generic_write_solid_output (i, t);
+}
+
+event case_output_fluid_iterations (i++) {
+  if (generic_iteration_output_due (generic_case.fluid_output, i, t))
+    generic_write_fluid_output (i, t);
 }
 
 #if TREE
@@ -355,8 +404,14 @@ event case_checkpoint (i++, last) {
   }
 }
 
-event case_stop (t = generic_end_time) {
+event case_stop (t = generic_end_time;
+                 generic_case.time_end_mode == BASILISK_END_EXACT) {
   return 1;
+}
+
+event case_stop_after_step (i++, last) {
+  if (generic_case.time_end_mode == BASILISK_END_AFTER_STEP && t > generic_end_time)
+    return 1;
 }
 
 event case_cleanup (i = end, last) {
@@ -387,10 +442,15 @@ static int generic_case_agree (int success) {
 }
 
 static bool generic_schedule_valid (BasiliskOutputSchedule schedule) {
-  return !schedule.enabled ||
-         (isfinite (schedule.start) && isfinite (schedule.interval) &&
-          isfinite (schedule.end) && schedule.start >= 0 && schedule.interval > 0 &&
-          schedule.end >= 0);
+  if (!schedule.enabled)
+    return true;
+  if (schedule.kind == BASILISK_OUTPUT_SIMULATION_TIME)
+    return isfinite (schedule.start) && isfinite (schedule.interval) &&
+           isfinite (schedule.end) && schedule.start >= 0 && schedule.interval > 0 &&
+           schedule.end >= 0;
+  return schedule.kind == BASILISK_OUTPUT_ITERATIONS &&
+         schedule.iteration_start >= 0 && schedule.iteration_interval > 0 &&
+         schedule.iteration_end >= schedule.iteration_start;
 }
 
 static void basilisk_xml_case_defaults (BasiliskXMLCase* c) {
@@ -402,6 +462,7 @@ static void basilisk_xml_case_defaults (BasiliskXMLCase* c) {
   c->grid_max_level = c->ib_level = 6;
   c->time_max_dt = 0.001;
   c->time_end = 1.;
+  c->time_end_mode = BASILISK_END_EXACT;
   c->fluid_density = 1.;
   c->force_relaxation = 0.8;
   c->kernel = peskin_cosine_kernel_1d;
@@ -409,6 +470,8 @@ static void basilisk_xml_case_defaults (BasiliskXMLCase* c) {
   c->force_iterations = 2;
   c->fluid_output.interval = c->solid_output.interval = 1.;
   c->fluid_output.end = c->solid_output.end = 1.;
+  c->fluid_output.iteration_interval = c->solid_output.iteration_interval = 1;
+  c->fluid_output.iteration_end = c->solid_output.iteration_end = INT_MAX;
   strcpy (c->output_directory, "output");
 }
 
@@ -758,6 +821,8 @@ static int basilisk_xml_validate_configuration (const BasiliskXMLCase* c, elff_x
     c->grid_initial_level <= c->grid_max_level && c->ib_level >= c->grid_min_level &&
     c->ib_level < 30 && c->force_iterations > 0 && isfinite (c->force_relaxation) &&
     c->force_relaxation > 0 && c->force_relaxation <= 1 &&
+    (c->time_end_mode == BASILISK_END_EXACT ||
+     c->time_end_mode == BASILISK_END_AFTER_STEP) &&
     generic_schedule_valid (c->fluid_output) && generic_schedule_valid (c->solid_output);
   for (int d = 0; d < dimension; ++d)
     valid = valid && c->grid_dimensions[d] > 0 &&
@@ -834,13 +899,17 @@ static int generic_ibm_case_run (const BasiliskXMLCase* configuration) {
     }
   }
   generic_end_time = c->time_end;
-  // Disabled output must not impose extra timesteps.
-  generic_fluid_start = c->fluid_output.enabled ? c->fluid_output.start : HUGE;
-  generic_fluid_interval = c->fluid_output.enabled ? c->fluid_output.interval : 1.;
-  generic_fluid_end = c->fluid_output.enabled ? c->fluid_output.end : HUGE;
-  generic_solid_start = c->solid_output.enabled ? c->solid_output.start : HUGE;
-  generic_solid_interval = c->solid_output.enabled ? c->solid_output.interval : 1.;
-  generic_solid_end = c->solid_output.enabled ? c->solid_output.end : HUGE;
+  // Disabled and iteration-based output must not impose extra timesteps.
+  bool fluid_time_output = c->fluid_output.enabled &&
+    c->fluid_output.kind == BASILISK_OUTPUT_SIMULATION_TIME;
+  bool solid_time_output = c->solid_output.enabled &&
+    c->solid_output.kind == BASILISK_OUTPUT_SIMULATION_TIME;
+  generic_fluid_start = fluid_time_output ? c->fluid_output.start : HUGE;
+  generic_fluid_interval = fluid_time_output ? c->fluid_output.interval : 1.;
+  generic_fluid_end = fluid_time_output ? c->fluid_output.end : HUGE;
+  generic_solid_start = solid_time_output ? c->solid_output.start : HUGE;
+  generic_solid_interval = solid_time_output ? c->solid_output.interval : 1.;
+  generic_solid_end = solid_time_output ? c->solid_output.end : HUGE;
   mu = generic_mu;
   alpha = generic_alpha;
   rho = generic_rho;
@@ -904,19 +973,47 @@ static int basilisk_xml_schedule (elff_xml_node_t node,
     return 1;
   if (!node)
     return 0;
-  elff_xml_node_t time = NULL;
+  elff_xml_node_t time = NULL, iterations = NULL;
   if (basilisk_xml_optional (node, "SimulationTime", &time, error))
     return 1;
+  if (basilisk_xml_optional (node, "IterationSchedule", &iterations, error))
+    return 1;
+  if (time && iterations)
+    return basilisk_xml_error (
+      error, 0, "Choose either SimulationTime or IterationSchedule output.");
   if (time &&
       (elff_xml_node_attribute_double_or (time, "step", schedule->interval, &schedule->interval, error) !=
          ELFF_XML_OK ||
        elff_xml_node_attribute_double_or (time, "end", end, &schedule->end, error) !=
          ELFF_XML_OK))
     return 1;
-  // Retain the historical first output at one interval, not at t = 0.
-  schedule->start = schedule->interval;
+  if (time) {
+    schedule->kind = BASILISK_OUTPUT_SIMULATION_TIME;
+    // Retain the historical first time-based output at one interval, not at t = 0.
+    schedule->start = schedule->interval;
+  }
+  if (iterations) {
+    schedule->kind = BASILISK_OUTPUT_ITERATIONS;
+    schedule->iteration_start = 0;
+    schedule->iteration_end = INT_MAX;
+    if (elff_xml_node_attribute_int (
+          iterations, "step", &schedule->iteration_interval, error) != ELFF_XML_OK)
+      return 1;
+    elff_xml_status status = elff_xml_node_attribute_int (
+      iterations, "start", &schedule->iteration_start, error);
+    if (status == ELFF_XML_NOT_FOUND)
+      elff_xml_error_clear (error);
+    else if (status != ELFF_XML_OK)
+      return 1;
+    status = elff_xml_node_attribute_int (
+      iterations, "end", &schedule->iteration_end, error);
+    if (status == ELFF_XML_NOT_FOUND)
+      elff_xml_error_clear (error);
+    else if (status != ELFF_XML_OK)
+      return 1;
+  }
   if (!generic_schedule_valid (*schedule))
-    return basilisk_xml_error (error, 0, "Invalid simulation-time output schedule.");
+    return basilisk_xml_error (error, 0, "Invalid output schedule.");
   return 0;
 }
 
@@ -938,7 +1035,8 @@ static int basilisk_xml_output_fields (elff_xml_node_t node,
     elff_xml_node_t child = NULL; const char* tag = NULL;
     if (elff_xml_node_element_child_at(node, j, &child, error) != ELFF_XML_OK ||
         elff_xml_node_name(child, &tag, error) != ELFF_XML_OK) return 1;
-    if (strcmp(tag, "SimulationTime")) ++field_count;
+    if (strcmp(tag, "SimulationTime") && strcmp(tag, "IterationSchedule"))
+      ++field_count;
   }
   if (!field_count) return 0;
   free(*fields); *fields = NULL; *count = 0;
@@ -951,7 +1049,7 @@ static int basilisk_xml_output_fields (elff_xml_node_t node,
     if (elff_xml_node_element_child_at (node, j, &child, error) != ELFF_XML_OK ||
         elff_xml_node_name (child, &tag, error) != ELFF_XML_OK)
       return 1;
-    if (!strcmp (tag, "SimulationTime"))
+    if (!strcmp (tag, "SimulationTime") || !strcmp (tag, "IterationSchedule"))
       continue;
     bool vector_field = !strcmp (tag, solid ? "IBVectorField" : "VectorField");
     if (!vector_field && strcmp (tag, solid ? "IBScalarField" : "ScalarField"))
@@ -1129,6 +1227,17 @@ static int basilisk_xml_case_read (elff_xml_document_t document,
   if (time) {
     XML_ATTR(elff_xml_node_attribute_double(time, "step", &c->time_max_dt, error));
     XML_ATTR(elff_xml_node_attribute_double(time, "end", &c->time_end, error));
+    char mode[32] = "exact";
+    XML_ATTR(elff_xml_node_attribute_string(
+      time, "endMode", mode, sizeof(mode), NULL, error));
+    if (!strcmp(mode, "exact"))
+      c->time_end_mode = BASILISK_END_EXACT;
+    else if (!strcmp(mode, "after-step"))
+      c->time_end_mode = BASILISK_END_AFTER_STEP;
+    else {
+      basilisk_xml_case_destroy(&parsed);
+      return basilisk_xml_error(error, 0, "Time endMode must be exact or after-step.");
+    }
   }
   // Default schedules follow the merged run duration unless XML supplies an end.
   c->fluid_output.end = c->solid_output.end = c->time_end;
