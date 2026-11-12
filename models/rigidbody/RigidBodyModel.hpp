@@ -25,6 +25,10 @@ public:
   void initialize();
   void step(real_t dt, const std::vector<Vec3>& traction_world);
 
+  /** @brief Advance with integrated world force and torque about the COM. */
+  void step(real_t dt, const Vec3& force_world, const Vec3& torque_world);
+  real_t mass() const { return mass_; }
+
   const Vec3& center_of_mass() const { return x_com_world_; }
   const Vec3& com_velocity() const { return v_com_world_; }
   real_t time() const { return t_; }
@@ -47,7 +51,6 @@ protected:
   void reset_time_integration_state();
   void set_time_integration_state(real_t t, size_t time_iter);
   void set_mass(real_t mass);
-  real_t mass() const { return mass_; }
 
   void set_center_of_mass(const Vec3& x_com_world)
   {

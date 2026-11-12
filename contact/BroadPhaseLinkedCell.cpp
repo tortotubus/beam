@@ -62,15 +62,7 @@ void BroadPhaseLinkedCell::insert(ShapeId id, const AABB& bounds)
 
 std::vector<ShapePair> BroadPhaseLinkedCell::candidate_pairs() const
 {
-  std::vector<ShapePair> pairs;
-  for (const auto& cell : cells_)
-    for (std::size_t i = 0; i < cell.shapes.size(); ++i)
-      for (std::size_t j = i + 1; j < cell.shapes.size(); ++j)
-        if (cell.shapes[i] != cell.shapes[j])
-          pairs.emplace_back(std::minmax(cell.shapes[i], cell.shapes[j]));
-  std::sort(pairs.begin(), pairs.end());
-  pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
-  return pairs;
+  return candidate_pairs_if([](ShapeId, ShapeId) { return true; });
 }
 
 std::vector<ShapePair>

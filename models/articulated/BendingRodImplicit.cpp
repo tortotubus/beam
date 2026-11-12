@@ -502,6 +502,23 @@ void BendingRodImplicit::advance(real_t dt, const std::vector<Vec3> &loads) {
   update_mesh();
 }
 
+void BendingRodImplicit::solve_integrated(real_t dt, const std::vector<Vector>& loads) {
+  std::vector<Vec3> forces;
+  forces.reserve(loads.size());
+  for(const auto& force : loads) forces.emplace_back(force[0],force[1],force[2]);
+  advance(dt,forces);
+}
+
+std::vector<real_t> BendingRodImplicit::nodal_masses() const {
+  std::vector<real_t> result(static_cast<size_t>(n_)+1,0);
+  for(int i=0;i<n_;++i) {
+    const real_t mass=masses_[boundary_==Boundary::PinnedRight ? n_-1-i : i];
+    result[i]+=mass/2;
+    result[i+1]+=mass/2;
+  }
+  return result;
+}
+
 void BendingRodImplicit::pack_state(ModelState &s) const {
   // Version 2 removes built-in gravity from the structural payload.
   s.ints = {2, n_, static_cast<int64_t>(boundary_), max_iterations_,

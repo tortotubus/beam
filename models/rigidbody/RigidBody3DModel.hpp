@@ -1,4 +1,5 @@
 #pragma once
+#include "elff/contact/Wrench.hpp"
 
 #include "elff/config/config.hpp"
 #include "elff/general/error.hpp"
@@ -21,6 +22,15 @@ public:
 
   const RigidBody3DMesh& mesh() const { return mesh_; }
   RigidBody3DMesh& mesh() { return mesh_; }
+  /** @brief World position of a body-coordinate point. */
+  Vec3 world_point(const Vec3& point) const;
+  Vec3 angular_velocity_world() const;
+  Vec3 velocity_at_world(const Vec3& point) const;
+  /** @brief Axisymmetric split integration; kicks do not advance clocks. */
+  void kick(real_t dt, const Contact::Wrench& wrench);
+  void drift(real_t dt);
+  void verify_axisymmetric_inertia() const;
+
   const std::array<real_t, 4>& pose() const { return q_bw_; }
   const Vec3& angular_velocity_body() const { return omega_body_; }
   const Vec3& angular_momentum_body() const { return L_body_; }
@@ -61,6 +71,7 @@ protected:
                                          const Vec3& L_body) const;
 
 private:
+  friend class RigidContactBody;
   RigidBody3DMesh mesh_;
   Mat3 I_body_ = { { { 1., 0., 0. }, { 0., 1., 0. }, { 0., 0., 1. } } };
   Mat3 I_body_inv_ = { { { 1., 0., 0. }, { 0., 1., 0. }, { 0., 0., 1. } } };

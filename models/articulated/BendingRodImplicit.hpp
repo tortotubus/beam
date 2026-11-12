@@ -150,6 +150,10 @@ public:
    * step updates the common mesh positions and velocities.
    */
   void solve(real_t dt, const std::vector<Vector>& load) override;
+  /** @brief Advance with integrated nodal forces, bypassing line quadrature. */
+  virtual void solve_integrated(real_t dt, const std::vector<Vector>& nodal_forces);
+  /** @brief Endpoint masses producing the exact gravity load on each rigid link. */
+  std::vector<real_t> nodal_masses() const;
   /**
    * @brief Initialize the structural state from nodal positions and velocities.
    * @param mesh Mesh with the same node count and length as the solver.

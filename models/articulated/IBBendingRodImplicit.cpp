@@ -62,6 +62,17 @@ void IBBendingRodImplicit::solve(real_t dt, const std::vector<Vector>& density)
   syncMeshes();
 }
 
+void IBBendingRodImplicit::solve_integrated(real_t dt, const std::vector<Vector>& forces)
+{
+  BendingRodImplicit::solve_integrated(dt, forces);
+  for(size_t i=0;i<mesh.GetNumberOfPoints();++i) {
+    const real_t measure=mesh.GetMeasures()[i];
+    const auto force=forces.empty() ? Vector{} : forces[i];
+    mesh.GetForces()[i]={force[0]/measure,force[1]/measure,force[2]/measure};
+  }
+  syncMeshes();
+}
+
 void IBBendingRodImplicit::pack_state(ModelState &s) const
 {
   BendingRodImplicit::pack_state(s);

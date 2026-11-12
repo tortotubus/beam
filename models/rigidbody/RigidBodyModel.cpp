@@ -1,4 +1,5 @@
 #include "elff/models/rigidbody/RigidBodyModel.hpp"
+#include <cmath>
 
 namespace ELFF {
 namespace Models {
@@ -26,6 +27,18 @@ RigidBodyModel::step(real_t dt, const std::vector<Vec3>& traction_world)
   const Vec3 tau_world =
     integrate_torque_world_about_com(traction_world, x_com_world_);
 
+  step(dt, F_world, tau_world);
+}
+
+void
+RigidBodyModel::step(real_t dt, const Vec3& F_world, const Vec3& tau_world)
+{
+  verify_initialized_for_step("Rigid body must be initialized.");
+  verify_positive_dt(dt, "Rigid-body timestep must be finite and positive.");
+  for (size_t d = 0; d < 3; ++d) {
+    ELFF_VERIFY(std::isfinite(F_world[d]) && std::isfinite(tau_world[d]),
+                "Rigid-body wrench must be finite.");
+  }
   const Vec3 a_world = mul(1. / mass_, F_world);
   v_com_world_ = add(v_com_world_, mul(dt, a_world));
   x_com_world_ = add(x_com_world_, mul(dt, v_com_world_));
@@ -108,7 +121,7 @@ RigidBodyModel::verify_initialized_for_step(const char* context) const
 void
 RigidBodyModel::verify_positive_dt(real_t dt, const char* context) const
 {
-  ELFF_VERIFY(dt > 0., context);
+  ELFF_VERIFY(std::isfinite(dt) && dt > 0., context);
 }
 
 void

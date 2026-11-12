@@ -1,4 +1,5 @@
 #pragma once
+#include "elff/contact/CollisionGeometry.hpp"
 
 #include "elff/models/rigidbody/RigidBody3DModel.hpp"
 
@@ -18,9 +19,13 @@ namespace Models {
  * \f( m = \rho\,\frac{4}{3}\pi R^3 \f),
  * \f( \mathbf{I} = \frac{2}{5}mR^2\mathbf{I}_3 \f).
  */
-class RigidBodySphere : public RigidBody3DModel
+class RigidBodySphere : public RigidBody3DModel, public Contact::CollisionGeometryProvider
 {
 public:
+  /** @brief Analytic body-coordinate collision geometry, independent of markers. */
+  Contact::CollisionShape collision_shape() const override {
+    return Contact::SphereGeometry{{0, 0, 0}, radius_};
+  }
   /**
    * @brief Construct a sphere model.
    * @param radius Sphere radius \f( R > 0 \f)

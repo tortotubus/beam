@@ -1,6 +1,7 @@
 #pragma once
 
 #include "elff/contact/BroadPhase.hpp"
+#include <algorithm>
 #include <cstddef>
 
 namespace ELFF::Contact {
@@ -39,6 +40,24 @@ public:
   /** @brief Return sorted unique candidate pairs; geometric false positives are allowed. */
   std::vector<ShapePair> candidate_pairs() const override;
 
+  /** @brief Apply eligibility before emitting, sorting or deduplicating pairs.
+   * The predicate receives inserted shape IDs (in arbitrary order), can be
+   * evaluated repeatedly for the same pair, and must not modify the grid.
+   */
+  template <class Predicate> std::vector<ShapePair> candidate_pairs_if(Predicate eligible) const {
+    std::vector<ShapePair> pairs;
+    for (const auto& cell : cells_)
+      for (std::size_t i = 0; i < cell.shapes.size(); ++i)
+        for (std::size_t j = i + 1; j < cell.shapes.size(); ++j) {
+          const auto a = cell.shapes[i], b = cell.shapes[j];
+          if (a != b && eligible(a, b))
+            pairs.emplace_back(std::minmax(a, b));
+        }
+    std::sort(pairs.begin(), pairs.end());
+    pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+    return pairs;
+  }
+
   /**
    * @brief Return sorted unique pairs across two disjoint groups of shape IDs.
    * @param first_candidate IDs below this value are obstacles; all others are candidates.
@@ -50,11 +69,13 @@ public:
 
 private:
   /** @brief Shape identifiers occupying a single grid cell. */
-  struct Cell { std::vector<ShapeId> shapes; };
+  struct Cell {
+    std::vector<ShapeId> shapes;
+  };
 
-  std::array<real_t, 3> origin_; /**< @brief Lower domain corner. */
-  std::array<real_t, 3> upper_; /**< @brief Closed upper domain corner. */
-  real_t cell_width_; /**< @brief Uniform cell width. */
+  std::array<real_t, 3> origin_;          /**< @brief Lower domain corner. */
+  std::array<real_t, 3> upper_;           /**< @brief Closed upper domain corner. */
+  real_t cell_width_;                   /**< @brief Uniform cell width. */
   std::array<std::size_t, 3> dimensions_; /**< @brief Cell counts in each direction. */
   std::vector<Cell> cells_; /**< @brief Dense storage, indexed by x + nx * (y + ny * z). */
 };

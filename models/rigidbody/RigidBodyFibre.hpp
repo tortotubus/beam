@@ -1,4 +1,5 @@
 #pragma once
+#include "elff/contact/CollisionGeometry.hpp"
 
 #include "elff/models/rigidbody/RigidBody3DModel.hpp"
 #include "elff/contact/ContactGeometryProvider.hpp"
@@ -10,12 +11,16 @@ namespace Models {
  * @brief Centerline-only rigid fibre with solid-cylinder mass properties.
  *
  * The immersed-boundary markers lie on the body-frame x-axis and use
- * trapezoidal line quadrature. The supplied diameter is used only for mass
- * properties so that the 3D inertia tensor is nonsingular.
+ * trapezoidal line quadrature. The diameter sets the solid-cylinder mass properties and the capsule
+ * collision radius. Capsule caps extend beyond the centerline endpoints.
  */
-class RigidBodyFibre : public RigidBody3DModel, public Contact::ContactGeometryProvider
+class RigidBodyFibre : public RigidBody3DModel, public Contact::ContactGeometryProvider, public Contact::CollisionGeometryProvider
 {
 public:
+  /** @brief Analytic body-coordinate collision geometry, independent of markers. */
+  Contact::CollisionShape collision_shape() const override {
+    return Contact::CapsuleGeometry{{{-length_ / 2, 0, 0}, {length_ / 2, 0, 0}}, diameter_ / 2};
+  }
   /** @brief Borrow the world-space centreline for insertion clearance checks. */
   Contact::PolylineView contact_geometry() const override {
     const auto& points = mesh().world_points();

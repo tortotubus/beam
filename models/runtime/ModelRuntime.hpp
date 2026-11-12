@@ -40,7 +40,10 @@ enum class ModelType : int32_t
   PinnedRigidBodyFibre = 11,
   PinnedRigidBodySphere = 12,
   SpringCircle = 13,
-  BendingRodImplicit = 14
+  BendingRodImplicit = 14,
+  DryRigidBodySphere = 15,
+  DryRigidBodyFibre = 16,
+  DryBendingRodImplicit = 17
 };
 
 struct RuntimeModelState
