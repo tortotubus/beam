@@ -27,12 +27,6 @@ option(ELFF_BUILD_THIRD_PARTY_LIBXML2 "Build libxml2" OFF)
 option(ELFF_USE_EIGEN3 "Enable the use of Eigen3" ON)
 option(ELFF_BUILD_THIRD_PARTY_EIGEN3 "Build Eigen" OFF)
 
-option(ELFF_USE_AMREX "Enable the use of AMReX" ON)
-option(ELFF_BUILD_THIRD_PARTY_AMREX "Build AMReX" ON)
-
-option(ELFF_USE_AMREX_HYDRO "Enable the use of AMReX Hydro" ON)
-option(ELFF_BUILD_THIRD_PARTY_AMREX_HYDRO "Build AMReX Hydro" ON)
-
 option(ELFF_USE_BASILISK "Enable the basilisk subproject" ON)
 option(ELFF_BUILD_THIRD_PARTY_BASILISK "Build Basilisk" ON)
 
