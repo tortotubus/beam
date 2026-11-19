@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 
 #include "library/ibm/IBConfig.h"
 #include "library/ibm/IBMacros.h"
@@ -19,6 +20,8 @@ typedef struct {
   int mesh_gid; /**< Stable logical mesh identity. */
   int node_lid; /**< Stable node id within the logical mesh. */
   int touched_epoch; /**< Sparse-node liveness marker. */
+  // Keep the trailing double field storage aligned as well as saving the owner.
+  int64_t force_input_pid; /**< Pre-adaptation force owner; -2 means use pid. */
 } IBNode;
 
 #include "library/ibm/IBFields.h"
@@ -70,6 +73,7 @@ int ibnode_init (IBNode* node) {
   }
  
   node->depth = 0; 
+  node->force_input_pid = -2;
   node->mesh_gid = -1;
   node->node_lid = -1;
   node->touched_epoch = 0;

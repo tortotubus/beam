@@ -578,6 +578,24 @@ static void ibmeshmanager_temp_node_free (IBNode* node) {
   free (node);
 }
 
+/** Preserve the source of accumulated forces while the grid is repartitioned.
+ * Sparse replicas remain alive until the next model advance publishes geometry.
+ * Consume their forces through the existing reduction before pruning them.
+ */
+static void ibmeshmanager_save_force_input_owners () {
+  ibmeshmanager_update_pid ();
+  foreach_ibmesh () {
+    if (!mesh->sparse_managed || mesh->model.type != IB_MODEL_FORCE_COUPLED)
+      continue;
+    for (size_t ni = 0; ni < mesh->nodes.size; ++ni) {
+      IBNode* node = mesh->nodes.ptrs[ni];
+      // Multiple adaptations may occur before the force is consumed.
+      if (node->force_input_pid == -2)
+        node->force_input_pid = node->pid;
+    }
+  }
+}
+
 static void ibmeshmanager_reduce_fields_to_mesh_owner_sparse (IBMesh* mesh,
                                                               IBscalar* fields) {
   if (!mesh || !fields)
@@ -601,9 +619,11 @@ static void ibmeshmanager_reduce_fields_to_mesh_owner_sparse (IBMesh* mesh,
     IBNode* node = mesh->nodes.ptrs[ni];
     if (!node || node->node_lid < 0 || node->node_lid >= nn)
       continue;
-    // Force inputs are complete nodal values, also present on support replicas.
-    // Count only the center owner, matching the dense force-coupled contract.
-    if (mesh->model.type == IB_MODEL_FORCE_COUPLED && node->pid != pid ())
+    // Repartitioning may change the center owner before its replica exists.
+    // The old replica still holds the complete force from the previous step.
+    int input_pid = node->force_input_pid == -2 ? node->pid : node->force_input_pid;
+    node->force_input_pid = -2;
+    if (mesh->model.type == IB_MODEL_FORCE_COUPLED && input_pid != pid ())
       continue;
 
     int si = 0;

@@ -59,6 +59,11 @@ astats adapt_wavelet_ibm (
 
   minlevel = init ? grid->depth : minlevel;
 
+#if _MPI
+  if (!init)
+    ibmeshmanager_save_force_input_owners ();
+#endif
+
   for (int i = 0; i < max_iter; i++) {
     for (int li = 0; li < n - 1; li++) {
       max_c[li] = max[li];
